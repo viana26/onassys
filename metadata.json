@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Mini Fábrica de Salgados",
+  "description": "Sistema de controle de estoque, fichas técnicas, produção e pedidos para mini fábricas de salgados, bolos e doces.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
