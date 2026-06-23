@@ -6,6 +6,20 @@ import Produtos from './components/Produtos';
 import EstoqueProdutos from './components/EstoqueProdutos';
 import Clientes from './components/Clientes';
 import Pedidos from './components/Pedidos';
+import SetupInstructions from './components/SetupInstructions';
+import Login from './components/Login';
+import AddAdmin from './components/AddAdmin';
+import Usuarios from './components/Usuarios';
+import DataMigrator from './components/DataMigrator';
+import { 
+    isSupabaseConfigured, 
+    verificarAdminExiste,
+    onAuthStateChange, 
+    signOut,
+    supabase,
+    checkDatabaseEmpty 
+} from './lib/supabaseClient';
+import { User } from '@supabase/supabase-js';
 
 import { 
   Beef, 
@@ -16,34 +30,102 @@ import {
   Warehouse, 
   Users, 
   ShoppingBag, 
+  Shield,
   PlusCircle,
   Menu,
   X,
   Plus,
   Sun,
-  Moon
+  Moon,
+  LogOut
 } from 'lucide-react';
 
+type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'sync' | 'app';
+
 export default function App() {
-  // Global transactional store instance memoized (so we don't recreate it on renders)
-  const store = useMemo(() => new MiniFactoryStore(), []);
-  
-  // Update listener to trigger re-renders
+  // =====================================================
+  // AUTH STATE (all hooks at top)
+  // =====================================================
+  const [authScreen, setAuthScreen] = useState<AuthScreen>('loading');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // =====================================================
+  // STORE AND APP STATE (only mounted when authenticated)
+  // =====================================================
+  const [store, setStore] = useState<MiniFactoryStore | null>(null);
   const [updateTick, setUpdateTick] = useState(0);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
+  const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
+
+  // =====================================================
+  // EFFECTS - Auth
+  // =====================================================
   useEffect(() => {
-    return store.subscribe(() => {
-      setUpdateTick(prev => prev + 1);
+    const initAuth = async () => {
+      if (!isSupabaseConfigured()) {
+        setAuthScreen('setup');
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setCurrentUser(session.user);
+          setAuthScreen('sync');
+        } else {
+          const adminExiste = await verificarAdminExiste();
+          setAuthScreen(adminExiste ? 'login' : 'add-admin');
+        }
+      } catch {
+        setAuthScreen('setup');
+      }
+    };
+
+    initAuth();
+
+    const unsubscribe = onAuthStateChange(async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        setAuthScreen('sync');
+      } else {
+        setCurrentUser(null);
+        setStore(null);
+        const adminExiste = await verificarAdminExiste();
+        setAuthScreen(adminExiste ? 'login' : 'add-admin');
+      }
     });
-  }, [store]);
 
-  // Theme selector state
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return () => unsubscribe();
+  }, []);
+
+  // =====================================================
+  // EFFECTS - Store initialization
+  // =====================================================
+  useEffect(() => {
+    if (authScreen === 'app') {
+      const miniStore = new MiniFactoryStore();
+      setStore(miniStore);
+      
+      const unsubscribe = miniStore.subscribe(() => {
+        setUpdateTick(prev => prev + 1);
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [authScreen]);
+
+  // =====================================================
+  // EFFECTS - Theme
+  // =====================================================
+  useEffect(() => {
     const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || saved === 'light') return saved;
-    return 'light';
-  });
+    if (saved === 'dark' || saved === 'light') setTheme(saved);
+  }, []);
 
-  // Apply dark class to root document element dynamically
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -53,20 +135,26 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Root Navigation Tabs Router state
-  // Supported tabs: 'dashboard', 'materiais', 'produtos', 'estoque', 'clientes', 'pedidos'
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  // =====================================================
+  // HANDLERS
+  // =====================================================
+  const handleLoginSuccess = () => {
+    setAuthScreen('app');
+  };
 
-  // Sidebar toggle state for intermediate tablet sizes
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const handleAddAdminSuccess = () => {
+    setAuthScreen('login');
+  };
 
-  // References to trigger specific quick-action modals across components
-  const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
-  const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
+  const handleLogout = async () => {
+    await signOut();
+    setCurrentUser(null);
+    setStore(null);
+    setAuthScreen('login');
+  };
 
   const handleQuickOrder = () => {
     setCurrentTab('pedidos');
-    // Tick to ensure page loads previous changes, then trigger
     setTimeout(() => {
       if (newOrderTriggerRef.current.trigger) {
         newOrderTriggerRef.current.trigger();
@@ -76,24 +164,68 @@ export default function App() {
 
   const handleQuickLot = () => {
     setCurrentTab('estoque');
-    // Tick to ensure page loads previous changes, then trigger
     setTimeout(() => {
-      // In Estoque page, we can open the production lote form
-      const lotButton = document.querySelector('[id="estoque-tab"] button') || document.querySelector('button:contains("Lançar Lote de Produção")');
       const event = new MouseEvent('click', { bubbles: true, cancelable: true });
       document.querySelector('button[class*="bg-emerald-600"]')?.dispatchEvent(event);
     }, 50);
   };
 
+  // =====================================================
+  // RENDER - Early returns AFTER all hooks
+  // =====================================================
+  if (authScreen === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex items-center justify-center">
+        <div className="animate-pulse text-[#5c4a37] dark:text-amber-100/60">Carregando...</div>
+      </div>
+    );
+  }
+
+  if (authScreen === 'setup') {
+    return <SetupInstructions />;
+  }
+
+  if (authScreen === 'add-admin') {
+    return (
+      <AddAdmin 
+        onSuccess={handleAddAdminSuccess} 
+        onBack={() => setAuthScreen('login')} 
+      />
+    );
+  }
+
+  if (authScreen === 'login') {
+    return (
+      <Login 
+        onLoginSuccess={handleLoginSuccess} 
+        onNavigateToAddAdmin={() => setAuthScreen('add-admin')} 
+      />
+    );
+  }
+
+  if (authScreen === 'sync') {
+    return (
+      <DataMigrator onComplete={() => setAuthScreen('app')} />
+    );
+  }
+
+  // =====================================================
+  // APP PRINCIPAL
+  // =====================================================
+  if (!store) {
+    return (
+      <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex items-center justify-center">
+        <div className="animate-pulse text-[#5c4a37] dark:text-amber-100/60">Inicializando...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex flex-col md:flex-row relative text-[#2e2315] dark:text-[#f7f4f0] transition-colors duration-200">
       
-      {/* ---------------------------------------------------- */}
       {/* DESKTOP SIDEBAR */}
-      {/* ---------------------------------------------------- */}
       <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 justify-between border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
         <div className="space-y-6">
-          {/* Logo Brand / Header */}
           <div className="flex items-center gap-2.5 lg:gap-3 pb-4 border-b border-[#ebdcc9] dark:border-[#1e1005]">
             <div className="bg-amber-600 p-1.5 lg:p-2 rounded-xl text-amber-950 shrink-0">
               <ChefHat size={20} />
@@ -104,7 +236,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Nav menu links */}
           <nav className="space-y-1" id="desktop-nav">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} /> },
@@ -113,6 +244,7 @@ export default function App() {
               { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} /> },
               { id: 'clientes', label: 'Clientes', icon: <Users size={15} /> },
               { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} /> },
+              { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} /> },
             ].map(item => {
               const active = currentTab === item.id;
               return (
@@ -137,7 +269,6 @@ export default function App() {
         </div>
 
         <div className="space-y-4 pt-4 border-t border-[#ebdcc9] dark:border-[#1e1005]">
-          {/* Dynamic Theme Selection Switch */}
           <div className="flex items-center justify-between bg-[#f0eade] dark:bg-[#130b04] p-1 rounded-xl border border-[#ebdcc9] dark:border-[#1e1005]">
             <button
               onClick={() => setTheme('light')}
@@ -163,17 +294,25 @@ export default function App() {
             </button>
           </div>
 
-          {/* User Account / Context */}
-          <div className="text-xs space-y-1 text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
-            <p className="font-semibold text-amber-700 dark:text-amber-400 font-sans truncate">vianapessoal@gmail.com</p>
-            <p className="text-[9px]">Sessão Administrador | V.1.0</p>
+          <div className="text-xs space-y-2">
+            <div className="text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
+              <p className="font-semibold text-amber-700 dark:text-amber-400 font-sans truncate">
+                {currentUser?.email || 'Usuário'}
+              </p>
+              <p className="text-[9px]">Administrador | V.1.0</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-medium text-[#5c4a37]/60 dark:text-amber-100/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+            >
+              <LogOut size={12} />
+              <span>Sair</span>
+            </button>
           </div>
         </div>
       </aside>
 
-      {/* ---------------------------------------------------- */}
       {/* MOBILE HEADER */}
-      {/* ---------------------------------------------------- */}
       <header className="md:hidden bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-100 p-4 border-b border-[#ebdcc9] dark:border-[#1e1005] flex items-center justify-between sticky top-0 z-40 transition-colors duration-200">
         <div className="flex items-center gap-2">
           <div className="bg-amber-600 p-1.5 rounded-lg text-amber-950">
@@ -183,11 +322,9 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Theme Quick Switcher for Mobile */}
           <button
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
             className="p-1.5 rounded-lg bg-[#f0eade] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#1e1005] text-amber-700 dark:text-amber-400 hover:opacity-85 transition"
-            title="Alternar Tema Claro/Escuro"
           >
             {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
           </button>
@@ -198,12 +335,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* ---------------------------------------------------- */}
       {/* MAIN VIEWPORT BODY */}
-      {/* ---------------------------------------------------- */}
       <main className="flex-1 p-5 md:p-8 pb-20 md:pb-8 w-full max-w-7xl mx-auto overflow-x-hidden space-y-6">
         
-        {/* Render Tab elements dynamically */}
         {currentTab === 'dashboard' && (
           <Dashboard 
             store={store} 
@@ -237,11 +371,13 @@ export default function App() {
           />
         )}
 
+        {currentTab === 'usuarios' && (
+          <Usuarios />
+        )}
+
       </main>
 
-      {/* ---------------------------------------------------- */}
       {/* MOBILE BOTTOM NAVIGATION BAR */}
-      {/* ---------------------------------------------------- */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#f8f5ee] dark:bg-[#0c0703] border-t border-[#ebdcc9] dark:border-[#1e1005] text-[#2e2315] dark:text-amber-100 flex items-center justify-around py-2 px-1 z-40 shadow-xl navbar-mobile transition-colors duration-200">
         {[
           { id: 'dashboard', label: 'Monitor', icon: <LayoutDashboard size={18} /> },
@@ -264,7 +400,6 @@ export default function App() {
           );
         })}
 
-        {/* Quick floating central ADD order buttons shortcut */}
         <button
           onClick={handleQuickOrder}
           id="btn-mobile-fab-add"

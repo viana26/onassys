@@ -9,6 +9,9 @@ if (typeof dns.setDefaultResultOrder === 'function') {
   dns.setDefaultResultOrder('ipv4first');
 }
 
+// Workaround para certificados auto-assinados (desenvolvimento)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 // Carrega variáveis de ambiente do .env
 dotenv.config();
 
@@ -40,7 +43,8 @@ if (!dbUrl) {
 const client = new Client({
   connectionString: dbUrl,
   ssl: {
-    rejectUnauthorized: false // Requerido por segurança nas conexões do Supabase SSL
+    rejectUnauthorized: false,
+    sslmode: 'require'
   }
 });
 

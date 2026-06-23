@@ -149,8 +149,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
     onUpdate();
   };
 
-  const handleTransitionStatus = (pedId: string, novoSt: PedidoStatus) => {
-    const result = store.updatePedidoStatus(pedId, novoSt);
+  const handleTransitionStatus = async (pedId: string, novoSt: PedidoStatus) => {
+    const result = await store.updatePedidoStatus(pedId, novoSt);
     if (!result.success) {
       alert(result.error);
     } else {
