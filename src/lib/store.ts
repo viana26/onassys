@@ -461,48 +461,54 @@ export class MiniFactoryStore {
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const fromStatus = pedido.status_id;
 
-if (fromStatus === 1 && status_id === 2) {
-        // Reservar estoque disponível para o pedido confirmado
-        const itensConfirm = this.itensPedido.filter(i => i.pedido_id === id);
-        for (const it of itensConfirm) {
-          const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
-          if (estoque) {
-            // mover do disponivel para reservada
-            const moverQtd = Math.min(it.quantidade_solicitada, estoque.quantidade_disponivel);
-            estoque.quantidade_disponivel -= moverQtd;
-            estoque.quantidade_reservada += moverQtd;
-            estoque.data_atualizacao = new Date().toISOString();
-            await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
-          }
+    // 1 → 2: confirmar pedido (reservar estoque disponível)
+    if (fromStatus === 1 && status_id === 2) {
+      const itensConfirm = this.itensPedido.filter(i => i.pedido_id === id);
+      for (const it of itensConfirm) {
+        const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
+        if (estoque) {
+          const moverQtd = Math.min(it.quantidade_solicitada, estoque.quantidade_disponivel);
+          estoque.quantidade_disponivel -= moverQtd;
+          estoque.quantidade_reservada += moverQtd;
+          estoque.data_atualizacao = new Date().toISOString();
+          await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
         }
       }
+    }
 
-      // Cancelamento libera reservas
-      if (status_id === 6) {
-        const itensCanc = this.itensPedido.filter(i => i.pedido_id === id);
-        for (const it of itensCanc) {
-          const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
-          if (estoque) {
-            estoque.quantidade_reservada -= it.quantidade_solicitada;
-            estoque.quantidade_disponivel += it.quantidade_solicitada;
-            estoque.data_atualizacao = new Date().toISOString();
-            await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
-          }
-        }
-      }
+    // 2 → 3: iniciar produção
+    if (fromStatus === 2 && status_id === 3) {
       const itens = this.itensPedido.filter(i => i.pedido_id === id);
       const result = await this.lancarProducao(itens, id);
       if (!result.success) return result;
     }
 
-    // 4 → 5: Entregar — baixar estoque de produtos
+    // Cancelamento (status 6): liberar reservas
+    if (status_id === 6) {
+      const itensCanc = this.itensPedido.filter(i => i.pedido_id === id);
+      for (const it of itensCanc) {
+        const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
+        if (estoque) {
+          estoque.quantidade_reservada -= it.quantidade_solicitada;
+          estoque.quantidade_disponivel += it.quantidade_solicitada;
+          estoque.data_atualizacao = new Date().toISOString();
+          await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+        }
+      }
+    }
+
+    // 4 → 5: entregar — baixar estoque de produtos
     if (fromStatus === 4 && status_id === 5) {
       const result = await this.lancarSaidaPedido(id);
       if (!result.success) return result;
     }
 
-    try { await this.updatePedido(id, { status_id }); return { success: true }; }
-    catch (e) { return { success: false, error: e instanceof Error ? e.message : 'Erro' }; }
+    try {
+      await this.updatePedido(id, { status_id });
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Erro' };
+    }
   }
 
   async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string): Promise<{ success: boolean; error?: string }> {
