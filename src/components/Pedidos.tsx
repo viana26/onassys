@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Pedido, ItemPedido, PedidoStatus, Cliente, Produto } from '../types';
+import { Pedido, Cliente } from '../types';
 import { 
   Plus, 
   Trash2, 
-  Edit3, 
   Search, 
   Calendar, 
   MapPin, 
@@ -13,44 +12,47 @@ import {
   AlertTriangle, 
   KanbanSquare, 
   ClipboardList, 
-  User, 
   PlusCircle, 
-  Minus, 
-  Layers, 
-  ChevronRight, 
   X,
-  Sparkles,
   DollarSign
 } from 'lucide-react';
 import { analisarEstoqueParaPedido } from '../lib/calculos';
+
+const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 interface PedidosProps {
   store: MiniFactoryStore;
   onUpdate: () => void;
   // Trigger order modal directly (used by quick dashboard buttons too)
   forceOpenNewOrderRef?: { trigger: () => void };
+  onNavigateToCaixa?: (pedidoId?: string) => void;
 }
 
-export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: PedidosProps) {
+export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavigateToCaixa }: PedidosProps) {
   const [activeTab, setActiveTab] = useState<'kanban' | 'carga' | 'lista'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Kanban columns active selection on mobile (Rule: display 1 column at a time on mobile with swipe navigation tabs)
-  const [mobileKanbanColumn, setMobileKanbanColumn] = useState<PedidoStatus>('confirmado');
+  const [mobileKanbanColumn, setMobileKanbanColumn] = useState<number>(2);
 
   // Form builder state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [clienteId, setClienteId] = useState('');
   const [dataEntrega, setDataEntrega] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const [status, setStatus] = useState<PedidoStatus>('confirmado');
+  const [statusId, setStatusId] = useState<number>(2);
   const [itensPedido, setItensPedido] = useState<{ produto_id: string; quantidade_solicitada: number; preco_unitario: number; observacao?: string }[]>([]);
 
   // Selected Order detail popup state
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(null);
   
+  // Edit mode
+  const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
+  
   // Live ingredient depletion analyzer inside Order Creator
   const [analiseResultado, setAnaliseResultado] = useState<ReturnType<typeof analisarEstoqueParaPedido> | null>(null);
+
+
 
   // Drag and drop states for Kanban columns
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
@@ -64,6 +66,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
   }
 
   const handleOpenNewOrder = () => {
+    setEditingPedidoId(null);
     setIsFormOpen(true);
     setClienteId(store.clientes[0]?.id || '');
     // sugiere fecha entrega: mañana a las 16h
@@ -72,10 +75,33 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
     const dateFormatted = amanha.toISOString().split('T')[0] + 'T16:00';
     setDataEntrega(dateFormatted);
     setObservacoes('');
-    setStatus('confirmado');
+    setStatusId(2);
     // Adiciona primeiramente uma coxinha
     setItensPedido([{ produto_id: store.produtos[0]?.id || '', quantidade_solicitada: 10, preco_unitario: 15.00 }]);
     setAnaliseResultado(null);
+  };
+
+  const handleOpenEditOrder = (pedidoId: string) => {
+    const pedido = store.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return;
+
+    setEditingPedidoId(pedidoId);
+    setClienteId(pedido.cliente_id);
+    setDataEntrega(pedido.data_entrega_prevista);
+    setObservacoes(pedido.observacoes || '');
+    setStatusId(pedido.status_id);
+
+    const itens = store.itensPedido.filter(it => it.pedido_id === pedidoId);
+    setItensPedido(itens.map(it => ({
+      produto_id: it.produto_id,
+      quantidade_solicitada: it.quantidade_solicitada,
+      preco_unitario: it.preco_unitario,
+      observacao: it.observacao
+    })));
+
+    setAnaliseResultado(null);
+    setSelectedPedidoId(null);
+    setIsFormOpen(true);
   };
 
   const handleAddItemRow = () => {
@@ -101,8 +127,10 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
       if (selectedProd) {
         // Suggested pricing system defaults
         let precoSugerido = 15.00;
-        if (selectedProd.categoria === 'bolo') precoSugerido = 80.00;
-        if (selectedProd.categoria === 'salgado' && selectedProd.unidade_producao === 'por unidade') precoSugerido = 2.50;
+        const catBolo = store.categorias.find(c => c.nome === 'bolo')?.id;
+        const catSalgado = store.categorias.find(c => c.nome === 'salgado')?.id;
+        if (selectedProd.categoria_id === catBolo) precoSugerido = 80.00;
+        if (selectedProd.categoria_id === catSalgado && selectedProd.unidade_producao_id === 5) precoSugerido = 2.50;
         next[idx].preco_unitario = precoSugerido;
       }
     }
@@ -121,7 +149,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
       };
     });
 
-    const res = analisarEstoqueParaPedido(formatados, store.estoqueProdutos, store.fichas, store.materiais);
+    const res = analisarEstoqueParaPedido(formatados, store.estoqueProdutos, store.fichas, store.materiais, store.unidades);
     setAnaliseResultado(res);
   };
 
@@ -136,20 +164,82 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
       return;
     }
 
+    if (editingPedidoId) {
+      // Update existing order
+      store.updatePedido(editingPedidoId, {
+        cliente_id: clienteId,
+        status_id: statusId,
+        data_entrega_prevista: dataEntrega,
+        observacoes: observacoes,
+        criado_by: 'Cozinha'
+      });
+
+      const existingItens = store.itensPedido.filter(it => it.pedido_id === editingPedidoId);
+      const newItemKeys = itensPedido.map(item => `${item.produto_id}_${item.preco_unitario}_${item.observacao || ''}`);
+
+      // Remove items that are no longer in the list
+      existingItens.forEach(existingItem => {
+        const key = `${existingItem.produto_id}_${existingItem.preco_unitario}_${existingItem.observacao || ''}`;
+        if (!newItemKeys.includes(key)) {
+          store.deleteItemPedido(existingItem.id);
+        }
+      });
+
+      // Add or update items
+      itensPedido.forEach((item, idx) => {
+        const existing = existingItens[idx];
+        if (existing) {
+          store.updateItemPedido(existing.id, {
+            produto_id: item.produto_id,
+            quantidade_solicitada: item.quantidade_solicitada,
+            preco_unitario: item.preco_unitario,
+            observacao: item.observacao
+          });
+        } else {
+          store.addItemPedido({
+            pedido_id: editingPedidoId,
+            produto_id: item.produto_id,
+            quantidade_solicitada: item.quantidade_solicitada,
+            quantidade_produzida: 0,
+            preco_unitario: item.preco_unitario,
+            observacao: item.observacao
+          });
+        }
+      });
+
+      setEditingPedidoId(null);
+      setIsFormOpen(false);
+      onUpdate();
+      return;
+    }
+
     // Save order
-    store.addPedido({
+    const savedPedido = store.addPedido({
       cliente_id: clienteId,
-      status: status,
+      status_id: statusId,
       data_entrega_prevista: dataEntrega,
       observacoes: observacoes,
       criado_by: 'Cozinha'
-    }, itensPedido);
+    });
+
+    Promise.resolve(savedPedido).then(pedido => {
+      itensPedido.forEach(item => {
+        store.addItemPedido({
+          pedido_id: pedido.id,
+          produto_id: item.produto_id,
+          quantidade_solicitada: item.quantidade_solicitada,
+          quantidade_produzida: 0,
+          preco_unitario: item.preco_unitario,
+          observacao: item.observacao
+        });
+      });
+    });
 
     setIsFormOpen(false);
     onUpdate();
   };
 
-  const handleTransitionStatus = async (pedId: string, novoSt: PedidoStatus) => {
+  const handleTransitionStatus = async (pedId: string, novoSt: number) => {
     const result = await store.updatePedidoStatus(pedId, novoSt);
     if (!result.success) {
       alert(result.error);
@@ -167,9 +257,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
     return store.produtos.find(p => p.id === pid)?.nome || 'N/A';
   };
 
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  };
+  
 
   // Filters
   const filteredPedidos = store.pedidos.filter(p => {
@@ -199,7 +287,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
     }
 
     store.pedidos.forEach(p => {
-      if (['cancelado', 'entregue'].includes(p.status)) return;
+      if ([5, 6].includes(p.status_id)) return;
       const str = p.data_entrega_prevista.split('T')[0];
       if (daysData[str]) {
         daysData[str].pedidos.push(p);
@@ -209,9 +297,12 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
         itens.forEach(it => {
           const prod = store.produtos.find(prd => prd.id === it.produto_id);
           if (prod) {
-            if (prod.categoria === 'salgado') daysData[str].totalUnidadesSalgados += it.quantidade_solicitada;
-            if (prod.categoria === 'doce') daysData[str].totalUnidadesDoces += it.quantidade_solicitada;
-            if (prod.categoria === 'bolo') daysData[str].totalUnidadesBolos += it.quantidade_solicitada;
+            const catSalgado = store.categorias.find(c => c.nome === 'salgado')?.id;
+            const catDoce = store.categorias.find(c => c.nome === 'doce')?.id;
+            const catBolo = store.categorias.find(c => c.nome === 'bolo')?.id;
+            if (prod.categoria_id === catSalgado) daysData[str].totalUnidadesSalgados += it.quantidade_solicitada;
+            if (prod.categoria_id === catDoce) daysData[str].totalUnidadesDoces += it.quantidade_solicitada;
+            if (prod.categoria_id === catBolo) daysData[str].totalUnidadesBolos += it.quantidade_solicitada;
           }
         });
       }
@@ -276,14 +367,14 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
           {/* Mobile column controller tabs (Rule: 1 column at a time on mobile) */}
           <div className="flex sm:hidden overflow-x-auto gap-1.5 border border-amber-100 dark:border-[#22160b] p-1 bg-amber-50/20 dark:bg-[#1a1107]/50 rounded-xl no-scrollbar font-sans text-[10px] font-bold">
             {[
-              { status: 'confirmado', label: 'Aguardando ⏳' },
-              { status: 'em_producao', label: 'Cozinha 🥘' },
-              { status: 'pronto', label: 'Pronto 📦' },
-              { status: 'entregue', label: 'Entregue 🚚' }
+              { status: 2, label: 'Aguardando ⏳' },
+              { status: 3, label: 'Cozinha 🥘' },
+              { status: 4, label: 'Pronto 📦' },
+              { status: 5, label: 'Entregue 🚚' }
             ].map(col => (
               <button
                 key={col.status}
-                onClick={() => setMobileKanbanColumn(col.status as PedidoStatus)}
+                onClick={() => setMobileKanbanColumn(col.status)}
                 className={`flex-1 text-center py-2 px-1 rounded-lg transition-all ${
                   mobileKanbanColumn === col.status 
                     ? 'bg-amber-800 dark:bg-amber-700 text-white' 
@@ -298,12 +389,12 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="kanban-columns-container">
             {/* Compile Columns list */}
             {[
-              { id: 'confirmado', title: 'Aguardando Produção', color: 'bg-amber-50/45 dark:bg-[#1a1107]/40 border-amber-100 dark:border-[#382613]/55', text: 'text-amber-950 dark:text-amber-200', badge: 'bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200' },
-              { id: 'em_producao', title: 'Em Produção (Cozinha)', color: 'bg-indigo-50/20 dark:bg-[#111124]/30 border-indigo-100 dark:border-[#22224c]/40', text: 'text-indigo-900 dark:text-indigo-300', badge: 'bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-200' },
-              { id: 'pronto', title: 'Pronto p/ Entrega', color: 'bg-emerald-50/20 dark:bg-[#071a10]/30 border-emerald-100 dark:border-[#133c24]/40', text: 'text-emerald-900 dark:text-emerald-305', badge: 'bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' },
-              { id: 'entregue', title: 'Entregues Recentes', color: 'bg-gray-50/20 dark:bg-[#111111]/30 border-gray-100 dark:border-[#222222]/40', text: 'text-gray-650 dark:text-gray-300', badge: 'bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }
+              { id: 2, title: 'Aguardando Produção', color: 'bg-amber-50/45 dark:bg-[#1a1107]/40 border-amber-100 dark:border-[#382613]/55', text: 'text-amber-950 dark:text-amber-200', badge: 'bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200' },
+              { id: 3, title: 'Em Produção (Cozinha)', color: 'bg-indigo-50/20 dark:bg-[#111124]/30 border-indigo-100 dark:border-[#22224c]/40', text: 'text-indigo-900 dark:text-indigo-300', badge: 'bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-200' },
+              { id: 4, title: 'Pronto p/ Entrega', color: 'bg-emerald-50/20 dark:bg-[#071a10]/30 border-emerald-100 dark:border-[#133c24]/40', text: 'text-emerald-900 dark:text-emerald-305', badge: 'bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' },
+              { id: 5, title: 'Entregues Recentes', color: 'bg-gray-50/20 dark:bg-[#111111]/30 border-gray-100 dark:border-[#222222]/40', text: 'text-gray-650 dark:text-gray-300', badge: 'bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }
             ].map(col => {
-              const ordersInCol = filteredPedidos.filter(p => p.status === col.id);
+              const ordersInCol = filteredPedidos.filter(p => p.status_id === col.id);
               
               // Hide other columns on mobile if not active
               const isActiveOnMobile = mobileKanbanColumn === col.id;
@@ -330,7 +421,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                     e.preventDefault();
                     const orderId = e.dataTransfer.getData("text/plain") || draggedOrderId;
                     if (orderId) {
-                      handleTransitionStatus(orderId, col.id as PedidoStatus);
+                      handleTransitionStatus(orderId, col.id);
                     }
                     setDraggedOrderId(null);
                     setDragOverColumn(null);
@@ -421,33 +512,33 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                               
                               {/* Fast click status controllers */}
                               <div className="flex items-center gap-1 shrink-0">
-                                {p.status === 'confirmado' && (
+                                {p.status_id === 2 && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleTransitionStatus(p.id, 'em_producao');
+                                      handleTransitionStatus(p.id, 3);
                                     }}
                                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[9px] py-1 px-1.5 sm:px-2 rounded whitespace-nowrap"
                                   >
                                     Cozinha
                                   </button>
                                 )}
-                                {p.status === 'em_producao' && (
+                                {p.status_id === 3 && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleTransitionStatus(p.id, 'pronto');
+                                      handleTransitionStatus(p.id, 4);
                                     }}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] py-1 px-1.5 sm:px-2 rounded animate-pulse whitespace-nowrap"
                                   >
                                     Pronto!
                                   </button>
                                 )}
-                                {p.status === 'pronto' && (
+                                {p.status_id === 4 && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleTransitionStatus(p.id, 'entregue');
+                                      handleTransitionStatus(p.id, 5);
                                     }}
                                     className="bg-gray-800 hover:bg-gray-950 text-white font-bold text-[9px] py-1 px-1.5 sm:px-2 rounded whitespace-nowrap"
                                   >
@@ -587,14 +678,14 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                         <td className="p-3 font-bold text-amber-900 font-mono whitespace-nowrap">{formatCurrency(p.valor_total)}</td>
                         <td className="p-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
-                            ${p.status === 'rascunho' ? 'bg-gray-100 text-gray-600' : ''}
-                            ${p.status === 'confirmado' ? 'bg-amber-100 text-amber-900 border border-amber-200' : ''}
-                            ${p.status === 'em_producao' ? 'bg-indigo-100 text-indigo-700' : ''}
-                            ${p.status === 'pronto' ? 'bg-emerald-100 text-emerald-800' : ''}
-                            ${p.status === 'entregue' ? 'bg-gray-800 text-white' : ''}
-                            ${p.status === 'cancelado' ? 'bg-red-100 text-red-700' : ''}
+                            ${p.status_id === 1 ? 'bg-gray-100 text-gray-600' : ''}
+                            ${p.status_id === 2 ? 'bg-amber-100 text-amber-900 border border-amber-200' : ''}
+                            ${p.status_id === 3 ? 'bg-indigo-100 text-indigo-700' : ''}
+                            ${p.status_id === 4 ? 'bg-emerald-100 text-emerald-800' : ''}
+                            ${p.status_id === 5 ? 'bg-gray-800 text-white' : ''}
+                            ${p.status_id === 6 ? 'bg-red-100 text-red-700' : ''}
                           `}>
-                            {p.status}
+                            {store.statusNome(p.status_id)}
                           </span>
                         </td>
                         <td className="p-3 text-right pr-4 whitespace-nowrap">
@@ -638,7 +729,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                       <span className="font-mono text-[9px] text-gray-400 font-bold">#{p.id.substring(4).toUpperCase()}</span>
                       <h4 className="font-semibold text-amber-950 text-sm mt-0.5">{cliName}</h4>
                     </div>
-                    <span className="bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase">{p.status}</span>
+                    <span className="bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase">{store.statusNome(p.status_id)}</span>
                   </div>
                   <div className="flex justify-between items-center text-gray-500 pt-2 border-t border-amber-50">
                     <span>Val: {formatCurrency(p.valor_total)}</span>
@@ -660,9 +751,9 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
             <div className="p-6 border-b border-amber-100 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
                 <h3 className="font-display font-semibold text-base sm:text-lg text-amber-950">
-                  Registrar Encomenda de Cliente
+                  {editingPedidoId ? 'Editar Encomenda' : 'Registrar Encomenda de Cliente'}
                 </h3>
-                <p className="text-[10px] text-gray-500 mt-1">Selecione o cliente, os itens de salgados/bolos encomendados e execute a verificação inteligente de estoque.</p>
+                <p className="text-[10px] text-gray-500 mt-1">{editingPedidoId ? 'Altere os dados necessários e salve as alterações.' : 'Selecione o cliente, os itens de salgados/bolos encomendados e execute a verificação inteligente de estoque.'}</p>
               </div>
               <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
                 <X size={20} />
@@ -683,7 +774,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                   >
                     <option value="" disabled>--- Selecione o Cliente ---</option>
                     {store.clientes.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome} ({c.tipo})</option>
+                      <option key={c.id} value={c.id}>{c.nome} ({store.tipoClienteNome(c.tipo_id)})</option>
                     ))}
                   </select>
                 </div>
@@ -745,7 +836,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                               required
                             />
                             <span className="bg-amber-100 px-2 py-1 text-[9px] text-amber-900 font-bold whitespace-nowrap font-mono border-l border-amber-200">
-                              {prodRef?.unidade_producao.replace('por ', '')}
+                              {store.unidadeNome(prodRef?.unidade_producao_id || 0)}
                             </span>
                           </div>
                         </div>
@@ -864,10 +955,10 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
               {/* Saving or rascunho switches options */}
               <div className="flex gap-4">
                 <label className="flex items-center gap-1 cursor-pointer font-semibold text-amber-950">
-                  <input type="radio" checked={status === 'confirmado'} onChange={() => setStatus('confirmado')} className="text-amber-700" /> Ativo / Confirmado
+                  <input type="radio" checked={statusId === 2} onChange={() => setStatusId(2)} className="text-amber-700" /> Ativo / Confirmado
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer text-gray-500">
-                  <input type="radio" checked={status === 'rascunho'} onChange={() => setStatus('rascunho')} className="text-amber-700" /> Guardar Rascunho
+                  <input type="radio" checked={statusId === 1} onChange={() => setStatusId(1)} className="text-amber-700" /> Guardar Rascunho
                 </label>
               </div>
 
@@ -915,7 +1006,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                 quantidadeSolicitada: it.quantidade_solicitada
               };
             });
-            const analise = analisarEstoqueParaPedido(formatados, store.estoqueProdutos, store.fichas, store.materiais);
+            const analise = analisarEstoqueParaPedido(formatados, store.estoqueProdutos, store.fichas, store.materiais, store.unidades);
 
             return (
               <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col justify-between max-h-[90vh] overflow-y-auto no-scrollbar border-t border-amber-100">
@@ -952,7 +1043,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                               {it.observacao && <p className="text-[9px] text-gray-400 mt-0.5">{it.observacao}</p>}
                             </div>
                             <div className="text-right">
-                              <p className="font-bold font-mono text-amber-900">{it.quantidade_solicitada} {prod?.unidade_producao.replace('por ', '')}</p>
+                              <p className="font-bold font-mono text-amber-900">{it.quantidade_solicitada} {store.unidadeNome(prod?.unidade_producao_id || 0)}</p>
                               <p className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(it.preco_unitario)} cada</p>
                             </div>
                           </div>
@@ -993,18 +1084,27 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                   <div className="space-y-2">
                     <label className="text-[9px] font-bold uppercase text-amber-900/60 block">Mudança de Fase Operacional</label>
                     <div className="flex flex-wrap gap-2">
-                      {p.status === 'rascunho' && (
+                      {(p.status_id === 1 || p.status_id === 2) && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 'confirmado')}
+                          onClick={() => handleOpenEditOrder(p.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg"
+                        >
+                          ✏️ Editar Pedido
+                        </button>
+                      )}
+
+                      {p.status_id === 1 && (
+                        <button
+                          onClick={() => handleTransitionStatus(p.id, 2)}
                           className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-3 rounded-lg"
                         >
                           Confirmar Encomenda ✔️
                         </button>
                       )}
                       
-                      {p.status === 'confirmado' && (
+                      {p.status_id === 2 && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 'em_producao')}
+                          onClick={() => handleTransitionStatus(p.id, 3)}
                           disabled={!analise.tudoDisponivelEmEstoquePronto && !analise.podeProduzirRestante}
                           className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
@@ -1012,27 +1112,27 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
                         </button>
                       )}
 
-                      {p.status === 'em_producao' && (
+                      {p.status_id === 3 && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 'pronto')}
+                          onClick={() => handleTransitionStatus(p.id, 4)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
                           📦 Prontificar Assado (Pronto)
                         </button>
                       )}
 
-                      {p.status === 'pronto' && (
+                      {p.status_id === 4 && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 'entregue')}
+                          onClick={() => handleTransitionStatus(p.id, 5)}
                           className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
                           🚚 Confirmar Entrega de Pedido
                         </button>
                       )}
 
-                      {p.status !== 'entregue' && p.status !== 'cancelado' && (
+                      {p.status_id !== 5 && p.status_id !== 6 && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 'cancelado')}
+                          onClick={() => handleTransitionStatus(p.id, 6)}
                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-lg"
                         >
                           Cancelar Pedido ❌
@@ -1043,9 +1143,61 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
 
                 </div>
 
+                {/* Pagamento info + link to Caixa */}
+                <div className="px-6 space-y-3">
+                  <div className="border-t border-amber-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="font-display font-semibold text-amber-900 uppercase tracking-wider text-[10px]">
+                        Pagamentos
+                      </p>
+                      <button
+                        onClick={() => onNavigateToCaixa?.(p.id)}
+                        className="text-[10px] font-bold text-amber-700 hover:text-amber-600 flex items-center gap-1"
+                      >
+                        🪙 Ir para Caixa
+                      </button>
+                    </div>
+                    {(() => {
+                      const recebimentos = store.lancamentos.filter(l => l.pedido_id === p.id && l.tipo === 'receita');
+                      const totalRecebido = recebimentos.reduce((s, l) => s + l.valor, 0);
+                      const saldoRestante = p.valor_total - totalRecebido;
+                      const estaPago = saldoRestante <= 0;
+                      return (
+                        <div>
+                          {recebimentos.length === 0 ? (
+                            <p className="text-[10px] text-gray-400 italic">Nenhum pagamento registrado</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {recebimentos.map(l => (
+                                <div key={l.id} className="flex items-center justify-between text-[11px] py-1 px-2 rounded bg-emerald-50/30 border border-emerald-100/50">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-600 font-mono">{new Date(l.data_lancamento).toLocaleDateString('pt-BR')}</span>
+                                    <span className="text-gray-400">{l.forma_pagamento || '—'}</span>
+                                  </div>
+                                  <span className="font-bold font-mono text-emerald-700">{formatCurrency(l.valor)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mt-3 pt-2 border-t border-amber-100/50 text-xs">
+                            <span className="text-gray-500">Total recebido</span>
+                            <span className="font-bold font-mono text-emerald-700">{formatCurrency(totalRecebido)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-500">Saldo pendente</span>
+                            <span className={`font-bold font-mono ${estaPago ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {estaPago ? '✓ Pago' : formatCurrency(saldoRestante)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
                 <div className="p-6 bg-amber-50/20 border-t border-amber-100 flex items-center justify-between">
                   <div className="font-mono text-xs text-amber-950">
-                    Soma: <span className="font-bold text-sm text-amber-900">{formatCurrency(p.valor_total)}</span>
+                    Total: <span className="font-bold text-sm text-amber-900">{formatCurrency(p.valor_total)}</span>
                   </div>
                   <button 
                     onClick={() => setSelectedPedidoId(null)}
@@ -1063,3 +1215,5 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef }: Pedid
     </div>
   );
 }
+
+

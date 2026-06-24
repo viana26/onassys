@@ -1,42 +1,30 @@
-import { Material, FichaTecnicaItem, Produto, EstoqueProduto } from '../types';
+import { Material, FichaTecnicaItem, Produto, EstoqueProduto, Unidade } from '../types';
 
-/**
- * Standardizes quantity conversion from recipe unit to material inventory unit.
- * Handled conversions:
- * - g -> kg (divide recipe by 1000)
- * - mL -> L (divide recipe by 1000)
- * - kg -> g (multiply recipe by 1000)
- * - L -> mL (multiply recipe by 1000)
- */
 export function normalizarQuantidade(
   qtdFicha: number,
-  unidadeFicha: string,
-  unidadeMaterial: string
+  unidadeFichaId: number,
+  unidadeMaterialId: number,
+  unidades: Unidade[]
 ): number {
-  const uf = unidadeFicha.toLowerCase();
-  const um = unidadeMaterial.toLowerCase();
+  const uf = unidades.find(u => u.id === unidadeFichaId)?.sigla?.toLowerCase() || '';
+  const um = unidades.find(u => u.id === unidadeMaterialId)?.sigla?.toLowerCase() || '';
 
   if (uf === um) return qtdFicha;
 
-  // Mass conversions
   if (uf === 'g' && um === 'kg') return qtdFicha / 1000;
   if (uf === 'kg' && um === 'g') return qtdFicha * 1000;
 
-  // Volume conversions
   if (uf === 'ml' && um === 'l') return qtdFicha / 1000;
   if (uf === 'l' && um === 'ml') return qtdFicha * 1000;
 
-  // Default fallback if mismatch but not directly solvable
   return qtdFicha;
 }
 
-/**
- * Calculates current raw material cost of producing a single unit of a product
- */
 export function calcularCustoProducao(
   produtoId: string,
   fichas: FichaTecnicaItem[],
-  materiais: Material[]
+  materiais: Material[],
+  unidades: Unidade[]
 ): number {
   const ingredientes = fichas.filter((f) => f.produto_id === produtoId);
   if (ingredientes.length === 0) return 0;
@@ -45,7 +33,7 @@ export function calcularCustoProducao(
   for (const ing of ingredientes) {
     const mat = materiais.find((m) => m.id === ing.material_id);
     if (mat) {
-      const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade, mat.unidade);
+      const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade_id, mat.unidade_id, unidades);
       custoTotal += qtdNormalizada * mat.custo_unitario;
     }
   }
@@ -60,7 +48,8 @@ export function verificarViabilidadeProducao(
   produtoId: string,
   quantidade: number,
   fichas: FichaTecnicaItem[],
-  materiais: Material[]
+  materiais: Material[],
+  unidades: Unidade[]
 ): {
   viavel: boolean;
   deficit: { materialId: string; materialNome: string; falta: number; unidade: string }[];
@@ -72,19 +61,17 @@ export function verificarViabilidadeProducao(
     const mat = materiais.find((m) => m.id === ing.material_id);
     if (!mat) continue;
 
-    const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade, mat.unidade);
+    const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade_id, mat.unidade_id, unidades);
     const totalNecessario = qtdNormalizada * quantidade;
 
     if (mat.quantidade_atual < totalNecessario) {
       const faltaEstoqueUnidade = totalNecessario - mat.quantidade_atual;
-      
-      // If the material unit is different, format the showing unit appropriately for display
+      const unidadeNome = unidades.find(u => u.id === mat.unidade_id)?.sigla || '?';
       deficit.push({
         materialId: mat.id,
         materialNome: mat.nome,
-        // Rounded to 3 decimals
         falta: Number(faltaEstoqueUnidade.toFixed(3)),
-        unidade: mat.unidade,
+        unidade: unidadeNome,
       });
     }
   }
@@ -101,7 +88,8 @@ export function verificarViabilidadeProducao(
 export function sugerirMaximoProduzivel(
   produtoId: string,
   fichas: FichaTecnicaItem[],
-  materiais: Material[]
+  materiais: Material[],
+  unidades: Unidade[]
 ): number {
   const ingredientes = fichas.filter((f) => f.produto_id === produtoId);
   if (ingredientes.length === 0) return 0;
@@ -112,7 +100,7 @@ export function sugerirMaximoProduzivel(
     const mat = materiais.find((m) => m.id === ing.material_id);
     if (!mat) continue;
 
-    const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade, mat.unidade);
+    const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade_id, mat.unidade_id, unidades);
     if (qtdNormalizada <= 0) continue;
 
     const possivelComMaterial = mat.quantidade_atual / qtdNormalizada;
@@ -146,19 +134,17 @@ export function analisarEstoqueParaPedido(
   itens: { produtoId: string; produtoNome: string; quantidadeSolicitada: number }[],
   estoqueProdutos: EstoqueProduto[],
   fichas: FichaTecnicaItem[],
-  materiais: Material[]
+  materiais: Material[],
+  unidades: Unidade[]
 ): {
   tudoDisponivelEmEstoquePronto: boolean;
   podeProduzirRestante: boolean;
   itensAnalise: AlertaItemPedido[];
   resumoFaltasMateriais: { materialNome: string; falta: number; unidade: string }[];
 } {
-  // 1. Calculate physical stock missing for each product
   const itensAnalise: AlertaItemPedido[] = [];
   let tudoDisponivelEmEstoquePronto = true;
 
-  // Let's track materials consumed as if we started production of the deficit
-  // We make a copy of material quantities to simulate usage across different items
   const materiaisSimulados = materiais.map((m) => ({ ...m }));
   const materialFaltasAcumuladas: { [materialId: string]: { nome: string; falta: number; unidade: string } } = {};
 
@@ -179,30 +165,27 @@ export function analisarEstoqueParaPedido(
         const matSimulado = materiaisSimulados.find((m) => m.id === ing.material_id);
         if (!matSimulado) continue;
 
-        const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade, matSimulado.unidade);
+        const qtdNormalizada = normalizarQuantidade(ing.quantidade_necessaria, ing.unidade_id, matSimulado.unidade_id, unidades);
         const totalSimuladoNecessario = qtdNormalizada * faltaFisico;
 
         if (matSimulado.quantidade_atual >= totalSimuladoNecessario) {
-          // Consume simulated stock
           matSimulado.quantidade_atual -= totalSimuladoNecessario;
         } else {
-          // We have a deficit
           const faltaParaEsteIngrediente = totalSimuladoNecessario - matSimulado.quantidade_atual;
-          // Consume what we can and record deficit
           matSimulado.quantidade_atual = 0;
+          const unidadeNome = unidades.find(u => u.id === matSimulado.unidade_id)?.sigla || '?';
 
           ingredientesDefic.push({
             materialNome: matSimulado.nome,
             falta: Number(faltaParaEsteIngrediente.toFixed(3)),
-            unidade: matSimulado.unidade,
+            unidade: unidadeNome,
           });
 
-          // Accumulate for overall summary
           if (!materialFaltasAcumuladas[matSimulado.id]) {
             materialFaltasAcumuladas[matSimulado.id] = {
               nome: matSimulado.nome,
               falta: 0,
-              unidade: matSimulado.unidade,
+              unidade: unidadeNome,
             };
           }
           materialFaltasAcumuladas[matSimulado.id].falta += faltaParaEsteIngrediente;

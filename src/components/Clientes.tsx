@@ -32,7 +32,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [editId, setEditId] = useState<string | null>(null);
   
   const [nome, setNome] = useState('');
-  const [tipo, setTipo] = useState<'lanchonete' | 'evento' | 'particular' | 'outro'>('lanchonete');
+  const [tipoId, setTipoId] = useState<number>(1);
   const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
@@ -44,7 +44,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                           c.endereco.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (typeFilter !== 'todos') {
-      return matchesSearch && c.tipo === typeFilter;
+      return matchesSearch && c.tipo_id === Number(typeFilter);
     }
     return matchesSearch;
   });
@@ -53,7 +53,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     setIsOpenForm(true);
     setEditId(null);
     setNome('');
-    setTipo('lanchonete');
+    setTipoId(1);
     setTelefone('');
     setEmail('');
     setEndereco('');
@@ -64,7 +64,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     setIsOpenForm(true);
     setEditId(c.id);
     setNome(c.nome);
-    setTipo(c.tipo);
+    setTipoId(c.tipo_id);
     setTelefone(c.telefone);
     setEmail(c.email);
     setEndereco(c.endereco);
@@ -81,7 +81,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     if (editId) {
       store.updateCliente(editId, {
         nome,
-        tipo,
+        tipo_id: tipoId,
         telefone,
         email,
         endereco,
@@ -90,7 +90,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     } else {
       store.addCliente({
         nome,
-        tipo,
+        tipo_id: tipoId,
         telefone,
         email,
         endereco,
@@ -144,17 +144,17 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
-          {['todos', 'lanchonete', 'evento', 'particular', 'outro'].map(filter => (
+          {[{ label: 'Todos', value: 'todos' }, ...store.tiposCliente.map(t => ({ label: t.nome, value: String(t.id) }))].map(filter => (
             <button
-              key={filter}
-              onClick={() => setTypeFilter(filter)}
+              key={filter.value}
+              onClick={() => setTypeFilter(filter.value)}
               className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition ${
-                typeFilter === filter 
+                typeFilter === filter.value 
                   ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800 dark:border-amber-700' 
                   : 'bg-white dark:bg-[#1c140c] text-gray-500 dark:text-amber-200/50 border-amber-100 dark:border-[#2b1d10] hover:bg-amber-50 dark:hover:bg-amber-950'
               }`}
             >
-              {filter === 'todos' ? 'Todos' : filter}
+              {filter.label}
             </button>
           ))}
         </div>
@@ -179,13 +179,13 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono uppercase tracking-wider
-                        ${c.tipo === 'lanchonete' ? 'bg-amber-100 text-amber-900 border border-amber-200 dark:bg-amber-950 dark:text-amber-250 dark:border-[#382613]' : ''}
-                        ${c.tipo === 'evento' ? 'bg-pink-100 text-pink-800 border border-pink-200 dark:bg-pink-950/30 dark:text-pink-350 dark:border-[#4d1624]' : ''}
-                        ${c.tipo === 'particular' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-[#1d164d]' : ''}
-                        ${c.tipo === 'outro' ? 'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700' : ''}
-                      `}>
-                        {c.tipo}
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono uppercase tracking-wider ${
+                        (store.tipoClienteNome(c.tipo_id).toLowerCase().includes('lanchonete') ? 'bg-amber-100 text-amber-900 border border-amber-200 dark:bg-amber-950 dark:text-amber-250 dark:border-[#382613]' :
+                        store.tipoClienteNome(c.tipo_id).toLowerCase().includes('evento') || store.tipoClienteNome(c.tipo_id).toLowerCase().includes('buffet') ? 'bg-pink-100 text-pink-800 border border-pink-200 dark:bg-pink-950/30 dark:text-pink-350 dark:border-[#4d1624]' :
+                        store.tipoClienteNome(c.tipo_id).toLowerCase().includes('particular') ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-[#1d164d]' :
+                        'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700')
+                      }`}>
+                        {store.tipoClienteNome(c.tipo_id)}
                       </span>
                       <h3 className="font-semibold text-base font-display text-amber-950 dark:text-amber-100 mt-1.5">{c.nome}</h3>
                     </div>
@@ -275,14 +275,13 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium">Tipo de Cliente *</label>
                   <select 
-                    value={tipo}
-                    onChange={(e) => setTipo(e.target.value as any)}
+                    value={tipoId}
+                    onChange={(e) => setTipoId(Number(e.target.value))}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-200"
                   >
-                    <option value="lanchonete">Lanchonete / Revenda</option>
-                    <option value="evento">Buffet / Salão Festas</option>
-                    <option value="particular">Pessoa Particular</option>
-                    <option value="outro">Outros Convênios</option>
+                    {store.tiposCliente.map(tc => (
+                      <option key={tc.id} value={tc.id}>{tc.nome}</option>
+                    ))}
                   </select>
                 </div>
 

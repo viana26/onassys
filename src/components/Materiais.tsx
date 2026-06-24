@@ -32,11 +32,19 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [nome, setNome] = useState('');
-  const [unidade, setUnidade] = useState<'kg' | 'g' | 'L' | 'mL' | 'un'>('kg');
+  const [unidadeId, setUnidadeId] = useState<number>(1);
   const [quantidadeAtual, setQuantidadeAtual] = useState<number>(0);
   const [quantidadeMinima, setQuantidadeMinima] = useState<number>(0);
   const [custoUnitario, setCustoUnitario] = useState<number>(0);
-  const [fornecedor, setFornecedor] = useState('');
+  const [fornecedorId, setFornecedorId] = useState<number>(0);
+
+  // Quick-add fornecedor
+  const [showNovoFornecedor, setShowNovoFornecedor] = useState(false);
+  const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
+  const [novoFornecedorContato, setNovoFornecedorContato] = useState('');
+  const [novoFornecedorTel, setNovoFornecedorTel] = useState('');
+  const [novoFornecedorEmail, setNovoFornecedorEmail] = useState('');
+  const [savingFornecedor, setSavingFornecedor] = useState(false);
 
   // Quick Inbound replenishment state
   const [isInbounding, setIsInbounding] = useState(false);
@@ -44,11 +52,11 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [inboundQtd, setInboundQtd] = useState<number>(1);
   const [inboundCustoUnitario, setInboundCustoUnitario] = useState<number>(0);
   const [inboundObs, setInboundObs] = useState<string>('');
+  const [inboundCriarDespesa, setInboundCriarDespesa] = useState(false);
 
   // Filter materials list
   const filteredMateriais = store.materiais.filter(m => {
-    const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          m.fornecedor.toLowerCase().includes(searchTerm.toLowerCase());
+    const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filterCritico) {
       return batchesSearch && m.quantidade_atual < m.quantidade_minima;
@@ -60,27 +68,27 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     setIsEditing(true);
     setEditId(null);
     setNome('');
-    setUnidade('kg');
+    setUnidadeId(1);
     setQuantidadeAtual(0);
     setQuantidadeMinima(0);
     setCustoUnitario(0);
-    setFornecedor('');
+    setFornecedorId(0);
   };
 
   const handleOpenEdit = (m: Material) => {
     setIsEditing(true);
     setEditId(m.id);
     setNome(m.nome);
-    setUnidade(m.unidade);
+    setUnidadeId(m.unidade_id);
     setQuantidadeAtual(m.quantidade_atual);
     setQuantidadeMinima(m.quantidade_minima);
     setCustoUnitario(m.custo_unitario);
-    setFornecedor(m.fornecedor);
+    setFornecedorId(m.fornecedor_id || 0);
   };
 
   const handleSaveMaterial = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !fornecedor.trim()) {
+    if (!nome.trim() || fornecedorId === 0) {
       alert('Favor preencher o nome e o fornecedor.');
       return;
     }
@@ -88,20 +96,20 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     if (editId) {
       store.updateMaterial(editId, {
         nome,
-        unidade,
+        unidade_id: unidadeId,
         quantidade_atual: Number(quantidadeAtual),
         quantidade_minima: Number(quantidadeMinima),
         custo_unitario: Number(custoUnitario),
-        fornecedor
+        fornecedor_id: fornecedorId
       });
     } else {
       store.addMaterial({
         nome,
-        unidade,
+        unidade_id: unidadeId,
         quantidade_atual: Number(quantidadeAtual),
         quantidade_minima: Number(quantidadeMinima),
         custo_unitario: Number(custoUnitario),
-        fornecedor
+        fornecedor_id: fornecedorId
       });
     }
 
@@ -122,7 +130,29 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     setInboundQtd(1);
     setInboundCustoUnitario(m.custo_unitario);
     setInboundObs('');
+    setInboundCriarDespesa(true);
     setIsInbounding(true);
+  };
+
+  const handleCriarFornecedor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoFornecedorNome.trim()) return;
+    setSavingFornecedor(true);
+    const f = await store.addFornecedor({
+      nome_fantasia: novoFornecedorNome.trim(),
+      contato: novoFornecedorContato.trim() || undefined,
+      telefone: novoFornecedorTel.trim() || undefined,
+      email: novoFornecedorEmail.trim() || undefined,
+    });
+    setSavingFornecedor(false);
+    if (f) {
+      setFornecedorId(f.id);
+      setShowNovoFornecedor(false);
+      setNovoFornecedorNome('');
+      setNovoFornecedorContato('');
+      setNovoFornecedorTel('');
+      setNovoFornecedorEmail('');
+    }
   };
 
   const handleSaveInbound = (e: React.FormEvent) => {
@@ -135,7 +165,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       alert('O custo unitário não pode ser menor do que zero.');
       return;
     }
-    store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs);
+    store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa);
     setIsInbounding(false);
     onUpdate();
   };
@@ -272,16 +302,16 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       return (
                         <tr key={m.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                           <td className="p-3 pl-4 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{m.nome}</td>
-                          <td className="p-3 text-gray-650 dark:text-amber-100/60 whitespace-nowrap">{m.fornecedor}</td>
+                          <td className="p-3 text-gray-650 dark:text-amber-100/60 whitespace-nowrap">{store.fornecedorNome(m.fornecedor_id)}</td>
                           <td className="p-3 font-mono whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold
                               ${isAbatido ? 'bg-red-100 dark:bg-red-950/25 text-red-700 dark:text-red-350 animate-pulse' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200'}
                             `}>
-                              {m.quantidade_atual} {m.unidade}
+                              {m.quantidade_atual} {store.unidadeSigla(m.unidade_id)}
                             </span>
                           </td>
-                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{m.quantidade_minima} {m.unidade}</td>
-                          <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{m.unidade}</span></td>
+                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{m.quantidade_minima} {store.unidadeSigla(m.unidade_id)}</td>
+                          <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{store.unidadeSigla(m.unidade_id)}</span></td>
                           <td className="p-3 text-gray-400 dark:text-amber-100/30 whitespace-nowrap">{new Date(m.data_ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
@@ -321,7 +351,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-semibold text-amber-950 dark:text-amber-100 text-sm font-display">{m.nome}</h4>
-                          <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5 font-sans">Forn: {m.fornecedor}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5 font-sans">Forn: {store.fornecedorNome(m.fornecedor_id)}</p>
                         </div>
                         {isAbatido && (
                           <span className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-350 text-[9px] px-2 py-0.5 rounded-full border border-red-100 dark:border-red-950/20 font-bold flex items-center gap-0.5 font-sans">
@@ -334,12 +364,12 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                         <div>
                           <p className="text-[9px] text-gray-500 dark:text-amber-150/40 uppercase font-medium">Estoque</p>
                           <p className={`font-mono font-bold text-xs mt-0.5 ${isAbatido ? 'text-red-650' : 'text-amber-950 dark:text-amber-100'}`}>
-                            {m.quantidade_atual} {m.unidade}
+                            {m.quantidade_atual} {store.unidadeSigla(m.unidade_id)}
                           </p>
                         </div>
                         <div>
                           <p className="text-[9px] text-gray-500 dark:text-amber-150/40 uppercase font-medium">Mínimo</p>
-                          <p className="font-mono text-gray-600 dark:text-amber-200 text-xs mt-0.5">{m.quantidade_minima} {m.unidade}</p>
+                          <p className="font-mono text-gray-600 dark:text-amber-200 text-xs mt-0.5">{m.quantidade_minima} {store.unidadeSigla(m.unidade_id)}</p>
                         </div>
                         <div>
                           <p className="text-[9px] text-gray-500 dark:text-amber-150/40 uppercase font-medium">Custo Unit.</p>
@@ -390,7 +420,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
             <div className="space-y-2 max-h-96 overflow-y-auto no-scrollbar">
               {store.movMateriais.map((mov, idx) => {
                 const mat = store.materiais.find(m => m.id === mov.material_id);
-                const isEntrada = mov.tipo === 'entrada_compra';
+                const isEntrada = mov.tipo_id === 1;
                 return (
                   <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
@@ -404,13 +434,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     </div>
                     <div className="text-right">
                       <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
-                        {isEntrada ? '+' : '-'}{mov.quantidade}{mat?.unidade || ''}
+                        {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
                       </p>
                       {isEntrada && (mov.valor_pago !== undefined || mov.custo_unitario !== undefined || mat?.custo_unitario) && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-mono">
                           PAGO: {(mov.valor_pago !== undefined ? mov.valor_pago : (mov.custo_unitario || mat?.custo_unitario || 0) * mov.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           <span className="text-gray-400 dark:text-amber-100/30 font-sans font-normal ml-1">
-                            ({(mov.custo_unitario !== undefined ? mov.custo_unitario : mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{mat?.unidade || ''})
+                            ({(mov.custo_unitario !== undefined ? mov.custo_unitario : mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0) || ''})
                           </span>
                         </p>
                       )}
@@ -459,32 +489,50 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
                   <select 
-                    value={unidade}
-                    onChange={(e) => setUnidade(e.target.value as any)}
+                    value={unidadeId}
+                    onChange={(e) => setUnidadeId(Number(e.target.value))}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
                   >
-                    <option value="kg" className="dark:bg-[#1c140c]">kg (Quilograma)</option>
-                    <option value="g" className="dark:bg-[#1c140c]">g (Grama)</option>
-                    <option value="L" className="dark:bg-[#1c140c]">L (Litro)</option>
-                    <option value="mL" className="dark:bg-[#1c140c]">mL (Mililitro)</option>
-                    <option value="un" className="dark:bg-[#1c140c]">un (Lata/Unidade)</option>
+                    {store.unidades.map(u => (
+                      <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.sigla} ({u.nome})</option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Custo (R$)</label>
                   <input 
-                    type="text" 
-                    value={fornecedor}
-                    onChange={(e) => setFornecedor(e.target.value)}
-                    placeholder="Ex: Atacado Central"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                    required
+                    type="number" 
+                    step="any"
+                    value={custoUnitario}
+                    onChange={(e) => setCustoUnitario(Number(e.target.value))}
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={fornecedorId}
+                    onChange={(e) => setFornecedorId(Number(e.target.value))}
+                    className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
+                    required
+                  >
+                    <option value={0} className="dark:bg-[#1c140c]">-- Selecione --</option>
+                    {store.fornecedores.map(f => (
+                      <option key={f.id} value={f.id} className="dark:bg-[#1c140c]">{f.nome_fantasia}</option>
+                    ))}
+                  </select>
+                  <button type="button" onClick={() => setShowNovoFornecedor(true)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    + Novo
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium font-sans font-sans">Qtd Atual</label>
                   <input 
@@ -503,17 +551,6 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     step="any"
                     value={quantidadeMinima}
                     onChange={(e) => setQuantidadeMinima(Number(e.target.value))}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans font-sans">Custo (R$)</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    value={custoUnitario}
-                    onChange={(e) => setCustoUnitario(Number(e.target.value))}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
@@ -576,13 +613,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       placeholder="Ex: 10, 2.5"
                     />
                     <span className="bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                      {store.materiais.find(m => m.id === inboundMaterialId)?.unidade}
+                      {store.unidadeSigla(store.materiais.find(m => m.id === inboundMaterialId)?.unidade_id || 0)}
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Preço Unitário Pago (R$ / {store.materiais.find(m => m.id === inboundMaterialId)?.unidade}) *</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Preço Unitário Pago (R$ / {store.unidadeSigla(store.materiais.find(m => m.id === inboundMaterialId)?.unidade_id || 0)}) *</label>
                   <input 
                     type="number" 
                     step="any"
@@ -610,6 +647,16 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 />
               </div>
 
+              {/* Despesa automática toggle */}
+              <label className="flex items-center gap-2 p-2 rounded-lg bg-[#f8f5ee] dark:bg-[#130b04] cursor-pointer">
+                <input type="checkbox" checked={inboundCriarDespesa} onChange={e => setInboundCriarDespesa(e.target.checked)}
+                  className="rounded border-amber-300 text-amber-600 focus:ring-amber-500" />
+                <div>
+                  <span className="text-xs font-medium text-[#2e2315] dark:text-amber-100">Criar despesa no financeiro</span>
+                  <p className="text-[9px] text-[#5c4a37]/60 dark:text-amber-100/50">Registra esta compra como despesa em Matéria-Prima</p>
+                </div>
+              </label>
+
               {/* Total estimation preview */}
               <div className="p-3.5 bg-emerald-50/50 dark:bg-[#072410]/30 rounded-xl border border-emerald-100 dark:border-[#123e1d] flex items-center justify-between text-xs font-sans mt-3">
                 <div className="flex flex-col">
@@ -636,6 +683,47 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-800 dark:hover:bg-emerald-750 text-white font-semibold py-2.5 rounded-xl text-center shadow-sm cursor-pointer font-sans"
                 >
                   Confirmar Entrada
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Quick-add fornecedor */}
+      {showNovoFornecedor && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#120c06] max-w-sm w-full rounded-2xl p-6 border border-amber-100 dark:border-[#2d1e0d]">
+            <h3 className="font-semibold text-base text-amber-950 dark:text-amber-100 mb-4">Novo Fornecedor</h3>
+            <form onSubmit={handleCriarFornecedor} className="space-y-3">
+              <div>
+                <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Nome fantasia *</label>
+                <input type="text" value={novoFornecedorNome} onChange={e => setNovoFornecedorNome(e.target.value)} required
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              </div>
+              <div>
+                <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Contato</label>
+                <input type="text" value={novoFornecedorContato} onChange={e => setNovoFornecedorContato(e.target.value)}
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              </div>
+              <div>
+                <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Telefone</label>
+                <input type="text" value={novoFornecedorTel} onChange={e => setNovoFornecedorTel(e.target.value)}
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              </div>
+              <div>
+                <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Email</label>
+                <input type="email" value={novoFornecedorEmail} onChange={e => setNovoFornecedorEmail(e.target.value)}
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowNovoFornecedor(false)}
+                  className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold rounded-xl text-xs cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingFornecedor}
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400 text-white font-semibold rounded-xl text-xs cursor-pointer disabled:cursor-not-allowed">
+                  {savingFornecedor ? 'Criando...' : 'Criar'}
                 </button>
               </div>
             </form>

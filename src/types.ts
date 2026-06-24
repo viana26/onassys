@@ -1,47 +1,135 @@
-/**
- * Types representing the database schema for the Salgados & Bolos Mini-Factory Management System.
- */
+export interface Unidade {
+  id: number;
+  sigla: string;
+  nome: string;
+  tipo: 'massa' | 'volume' | 'unidade';
+}
+
+export interface Categoria {
+  id: number;
+  nome: string;
+  cor: string;
+}
+
+export interface StatusPedido {
+  id: number;
+  nome: string;
+  ordem: number;
+  cor: string;
+}
+
+export interface TipoMovimentacao {
+  id: number;
+  nome: string;
+  natureza: 'entrada' | 'saida';
+  entidade: 'produto' | 'material' | 'ambos';
+}
+
+export interface TipoCliente {
+  id: number;
+  nome: string;
+}
+
+export interface NivelAcesso {
+  id: number;
+  nome: string;
+}
+
+export interface Fornecedor {
+  id: number;
+  nome_fantasia: string;
+  contato?: string;
+  telefone?: string;
+  email?: string;
+  criado_em?: string;
+}
+
+export interface Permissao {
+  id: number;
+  chave: string;
+  nome: string;
+  grupo: string;
+}
+
+export interface Perfil {
+  id: number;
+  nome: string;
+  descricao: string;
+}
+
+export interface CategoriaFinanceiro {
+  id: number;
+  nome: string;
+  tipo: 'receita' | 'despesa';
+  cor: string;
+}
+
+export interface LancamentoFinanceiro {
+  id: string;
+  data_lancamento: string;
+  valor: number;
+  tipo: 'receita' | 'despesa';
+  categoria_id: number;
+  descricao?: string;
+  pedido_id?: string;
+  movimentacao_id?: string;
+  forma_pagamento?: string;
+  criado_por?: string;
+  criado_em?: string;
+}
+
+export interface PlanejamentoCompra {
+  id: number;
+  material_id: string;
+  quantidade_sugerida: number;
+  unidade_id?: number;
+  data_sugerida?: string;
+  status: 'pendente' | 'aprovado' | 'comprado' | 'cancelado';
+  motivo?: string;
+  consumo_medio_diario?: number;
+  dias_ate_minimo?: number;
+}
 
 export interface Material {
   id: string;
   nome: string;
-  unidade: 'kg' | 'g' | 'L' | 'mL' | 'un';
+  unidade_id: number;
   quantidade_atual: number;
   quantidade_minima: number;
-  custo_unitario: number; // cost per unit of purchase (e.g., cost per kg)
-  fornecedor: string;
+  custo_unitario: number;
+  fornecedor_id?: number | null;
   data_ultima_atualizacao: string;
 }
 
 export interface Produto {
   id: string;
   nome: string;
-  categoria: 'salgado' | 'doce' | 'bolo' | 'bebida' | 'outro';
+  categoria_id: number;
   descricao: string;
-  unidade_producao: string; // e.g., "por dúzia", "por unidade", "por kg"
+  unidade_producao_id: number;
   tempo_producao_minutos: number;
   custo_producao_calculado: number;
   ativo: boolean;
-  margem_lucro?: number;      // % of markup/profit
-  preco_venda?: number;       // final selling price
-  imagem?: string;            // compressed base64 image or local path
+  margem_lucro?: number;
+  preco_venda?: number;
+  imagem?: string;
 }
 
 export interface FichaTecnicaItem {
   id: string;
   produto_id: string;
   material_id: string;
-  quantidade_necessaria: number; // relative to the product unit (e.g., 0.150 kg for 1 unit, or total)
-  unidade: 'kg' | 'g' | 'L' | 'mL' | 'un';
+  quantidade_necessaria: number;
+  unidade_id: number;
 }
 
 export interface EstoqueProduto {
   id: string;
   produto_id: string;
-  quantidade_disponivel: number; // what is physically ready and unreserved
-  quantidade_reservada: number;   // reserved for orders
+  quantidade_disponivel: number;
+  quantidade_reservada: number;
   quantidade_minima: number;
-  data_validade?: string;         // YYYY-MM-DD
+  data_validade?: string;
   lote?: string;
   data_atualizacao: string;
 }
@@ -49,7 +137,7 @@ export interface EstoqueProduto {
 export interface MovimentacaoProduto {
   id: string;
   produto_id: string;
-  tipo: 'entrada_producao' | 'saida_pedido' | 'ajuste';
+  tipo_id: number;
   quantidade: number;
   pedido_id?: string;
   observacao?: string;
@@ -59,7 +147,7 @@ export interface MovimentacaoProduto {
 export interface MovimentacaoMaterial {
   id: string;
   material_id: string;
-  tipo: 'entrada_compra' | 'saida_producao' | 'ajuste';
+  tipo_id: number;
   quantidade: number;
   observacao?: string;
   valor_pago?: number;
@@ -70,21 +158,19 @@ export interface MovimentacaoMaterial {
 export interface Cliente {
   id: string;
   nome: string;
-  tipo: 'lanchonete' | 'evento' | 'particular' | 'outro';
+  tipo_id: number;
   telefone: string;
   email: string;
   endereco: string;
   observacoes?: string;
 }
 
-export type PedidoStatus = 'rascunho' | 'confirmado' | 'em_producao' | 'pronto' | 'entregue' | 'cancelado';
-
 export interface Pedido {
   id: string;
   cliente_id: string;
   data_pedido: string;
-  data_entrega_prevista: string; // YYYY-MM-DDTHH:mm
-  status: PedidoStatus;
+  data_entrega_prevista: string;
+  status_id: number;
   observacoes?: string;
   valor_total: number;
   criado_by: string;
@@ -101,12 +187,20 @@ export interface ItemPedido {
   observacao?: string;
 }
 
-// For UI dashboard reporting
+export interface PerfilUsuario {
+  id: string;
+  nome: string;
+  perfil_id: number;
+  ativo: boolean;
+  criado_em?: string;
+  atualizado_em?: string;
+}
+
 export interface DashboardStats {
   pedidosHoje: number;
   pedidosSemana: number;
-  alertasEstoqueMateriais: number; // materials below minimum
-  alertasEstoqueProdutos: number;   // products below minimum
+  alertasEstoqueMateriais: number;
+  alertasEstoqueProdutos: number;
   totalReceitaPedidosConfirmados: number;
-  proximasEntregasCount: number; // next 48 hours
+  proximasEntregasCount: number;
 }

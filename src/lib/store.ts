@@ -1,17 +1,7 @@
-import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, PedidoStatus } from '../types';
-import { 
-  INITIAL_MATERIAIS, 
-  INITIAL_PRODUTOS, 
-  INITIAL_FICHAS_TECNICAS, 
-  INITIAL_ESTOQUE_PRODUTOS, 
-  INITIAL_CLIENTES, 
-  INITIAL_PEDIDOS, 
-  INITIAL_ITENS_PEDIDO, 
-  INITIAL_MOVIMENTACOES_MATERIAIS, 
-  INITIAL_MOVIMENTACOES_PRODUTOS 
-} from './seedData';
-import { calcularCustoProducao, normalizarQuantidade, analisarEstoqueParaPedido } from './calculos';
+import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario } from '../types';
+import { calcularCustoProducao, normalizarQuantidade } from './calculos';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { deleteProdutoImage, isStorageUrl } from './imageUpload';
 
 export class MiniFactoryStore {
   materiais: Material[] = [];
@@ -23,625 +13,749 @@ export class MiniFactoryStore {
   itensPedido: ItemPedido[] = [];
   movMateriais: MovimentacaoMaterial[] = [];
   movProdutos: MovimentacaoProduto[] = [];
+
+  unidades: Unidade[] = [];
+  categorias: Categoria[] = [];
+  statusPedido: StatusPedido[] = [];
+  tiposMovimentacao: TipoMovimentacao[] = [];
+  tiposCliente: TipoCliente[] = [];
+  fornecedores: Fornecedor[] = [];
+  permissoes: Permissao[] = [];
+  perfis: Perfil[] = [];
+  categoriasFinanceiro: CategoriaFinanceiro[] = [];
+
+  lancamentos: LancamentoFinanceiro[] = [];
+  planejamentoCompras: PlanejamentoCompra[] = [];
+  perfisUsuarios: PerfilUsuario[] = [];
+
+  loading = true;
+  error: string | null = null;
   private onUpdateCallbacks: (() => void)[] = [];
-  private isLoaded = false;
 
   constructor() {
-    this.loadFromSupabase();
+    this.loadData();
   }
 
   subscribe(callback: () => void) {
     this.onUpdateCallbacks.push(callback);
-    return () => {
-      this.onUpdateCallbacks = this.onUpdateCallbacks.filter(cb => cb !== callback);
-    };
+    return () => { this.onUpdateCallbacks = this.onUpdateCallbacks.filter(cb => cb !== callback); };
   }
 
-  private notify() {
-    this.onUpdateCallbacks.forEach(cb => cb());
-  }
+  private notify() { this.onUpdateCallbacks.forEach(cb => cb()); }
 
+  // ================================================
+  // LOOKUP HELPERS
+  // ================================================
+  unidadeSigla(id: number): string { return this.unidades.find(u => u.id === id)?.sigla || `?(${id})`; }
+  unidadeNome(id: number): string { return this.unidades.find(u => u.id === id)?.nome || `?(${id})`; }
+  categoriaNome(id: number): string { return this.categorias.find(c => c.id === id)?.nome || `?(${id})`; }
+  statusNome(id: number): string { return this.statusPedido.find(s => s.id === id)?.nome || `?(${id})`; }
+  tipoClienteNome(id: number): string { return this.tiposCliente.find(t => t.id === id)?.nome || `?(${id})`; }
+  fornecedorNome(id: number): string { return this.fornecedores.find(f => f.id === id)?.nome_fantasia || `?(${id})`; }
+  perfilNome(id: number): string { return this.perfis.find(p => p.id === id)?.nome || `?(${id})`; }
+  tipoMovNome(id: number): string { return this.tiposMovimentacao.find(t => t.id === id)?.nome || `?(${id})`; }
+  categoriaFinanceiroNome(id: number): string { return this.categoriasFinanceiro.find(c => c.id === id)?.nome || `?(${id})`; }
+
+  // ================================================
+  // PERSISTÊNCIA LOCAL (cache)
+  // ================================================
   private saveToLocalStorage() {
     try {
-      localStorage.setItem('sb_materiais', JSON.stringify(this.materiais));
-      localStorage.setItem('sb_produtos', JSON.stringify(this.produtos));
-      localStorage.setItem('sb_fichas_tecnicas', JSON.stringify(this.fichas));
-      localStorage.setItem('sb_estoque_produtos', JSON.stringify(this.estoqueProdutos));
-      localStorage.setItem('sb_clientes', JSON.stringify(this.clientes));
-      localStorage.setItem('sb_pedidos', JSON.stringify(this.pedidos));
-      localStorage.setItem('sb_itens_pedido', JSON.stringify(this.itensPedido));
-      localStorage.setItem('sb_movimentacoes_materiais', JSON.stringify(this.movMateriais));
-      localStorage.setItem('sb_movimentacoes_produtos', JSON.stringify(this.movProdutos));
-    } catch (e) {
-      console.error('Erro ao salvar localStorage:', e);
-    }
-  }
-
-  async loadFromSupabase() {
-    if (!isSupabaseConfigured()) {
-      this.loadFromLocalStorage();
-      return;
-    }
-
-    try {
-      const [
-        materiaisRes,
-        produtosRes,
-        fichasRes,
-        estoqueProdutosRes,
-        clientesRes,
-        pedidosRes,
-        itensPedidoRes,
-        movMateriaisRes,
-        movProdutosRes
-      ] = await Promise.all([
-        supabase.from('materiais').select('*'),
-        supabase.from('produtos').select('*'),
-        supabase.from('fichas_tecnicas').select('*'),
-        supabase.from('estoque_produtos').select('*'),
-        supabase.from('clientes').select('*'),
-        supabase.from('pedidos').select('*'),
-        supabase.from('itens_pedido').select('*'),
-        supabase.from('movimentacoes_materiais').select('*').order('criado_em', { ascending: false }),
-        supabase.from('movimentacoes_produtos').select('*').order('criado_em', { ascending: false })
-      ]);
-
-      this.materiais = materiaisRes.data || [];
-      this.produtos = produtosRes.data || [];
-      this.fichas = fichasRes.data || [];
-      this.estoqueProdutos = estoqueProdutosRes.data || [];
-      this.clientes = clientesRes.data || [];
-      this.pedidos = pedidosRes.data || [];
-      this.itensPedido = itensPedidoRes.data || [];
-      this.movMateriais = movMateriaisRes.data || [];
-      this.movProdutos = movProdutosRes.data || [];
-
-      this.isLoaded = true;
-      await this.recalcularCustosProdutos();
-      this.notify();
-    } catch (e) {
-      console.error('Erro ao carregar do Supabase, usando localStorage:', e);
-      this.loadFromLocalStorage();
-    }
+      const data: Record<string, unknown> = {
+        materiais: this.materiais, produtos: this.produtos,
+        fichas: this.fichas, estoqueProdutos: this.estoqueProdutos,
+        clientes: this.clientes, pedidos: this.pedidos,
+        itensPedido: this.itensPedido, movMateriais: this.movMateriais,
+        movProdutos: this.movProdutos, lancamentos: this.lancamentos,
+        planejamentoCompras: this.planejamentoCompras,
+        perfisUsuarios: this.perfisUsuarios,
+        unidades: this.unidades, categorias: this.categorias,
+        statusPedido: this.statusPedido, tiposCliente: this.tiposCliente,
+        fornecedores: this.fornecedores, permissoes: this.permissoes,
+        perfis: this.perfis, tiposMovimentacao: this.tiposMovimentacao,
+        categoriasFinanceiro: this.categoriasFinanceiro,
+      };
+      Object.entries(data).forEach(([key, val]) => localStorage.setItem(`oc_${key}`, JSON.stringify(val)));
+    } catch { /* quota exceeded */ }
   }
 
   private loadFromLocalStorage() {
     try {
-      const materiastData = localStorage.getItem('sb_materiais');
-      const produtosData = localStorage.getItem('sb_produtos');
-      const fichasData = localStorage.getItem('sb_fichas_tecnicas');
-      const estoqueData = localStorage.getItem('sb_estoque_produtos');
-      const clientesData = localStorage.getItem('sb_clientes');
-      const pedidosData = localStorage.getItem('sb_pedidos');
-      const itensData = localStorage.getItem('sb_itens_pedido');
-      const movMatData = localStorage.getItem('sb_movimentacoes_materiais');
-      const movProdData = localStorage.getItem('sb_movimentacoes_produtos');
+      const get = <T>(k: string, fallback: T): T => {
+        const d = localStorage.getItem(`oc_${k}`);
+        return d ? JSON.parse(d) : fallback;
+      };
+      this.materiais = get('materiais', []);
+      this.produtos = get('produtos', []);
+      this.fichas = get('fichas', []);
+      this.estoqueProdutos = get('estoqueProdutos', []);
+      this.clientes = get('clientes', []);
+      this.pedidos = get('pedidos', []);
+      this.itensPedido = get('itensPedido', []);
+      this.movMateriais = get('movMateriais', []);
+      this.movProdutos = get('movProdutos', []);
+      this.lancamentos = get('lancamentos', []);
+      this.planejamentoCompras = get('planejamentoCompras', []);
+      this.perfisUsuarios = get('perfisUsuarios', []);
+      this.unidades = get('unidades', []);
+      this.categorias = get('categorias', []);
+      this.statusPedido = get('statusPedido', []);
+      this.tiposCliente = get('tiposCliente', []);
+      this.fornecedores = get('fornecedores', []);
+      this.permissoes = get('permissoes', []);
+      this.perfis = get('perfis', []);
+      this.tiposMovimentacao = get('tiposMovimentacao', []);
+      this.categoriasFinanceiro = get('categoriasFinanceiro', []);
+    } catch { /* ignore */ }
+  }
 
-      this.materiais = materiastData ? JSON.parse(materiastData) : INITIAL_MATERIAIS;
-      this.produtos = produtosData ? JSON.parse(produtosData) : INITIAL_PRODUTOS;
-      this.fichas = fichasData ? JSON.parse(fichasData) : INITIAL_FICHAS_TECNICAS;
-      this.estoqueProdutos = estoqueData ? JSON.parse(estoqueData) : INITIAL_ESTOQUE_PRODUTOS;
-      this.clientes = clientesData ? JSON.parse(clientesData) : INITIAL_CLIENTES;
-      this.pedidos = pedidosData ? JSON.parse(pedidosData) : INITIAL_PEDIDOS;
-      this.itensPedido = itensData ? JSON.parse(itensData) : INITIAL_ITENS_PEDIDO;
-      this.movMateriais = movMatData ? JSON.parse(movMatData) : INITIAL_MOVIMENTACOES_MATERIAIS;
-      this.movProdutos = movProdData ? JSON.parse(movProdData) : INITIAL_MOVIMENTACOES_PRODUTOS;
+  // ================================================
+  // SUPABASE HELPERS
+  // ================================================
+  private async fetchAll<T>(table: string, order?: string): Promise<T[]> {
+    if (!isSupabaseConfigured()) return [];
+    let q = supabase.from(table).select('*');
+    if (order) q = q.order(order.split(' ')[0], { ascending: order.includes('ASC') });
+    const { data } = await q;
+    return (data || []) as T[];
+  }
 
-      this.isLoaded = true;
-      this.recalcularCustosProdutos();
-      this.notify();
-    } catch (e) {
-      console.error('Erro ao carregar localStorage:', e);
-      this.materiais = INITIAL_MATERIAIS;
-      this.produtos = INITIAL_PRODUTOS;
-      this.fichas = INITIAL_FICHAS_TECNICAS;
-      this.estoqueProdutos = INITIAL_ESTOQUE_PRODUTOS;
-      this.clientes = INITIAL_CLIENTES;
-      this.pedidos = INITIAL_PEDIDOS;
-      this.itensPedido = INITIAL_ITENS_PEDIDO;
-      this.movMateriais = INITIAL_MOVIMENTACOES_MATERIAIS;
-      this.movProdutos = INITIAL_MOVIMENTACOES_PRODUTOS;
-      this.isLoaded = true;
-      this.notify();
-    }
+  private async supabaseInsert(table: string, data: Record<string, unknown>): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    const { error } = await supabase.from(table).insert(data);
+    if (error) { this.error = error.message; this.notify(); return false; }
+    return true;
+  }
+  private async supabaseUpdate(table: string, id: string, data: Record<string, unknown>): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    const { error } = await supabase.from(table).update(data).eq('id', id);
+    if (error) { this.error = error.message; this.notify(); return false; }
+    return true;
+  }
+  private async supabaseDelete(table: string, id: string): Promise<boolean> {
+    if (!isSupabaseConfigured()) return false;
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) { this.error = error.message; this.notify(); return false; }
+    return true;
+  }
+
+  // ================================================
+  // LOAD LOOKUPS
+  // ================================================
+  async loadLookups() {
+    if (!isSupabaseConfigured()) return;
+    const [
+      u, cat, st, tm, tc, f, perm, perf, cf
+    ] = await Promise.all([
+      this.fetchAll<Unidade>('unidades'),
+      this.fetchAll<Categoria>('categorias'),
+      this.fetchAll<StatusPedido>('status_pedido'),
+      this.fetchAll<TipoMovimentacao>('tipos_movimentacao'),
+      this.fetchAll<TipoCliente>('tipos_cliente'),
+      this.fetchAll<Fornecedor>('fornecedores'),
+      this.fetchAll<Permissao>('permissoes'),
+      this.fetchAll<Perfil>('perfis'),
+      this.fetchAll<CategoriaFinanceiro>('categorias_financeiro'),
+    ]);
+    this.unidades = u; this.categorias = cat; this.statusPedido = st;
+    this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
+    this.permissoes = perm; this.perfis = perf; this.categoriasFinanceiro = cf;
+  }
+
+  // ================================================
+  // LOAD DATA
+  // ================================================
+  async loadFromSupabase() {
+    if (!isSupabaseConfigured()) return false;
+    try {
+      const [m, p, f, e, c, pd, ip, mm, mp, l, pl, pu] = await Promise.all([
+        this.fetchAll<Material>('materiais'),
+        this.fetchAll<Produto>('produtos'),
+        this.fetchAll<FichaTecnicaItem>('fichas_tecnicas'),
+        this.fetchAll<EstoqueProduto>('estoque_produtos'),
+        this.fetchAll<Cliente>('clientes'),
+        this.fetchAll<Pedido>('pedidos', 'data_pedido DESC'),
+        this.fetchAll<ItemPedido>('itens_pedido'),
+        this.fetchAll<MovimentacaoMaterial>('movimentacoes_materiais', 'criado_em DESC'),
+        this.fetchAll<MovimentacaoProduto>('movimentacoes_produtos', 'criado_em DESC'),
+        this.fetchAll<LancamentoFinanceiro>('lancamentos_financeiros', 'data_lancamento DESC'),
+        this.fetchAll<PlanejamentoCompra>('planejamento_compras'),
+        this.fetchAll<PerfilUsuario>('perfis_usuario'),
+      ]);
+      this.materiais = m; this.produtos = p; this.fichas = f;
+      this.estoqueProdutos = e; this.clientes = c; this.pedidos = pd;
+      this.itensPedido = ip; this.movMateriais = mm; this.movProdutos = mp;
+      this.lancamentos = l; this.planejamentoCompras = pl; this.perfisUsuarios = pu;
+      return true;
+    } catch { return false; }
+  }
+
+  private async loadData() {
+    this.loading = true; this.notify();
+    await this.loadLookups();
+    const ok = await this.loadFromSupabase();
+    if (!ok) this.loadFromLocalStorage();
+    this.loading = false;
+    this.recalcularCustosProdutos();
+    this.saveToLocalStorage();
+    this.notify();
+  }
+
+  async refresh() {
+    this.loading = true; this.notify();
+    await this.loadLookups();
+    await this.loadFromSupabase();
+    this.loading = false;
+    this.recalcularCustosProdutos();
+    this.saveToLocalStorage();
+    this.notify();
   }
 
   async recalcularCustosProdutos() {
-    let mudou = false;
-    const produtosParaAtualizar: Produto[] = [];
-    
-    this.produtos = this.produtos.map(p => {
-      const custoNovo = calcularCustoProducao(p.id, this.fichas, this.materiais);
-      if (p.custo_producao_calculado !== custoNovo) {
-        mudou = true;
-        const updated = { ...p, custo_producao_calculado: custoNovo };
-        produtosParaAtualizar.push(updated);
-        return updated;
-      }
-      return p;
-    });
-
-    if (mudou && isSupabaseConfigured() && produtosParaAtualizar.length > 0) {
-      try {
-        await supabase.from('produtos').upsert(produtosParaAtualizar);
-      } catch (e) {
-        console.error('Erro ao recalcular custos:', e);
-      }
-    }
+    this.produtos = this.produtos.map(p => ({
+      ...p,
+      custo_producao_calculado: calcularCustoProducao(p.id, this.fichas, this.materiais, this.unidades)
+    }));
   }
 
-  // ==========================================
-  // MÓDULO 1: CRUD MATÉRIAS-PRIMAS
-  // ==========================================
-
-  async addMaterial(material: Omit<Material, 'id' | 'data_ultima_atualizacao'>) {
+  // ================================================
+  // CRUD — MATERIAIS
+  // ================================================
+  async addMaterial(data: { nome: string; unidade_id: number; custo_unitario: number; quantidade_atual?: number; quantidade_minima?: number; fornecedor_id?: number }) {
     const novo: Material = {
-      ...material,
       id: 'mat_' + Math.random().toString(36).substring(2, 9),
+      nome: data.nome,
+      unidade_id: data.unidade_id,
+      custo_unitario: data.custo_unitario,
+      quantidade_atual: data.quantidade_atual ?? 0,
+      quantidade_minima: data.quantidade_minima ?? 0,
+      fornecedor_id: data.fornecedor_id,
       data_ultima_atualizacao: new Date().toISOString()
     };
-    this.materiais.push(novo);
-    this.notify();
-    this.saveToLocalStorage();
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('materiais').insert(novo);
-      } catch (e) {
-        console.error('Erro ao salvar no Supabase (offline?):', e);
-      }
-    }
+    const ok = await this.supabaseInsert('materiais', novo as unknown as Record<string, unknown>);
+    if (ok) { this.materiais.push(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
-  async updateMaterial(id: string, updates: Partial<Omit<Material, 'id'>>) {
-    let updatedMaterial: Material | null = null;
-    this.materiais = this.materiais.map(m => {
-      if (m.id === id) {
-        updatedMaterial = { ...m, ...updates, data_ultima_atualizacao: new Date().toISOString() };
-        return updatedMaterial;
-      }
-      return m;
-    });
-    
-    this.notify();
-
-    if (isSupabaseConfigured() && updatedMaterial) {
-      await supabase.from('materiais').update(updatedMaterial).eq('id', id);
-    }
+  async updateMaterial(id: string, updates: Partial<Material>) {
+    const idx = this.materiais.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.materiais[idx], ...updates, data_ultima_atualizacao: new Date().toISOString() };
+    const ok = await this.supabaseUpdate('materiais', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.materiais[idx] = updated; this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteMaterial(id: string) {
-    this.materiais = this.materiais.filter(m => m.id !== id);
-    this.fichas = this.fichas.filter(f => f.material_id !== id);
-    this.recalcularCustosProdutos();
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('materiais').delete().eq('id', id);
+    const ok = await this.supabaseDelete('materiais', id);
+    if (ok) {
+      this.materiais = this.materiais.filter(m => m.id !== id);
+      this.fichas = this.fichas.filter(f => f.material_id !== id);
+      this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify();
     }
   }
 
-  async lancarEntradaMaterial(id: string, quantidade: number, custoUnitario?: number, observacao?: string) {
+  async lancarEntradaMaterial(id: string, quantidade: number, custoUnitario?: number, observacao?: string, criarDespesa?: boolean) {
     const mat = this.materiais.find(m => m.id === id);
     if (!mat) return;
     mat.quantidade_atual += quantidade;
-    if (custoUnitario !== undefined && custoUnitario >= 0) {
-      mat.custo_unitario = custoUnitario;
-    }
+    if (custoUnitario !== undefined && custoUnitario >= 0) mat.custo_unitario = custoUnitario;
     mat.data_ultima_atualizacao = new Date().toISOString();
 
     const unitPrice = custoUnitario !== undefined ? custoUnitario : mat.custo_unitario;
-    const valorPago = unitPrice * quantidade;
-
     const mov: MovimentacaoMaterial = {
       id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
       material_id: id,
-      tipo: 'entrada_compra',
+      tipo_id: 1,
       quantidade,
       observacao,
-      valor_pago: valorPago,
+      valor_pago: unitPrice * quantidade,
       custo_unitario: unitPrice,
       criado_em: new Date().toISOString()
     };
-    this.movMateriais.unshift(mov);
-    this.notify();
 
-    if (isSupabaseConfigured()) {
-      await supabase.from('materiais').update({
-        quantidade_atual: mat.quantidade_atual,
-        custo_unitario: mat.custo_unitario,
-        data_ultima_atualizacao: mat.data_ultima_atualizacao
-      }).eq('id', id);
-      await supabase.from('movimentacoes_materiais').insert(mov);
+    const fornecedor = mat.fornecedor_id ? this.fornecedores.find(f => f.id === mat.fornecedor_id) : undefined;
+
+    const okMat = await this.supabaseUpdate('materiais', id, mat as unknown as Record<string, unknown>);
+    const okMov = await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>);
+    if (okMat && okMov) {
+      this.movMateriais.unshift(mov);
+      if (criarDespesa) {
+        const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
+        const despesa: LancamentoFinanceiro = {
+          id: crypto.randomUUID(), criado_em: new Date().toISOString(),
+          data_lancamento: new Date().toISOString().split('T')[0],
+          valor: unitPrice * quantidade, tipo: 'despesa',
+          categoria_id: catDespesa?.id || 1,
+          descricao: `Compra de ${mat.nome}${fornecedor ? ` - ${fornecedor.nome_fantasia}` : ''}`,
+          movimentacao_id: mov.id,
+        };
+        await this.supabaseInsert('lancamentos_financeiros', despesa as unknown as Record<string, unknown>);
+        this.lancamentos.unshift(despesa);
+      }
+      this.saveToLocalStorage(); this.notify();
     }
   }
 
-  // ==========================================
-  // MÓDULO 2: CRUD PRODUTOS
-  // ==========================================
-
-  async addProduto(produto: Partial<Omit<Produto, 'id'>>, _recipeItems?: FichaTecnicaItem[]) {
+  // ================================================
+  // CRUD — PRODUTOS
+  // ================================================
+  async addProduto(data: Partial<Produto>) {
     const novo: Produto = {
-      nome: produto.nome || '',
-      categoria: produto.categoria || 'outro',
-      descricao: produto.descricao,
-      unidade_producao: produto.unidade_producao || 'un',
-      tempo_producao_minutos: produto.tempo_producao_minutos ?? 0,
-      custo_producao_calculado: produto.custo_producao_calculado ?? 0,
-      ativo: produto.ativo ?? true,
-      margem_lucro: produto.margem_lucro ?? 0,
-      preco_venda: produto.preco_venda ?? 0,
-      imagem: produto.imagem,
+      nome: data.nome || '',
+      categoria_id: data.categoria_id || 5,
+      descricao: data.descricao,
+      unidade_producao_id: data.unidade_producao_id || 5,
+      tempo_producao_minutos: data.tempo_producao_minutos ?? 0,
+      custo_producao_calculado: data.custo_producao_calculado ?? 0,
+      ativo: data.ativo ?? true,
+      margem_lucro: data.margem_lucro ?? 0,
+      preco_venda: data.preco_venda ?? 0,
+      imagem: data.imagem,
       id: 'prod_' + Math.random().toString(36).substring(2, 9)
     };
-    this.produtos.push(novo);
-    this.notify();
-    this.saveToLocalStorage();
-
-    if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('produtos').insert(novo);
-      } catch (e) {
-        console.error('Erro ao salvar no Supabase (offline?):', e);
-      }
-    }
+    const ok = await this.supabaseInsert('produtos', novo as unknown as Record<string, unknown>);
+    if (ok) { this.produtos.push(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
-  async updateProduto(id: string, updates: Partial<Omit<Produto, 'id'>>, _recipeItems?: FichaTecnicaItem[]) {
-    this.produtos = this.produtos.map(p => p.id === id ? { ...p, ...updates } : p);
-    this.recalcularCustosProdutos();
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('produtos').update(updates).eq('id', id);
-    }
+  async updateProduto(id: string, updates: Partial<Produto>) {
+    const idx = this.produtos.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.produtos[idx], ...updates };
+    const ok = await this.supabaseUpdate('produtos', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.produtos[idx] = updated; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteProduto(id: string) {
-    this.produtos = this.produtos.filter(p => p.id !== id);
-    this.fichas = this.fichas.filter(f => f.produto_id !== id);
-    this.estoqueProdutos = this.estoqueProdutos.filter(e => e.produto_id !== id);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('produtos').delete().eq('id', id);
+    const p = this.produtos.find(x => x.id === id);
+    const ok = await this.supabaseDelete('produtos', id);
+    if (ok) {
+      if (p?.imagem && isStorageUrl(p.imagem)) deleteProdutoImage(p.imagem).catch(() => {});
+      this.produtos = this.produtos.filter(x => x.id !== id);
+      this.fichas = this.fichas.filter(f => f.produto_id !== id);
+      this.estoqueProdutos = this.estoqueProdutos.filter(e => e.produto_id !== id);
+      this.saveToLocalStorage(); this.notify();
     }
   }
 
-  // ==========================================
-  // MÓDULO 3: FICHAS TÉCNICAS
-  // ==========================================
-
+  // ================================================
+  // CRUD — FICHAS TÉCNICAS
+  // ================================================
   async addFichaTecnica(ficha: Omit<FichaTecnicaItem, 'id'>) {
-    const nova: FichaTecnicaItem = {
-      ...ficha,
-      id: 'ficha_' + Math.random().toString(36).substring(2, 9)
-    };
-    this.fichas.push(nova);
-    this.recalcularCustosProdutos();
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('fichas_tecnicas').insert(nova);
-    }
+    const nova: FichaTecnicaItem = { ...ficha, id: 'ficha_' + Math.random().toString(36).substring(2, 9) };
+    const ok = await this.supabaseInsert('fichas_tecnicas', nova as unknown as Record<string, unknown>);
+    if (ok) { this.fichas.push(nova); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
     return nova;
   }
 
-  async updateFichaTecnica(id: string, updates: Partial<Omit<FichaTecnicaItem, 'id'>>) {
-    this.fichas = this.fichas.map(f => f.id === id ? { ...f, ...updates } : f);
-    this.recalcularCustosProdutos();
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('fichas_tecnicas').update(updates).eq('id', id);
-    }
+  async updateFichaTecnica(id: string, updates: Partial<FichaTecnicaItem>) {
+    const idx = this.fichas.findIndex(f => f.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.fichas[idx], ...updates };
+    const ok = await this.supabaseUpdate('fichas_tecnicas', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.fichas[idx] = updated; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteFichaTecnica(id: string) {
-    this.fichas = this.fichas.filter(f => f.id !== id);
-    this.recalcularCustosProdutos();
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('fichas_tecnicas').delete().eq('id', id);
-    }
+    const ok = await this.supabaseDelete('fichas_tecnicas', id);
+    if (ok) { this.fichas = this.fichas.filter(f => f.id !== id); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
-  // ==========================================
-  // MÓDULO 4: ESTOQUE PRODUTOS
-  // ==========================================
-
+  // ================================================
+  // CRUD — ESTOQUE PRODUTOS
+  // ================================================
   async addEstoqueProduto(estoque: Omit<EstoqueProduto, 'id' | 'data_atualizacao'>) {
-    const novo: EstoqueProduto = {
-      ...estoque,
-      id: 'est_' + Math.random().toString(36).substring(2, 9),
-      data_atualizacao: new Date().toISOString()
-    };
-    this.estoqueProdutos.push(novo);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('estoque_produtos').insert(novo);
-    }
+    const novo: EstoqueProduto = { ...estoque, id: 'est_' + Math.random().toString(36).substring(2, 9), data_atualizacao: new Date().toISOString() };
+    const ok = await this.supabaseInsert('estoque_produtos', novo as unknown as Record<string, unknown>);
+    if (ok) { this.estoqueProdutos.push(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
-  async updateEstoqueProduto(id: string, updates: Partial<Omit<EstoqueProduto, 'id'>>) {
-    let updated: EstoqueProduto | null = null;
-    this.estoqueProdutos = this.estoqueProdutos.map(e => {
-      if (e.id === id) {
-        updated = { ...e, ...updates, data_atualizacao: new Date().toISOString() };
-        return updated;
-      }
-      return e;
-    });
-    this.notify();
-
-    if (isSupabaseConfigured() && updated) {
-      await supabase.from('estoque_produtos').update(updated).eq('id', id);
-    }
+  async updateEstoqueProduto(id: string, updates: Partial<EstoqueProduto>) {
+    const idx = this.estoqueProdutos.findIndex(e => e.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.estoqueProdutos[idx], ...updates, data_atualizacao: new Date().toISOString() };
+    const ok = await this.supabaseUpdate('estoque_produtos', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.estoqueProdutos[idx] = updated; this.saveToLocalStorage(); this.notify(); }
   }
 
-  async updateEstoqueProdutoConfig(id: string, updates: Partial<Omit<EstoqueProduto, 'id'>>) {
-    return this.updateEstoqueProduto(id, updates);
-  }
+  async updateEstoqueProdutoConfig(id: string, updates: Partial<EstoqueProduto>) { return this.updateEstoqueProduto(id, updates); }
 
   async deleteEstoqueProduto(id: string) {
-    this.estoqueProdutos = this.estoqueProdutos.filter(e => e.id !== id);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('estoque_produtos').delete().eq('id', id);
-    }
+    const ok = await this.supabaseDelete('estoque_produtos', id);
+    if (ok) { this.estoqueProdutos = this.estoqueProdutos.filter(e => e.id !== id); this.saveToLocalStorage(); this.notify(); }
   }
 
-  async lancarLoteProducao(produtoId: string, quantidade: number, dataValidade?: string, lote?: string, observacao?: string) {
-    let estoque = this.estoqueProdutos.find(e => e.produto_id === produtoId);
-    
-    if (estoque) {
-      estoque.quantidade_disponivel += quantidade;
-      estoque.data_atualizacao = new Date().toISOString();
-      if (dataValidade) estoque.data_validade = dataValidade;
-      if (lote) estoque.lote = lote;
+  async lancarLoteProducao(produtoId: string, quantidade: number, dataValidade?: string, lote?: string, observacao?: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.lancarProducao([{ produto_id: produtoId, quantidade_solicitada: quantidade }], undefined);
+    if (!result.success) return result;
 
-      await supabase.from('estoque_produtos').update({
-        quantidade_disponivel: estoque.quantidade_disponivel,
-        data_validade: estoque.data_validade,
-        lote: estoque.lote,
-        data_atualizacao: estoque.data_atualizacao
-      }).eq('id', estoque.id);
-    } else {
-      estoque = {
-        id: 'est_' + Math.random().toString(36).substring(2, 9),
-        produto_id: produtoId,
-        quantidade_disponivel: quantidade,
-        quantidade_reservada: 0,
-        quantidade_minima: 0,
-        data_validade: dataValidade,
-        lote,
-        data_atualizacao: new Date().toISOString()
-      };
-      this.estoqueProdutos.push(estoque);
-
-      await supabase.from('estoque_produtos').insert(estoque);
+    // lancarProducao already consumed insumos and added to estoque_produtos
+    // Now add lote/validade if provided
+    if (dataValidade || lote) {
+      const estoque = this.estoqueProdutos.find(e => e.produto_id === produtoId);
+      if (estoque) {
+        if (dataValidade) estoque.data_validade = dataValidade;
+        if (lote) estoque.lote = lote;
+        estoque.data_atualizacao = new Date().toISOString();
+        await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+        this.saveToLocalStorage(); this.notify();
+      }
     }
-
-    const mov: MovimentacaoProduto = {
-      id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
-      produto_id: produtoId,
-      tipo: 'entrada_producao',
-      quantidade,
-      observacao: observacao || (lote ? `Lote: ${lote}` : undefined),
-      criado_em: new Date().toISOString()
-    };
-    this.movProdutos.unshift(mov);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('movimentacoes_produtos').insert(mov);
-    }
+    return { success: true };
   }
 
-  // ==========================================
-  // MÓDULO 5: CLIENTES
-  // ==========================================
-
-  async addCliente(cliente: Omit<Cliente, 'id'>) {
+  // ================================================
+  // CRUD — CLIENTES
+  // ================================================
+  async addCliente(data: { nome: string; tipo_id: number; telefone?: string; email?: string; endereco?: string; observacoes?: string }) {
     const novo: Cliente = {
-      ...cliente,
+      ...data, telefone: data.telefone || '', email: data.email || '', endereco: data.endereco || '',
       id: 'cli_' + Math.random().toString(36).substring(2, 9)
     };
-    this.clientes.push(novo);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('clientes').insert(novo);
-    }
+    const ok = await this.supabaseInsert('clientes', novo as unknown as Record<string, unknown>);
+    if (ok) { this.clientes.push(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
-  async updateCliente(id: string, updates: Partial<Omit<Cliente, 'id'>>) {
-    this.clientes = this.clientes.map(c => c.id === id ? { ...c, ...updates } : c);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('clientes').update(updates).eq('id', id);
-    }
+  async updateCliente(id: string, updates: Partial<Cliente>) {
+    const idx = this.clientes.findIndex(c => c.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.clientes[idx], ...updates };
+    const ok = await this.supabaseUpdate('clientes', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.clientes[idx] = updated; this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteCliente(id: string) {
-    this.clientes = this.clientes.filter(c => c.id !== id);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('clientes').delete().eq('id', id);
-    }
+    const ok = await this.supabaseDelete('clientes', id);
+    if (ok) { this.clientes = this.clientes.filter(c => c.id !== id); this.saveToLocalStorage(); this.notify(); }
   }
 
-  // ==========================================
-  // MÓDULO 6: PEDIDOS
-  // ==========================================
-
-  async addPedido(pedido: Partial<Omit<Pedido, 'id' | 'data_pedido' | 'atualizado_em'>>, _itens?: ItemPedido[]) {
+  // ================================================
+  // CRUD — PEDIDOS
+  // ================================================
+  async addPedido(data: Partial<Pedido>) {
     const novo: Pedido = {
-      cliente_id: pedido.cliente_id || '',
-      status: pedido.status || 'rascunho',
-      data_entrega_prevista: pedido.data_entrega_prevista || new Date().toISOString(),
-      observacoes: pedido.observacoes,
-      criado_by: pedido.criado_by,
-      valor_total: pedido.valor_total ?? 0,
+      cliente_id: data.cliente_id || '',
+      status_id: data.status_id || 1,
+      data_entrega_prevista: data.data_entrega_prevista || new Date().toISOString(),
+      observacoes: data.observacoes, criado_by: data.criado_by || '', valor_total: data.valor_total ?? 0,
       id: 'ped_' + Math.random().toString(36).substring(2, 9),
-      data_pedido: new Date().toISOString(),
-      atualizado_em: new Date().toISOString()
+      data_pedido: new Date().toISOString(), atualizado_em: new Date().toISOString()
     };
-    this.pedidos.push(novo);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('pedidos').insert(novo);
-    }
+    const ok = await this.supabaseInsert('pedidos', novo as unknown as Record<string, unknown>);
+    if (ok) { this.pedidos.push(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
-  async updatePedido(id: string, updates: Partial<Omit<Pedido, 'id'>>) {
-    this.pedidos = this.pedidos.map(p => p.id === id ? { ...p, ...updates, atualizado_em: new Date().toISOString() } : p);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('pedidos').update({ ...updates, atualizado_em: new Date().toISOString() }).eq('id', id);
-    }
+  async updatePedido(id: string, updates: Partial<Pedido>) {
+    const idx = this.pedidos.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.pedidos[idx], ...updates, atualizado_em: new Date().toISOString() };
+    const ok = await this.supabaseUpdate('pedidos', id, updated as unknown as Record<string, unknown>);
+    if (ok) { this.pedidos[idx] = updated; this.saveToLocalStorage(); this.notify(); }
   }
 
-  async updatePedidoStatus(id: string, status: PedidoStatus): Promise<{ success: boolean; error?: string }> {
-    try {
-      await this.updatePedido(id, { status });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Erro ao atualizar status' };
+  async updatePedidoStatus(id: string, status_id: number): Promise<{ success: boolean; error?: string }> {
+    const pedido = this.pedidos.find(p => p.id === id);
+    if (!pedido) return { success: false, error: 'Pedido não encontrado' };
+    const fromStatus = pedido.status_id;
+
+if (fromStatus === 1 && status_id === 2) {
+        // Reservar estoque disponível para o pedido confirmado
+        const itensConfirm = this.itensPedido.filter(i => i.pedido_id === id);
+        for (const it of itensConfirm) {
+          const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
+          if (estoque) {
+            // mover do disponivel para reservada
+            const moverQtd = Math.min(it.quantidade_solicitada, estoque.quantidade_disponivel);
+            estoque.quantidade_disponivel -= moverQtd;
+            estoque.quantidade_reservada += moverQtd;
+            estoque.data_atualizacao = new Date().toISOString();
+            await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+          }
+        }
+      }
+
+      // Cancelamento libera reservas
+      if (status_id === 6) {
+        const itensCanc = this.itensPedido.filter(i => i.pedido_id === id);
+        for (const it of itensCanc) {
+          const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
+          if (estoque) {
+            estoque.quantidade_reservada -= it.quantidade_solicitada;
+            estoque.quantidade_disponivel += it.quantidade_solicitada;
+            estoque.data_atualizacao = new Date().toISOString();
+            await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+          }
+        }
+      }
+      const itens = this.itensPedido.filter(i => i.pedido_id === id);
+      const result = await this.lancarProducao(itens, id);
+      if (!result.success) return result;
     }
+
+    // 4 → 5: Entregar — baixar estoque de produtos
+    if (fromStatus === 4 && status_id === 5) {
+      const result = await this.lancarSaidaPedido(id);
+      if (!result.success) return result;
+    }
+
+    try { await this.updatePedido(id, { status_id }); return { success: true }; }
+    catch (e) { return { success: false, error: e instanceof Error ? e.message : 'Erro' }; }
+  }
+
+  async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string): Promise<{ success: boolean; error?: string }> {
+    const materiaisUsados: Record<string, { material: Material; ficha: FichaTecnicaItem; qtdNeeded: number }[]> = {};
+
+    for (const item of itens) {
+      const fichas = this.fichas.filter(f => f.produto_id === item.produto_id);
+      const produto = this.produtos.find(p => p.id === item.produto_id);
+      if (!produto) return { success: false, error: `Produto não encontrado: ${item.produto_id}` };
+
+      for (const ficha of fichas) {
+        const mat = this.materiais.find(m => m.id === ficha.material_id);
+        if (!mat) return { success: false, error: `Ingrediente não encontrado na ficha de "${produto.nome}"` };
+
+        const qtdNeeded = normalizarQuantidade(
+          ficha.quantidade_necessaria * item.quantidade_solicitada,
+          ficha.unidade_id, mat.unidade_id, this.unidades
+        );
+
+        if (mat.quantidade_atual < qtdNeeded) {
+          const falta = qtdNeeded - mat.quantidade_atual;
+          return {
+            success: false,
+            error: `Insumo insuficiente: "${mat.nome}". Tem ${mat.quantidade_atual.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}, precisa ${qtdNeeded.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}. Compre mais ${falta.toFixed(2)}${this.unidadeSigla(mat.unidade_id)} antes de produzir.`
+          };
+        }
+
+        if (!materiaisUsados[mat.id]) materiaisUsados[mat.id] = [];
+        materiaisUsados[mat.id].push({ material: mat, ficha, qtdNeeded });
+      }
+    }
+
+    // Consumir insumos
+    for (const matId of Object.keys(materiaisUsados)) {
+      const totalQtd = materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0);
+      const mat = this.materiais.find(m => m.id === matId)!;
+      mat.quantidade_atual -= totalQtd;
+      mat.data_ultima_atualizacao = new Date().toISOString();
+      await this.supabaseUpdate('materiais', matId, mat as unknown as Record<string, unknown>);
+
+      const mov: MovimentacaoMaterial = {
+        id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
+        material_id: matId, tipo_id: 2, quantidade: totalQtd,
+        observacao: pedidoId ? `Produção pedido ${pedidoId}` : 'Produção avulsa',
+        criado_em: new Date().toISOString()
+      };
+      if (await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>)) {
+        this.movMateriais.unshift(mov);
+      }
+    }
+
+    // Gerar produtos + movimentações
+    for (const item of itens) {
+      const produto = this.produtos.find(p => p.id === item.produto_id)!;
+      let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
+
+if (estoque) {
+    estoque.quantidade_reservada += item.quantidade_solicitada;
+    estoque.data_atualizacao = new Date().toISOString();
+    await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+} else {
+    estoque = {
+        id: 'est_' + Math.random().toString(36).substring(2, 9),
+        produto_id: item.produto_id, quantidade_disponivel: 0,
+        quantidade_reservada: item.quantidade_solicitada, quantidade_minima: 0, data_atualizacao: new Date().toISOString()
+    };
+    await this.supabaseInsert('estoque_produtos', estoque as unknown as Record<string, unknown>);
+    this.estoqueProdutos.push(estoque);
+}
+
+      const movProd: MovimentacaoProduto = {
+        id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
+        produto_id: item.produto_id, tipo_id: 4, quantidade: item.quantidade_solicitada,
+        pedido_id: pedidoId, criado_em: new Date().toISOString()
+      };
+      if (await this.supabaseInsert('movimentacoes_produtos', movProd as unknown as Record<string, unknown>)) {
+        this.movProdutos.unshift(movProd);
+      }
+    }
+
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
   }
 
   async deletePedido(id: string) {
-    this.pedidos = this.pedidos.filter(p => p.id !== id);
-    this.itensPedido = this.itensPedido.filter(i => i.pedido_id !== id);
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('pedidos').delete().eq('id', id);
-    }
+    const ok = await this.supabaseDelete('pedidos', id);
+    if (ok) { this.pedidos = this.pedidos.filter(p => p.id !== id); this.itensPedido = this.itensPedido.filter(i => i.pedido_id !== id); this.saveToLocalStorage(); this.notify(); }
   }
 
+  // ================================================
+  // CRUD — ITENS PEDIDO
+  // ================================================
   async addItemPedido(item: Omit<ItemPedido, 'id'>) {
-    const novo: ItemPedido = {
-      ...item,
-      id: 'item_' + Math.random().toString(36).substring(2, 9)
-    };
-    this.itensPedido.push(novo);
-    
-    const pedido = this.pedidos.find(p => p.id === item.pedido_id);
-    if (pedido) {
-      pedido.valor_total = this.itensPedido
-        .filter(i => i.pedido_id === pedido.id)
-        .reduce((sum, i) => sum + (i.quantidade_solicitada * i.preco_unitario), 0);
-      pedido.atualizado_em = new Date().toISOString();
-    }
-
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('itens_pedido').insert(novo);
+    const novo: ItemPedido = { ...item, id: 'item_' + Math.random().toString(36).substring(2, 9) };
+    const ok = await this.supabaseInsert('itens_pedido', novo as unknown as Record<string, unknown>);
+    if (ok) {
+      this.itensPedido.push(novo);
+      const pedido = this.pedidos.find(p => p.id === item.pedido_id);
       if (pedido) {
-        await supabase.from('pedidos').update({ valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em }).eq('id', pedido.id);
+        pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+        pedido.atualizado_em = new Date().toISOString();
       }
+      this.saveToLocalStorage(); this.notify();
     }
     return novo;
   }
 
-  async updateItemPedido(id: string, updates: Partial<Omit<ItemPedido, 'id'>>) {
-    this.itensPedido = this.itensPedido.map(i => i.id === id ? { ...i, ...updates } : i);
-    
-    const item = this.itensPedido.find(i => i.id === id);
-    if (item) {
-      const pedido = this.pedidos.find(p => p.id === item.pedido_id);
+  async updateItemPedido(id: string, updates: Partial<ItemPedido>) {
+    const idx = this.itensPedido.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const updated = { ...this.itensPedido[idx], ...updates };
+    const ok = await this.supabaseUpdate('itens_pedido', id, updated as unknown as Record<string, unknown>);
+    if (ok) {
+      this.itensPedido[idx] = updated;
+      const pedido = this.pedidos.find(p => p.id === updated.pedido_id);
       if (pedido) {
-        pedido.valor_total = this.itensPedido
-          .filter(i => i.pedido_id === pedido.id)
-          .reduce((sum, i) => sum + (i.quantidade_solicitada * i.preco_unitario), 0);
+        pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
         pedido.atualizado_em = new Date().toISOString();
       }
-    }
-
-    this.notify();
-
-    if (isSupabaseConfigured() && item) {
-      await supabase.from('itens_pedido').update(updates).eq('id', id);
-      const pedido = this.pedidos.find(p => p.id === item.pedido_id);
-      if (pedido) {
-        await supabase.from('pedidos').update({ valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em }).eq('id', pedido.id);
-      }
+      this.saveToLocalStorage(); this.notify();
     }
   }
 
   async deleteItemPedido(id: string) {
     const item = this.itensPedido.find(i => i.id === id);
-    this.itensPedido = this.itensPedido.filter(i => i.id !== id);
-    
-    if (item) {
-      const pedido = this.pedidos.find(p => p.id === item.pedido_id);
-      if (pedido) {
-        pedido.valor_total = this.itensPedido
-          .filter(i => i.pedido_id === pedido.id)
-          .reduce((sum, i) => sum + (i.quantidade_solicitada * i.preco_unitario), 0);
-        pedido.atualizado_em = new Date().toISOString();
-      }
-    }
-
-    this.notify();
-
-    if (isSupabaseConfigured()) {
-      await supabase.from('itens_pedido').delete().eq('id', id);
+    const ok = await this.supabaseDelete('itens_pedido', id);
+    if (ok) {
+      this.itensPedido = this.itensPedido.filter(i => i.id !== id);
       if (item) {
         const pedido = this.pedidos.find(p => p.id === item.pedido_id);
         if (pedido) {
-          await supabase.from('pedidos').update({ valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em }).eq('id', pedido.id);
+          pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+          pedido.atualizado_em = new Date().toISOString();
         }
       }
+      this.saveToLocalStorage(); this.notify();
     }
   }
 
-  async lancarSaidaPedido(pedidoId: string) {
+  async lancarSaidaPedido(pedidoId: string): Promise<{ success: boolean; error?: string }> {
     const pedido = this.pedidos.find(p => p.id === pedidoId);
-    if (!pedido) return;
-
+    if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const itens = this.itensPedido.filter(i => i.pedido_id === pedidoId);
 
     for (const item of itens) {
-      let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
-      if (estoque) {
-        estoque.quantidade_disponivel -= item.quantidade_solicitada;
-        estoque.data_atualizacao = new Date().toISOString();
-
-        await supabase.from('estoque_produtos').update({
-          quantidade_disponivel: estoque.quantidade_disponivel,
-          data_atualizacao: estoque.data_atualizacao
-        }).eq('id', estoque.id);
+      const prod = this.produtos.find(p => p.id === item.produto_id);
+      const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
+      const reservada = estoque?.quantidade_reservada || 0;
+      if (reservada < item.quantidade_solicitada) {
+        return {
+          success: false,
+          error: `Estoque insuficiente de "${prod?.nome || item.produto_id}". Reservado: ${reservada}${prod ? this.unidadeSigla(prod.unidade_producao_id) : ''}, necessário: ${item.quantidade_solicitada}. Produza mais antes de entregar.`
+        };
       }
-
-      const mov: MovimentacaoProduto = {
-        id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
-        produto_id: item.produto_id,
-        tipo: 'saida_pedido',
-        quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId,
-        criado_em: new Date().toISOString()
-      };
-      this.movProdutos.unshift(mov);
-
-      await supabase.from('movimentacoes_produtos').insert(mov);
     }
 
-    this.notify();
+    let ok = true;
+    for (const item of itens) {
+      const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
+      if (estoque) {
+        estoque.quantidade_reservada -= item.quantidade_solicitada;
+        estoque.data_atualizacao = new Date().toISOString();
+        if (!await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>)) ok = false;
+      }
+      const mov: MovimentacaoProduto = {
+        id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
+        produto_id: item.produto_id, tipo_id: 5, quantidade: item.quantidade_solicitada,
+        pedido_id: pedidoId, criado_em: new Date().toISOString()
+      };
+      if (!await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>)) ok = false;
+      if (ok) this.movProdutos.unshift(mov);
+    }
+    if (ok) { this.saveToLocalStorage(); this.notify(); }
+    return { success: ok, error: ok ? undefined : 'Erro ao salvar no servidor' };
+  }
+
+  // ================================================
+  // CRUD — PERFIS USUÁRIO
+  // ================================================
+  async listPerfisUsuarios() {
+    const data = await this.fetchAll<PerfilUsuario>('perfis_usuario');
+    this.perfisUsuarios = data; return data;
+  }
+
+  async updatePerfilUsuario(userId: string, updates: Partial<PerfilUsuario>) {
+    const ok = await this.supabaseUpdate('perfis_usuario', userId, updates as unknown as Record<string, unknown>);
+    if (ok) {
+      const idx = this.perfisUsuarios.findIndex(u => u.id === userId);
+      if (idx >= 0) this.perfisUsuarios[idx] = { ...this.perfisUsuarios[idx], ...updates };
+      else this.perfisUsuarios.push({ id: userId, ...updates } as PerfilUsuario);
+      this.saveToLocalStorage(); this.notify();
+    }
+  }
+
+  // ================================================
+  // FORNECEDORES
+  // ================================================
+  async addFornecedor(data: { nome_fantasia: string; contato?: string; telefone?: string; email?: string }) {
+    if (!isSupabaseConfigured()) return null;
+    const { data: inserted, error } = await supabase.from('fornecedores').insert(data).select().single();
+    if (error || !inserted) { this.error = error?.message || 'Erro ao criar fornecedor'; this.notify(); return null; }
+    const f = inserted as Fornecedor;
+    this.fornecedores.push(f);
+    this.saveToLocalStorage(); this.notify();
+    return f;
+  }
+
+  async updateFornecedor(id: number, data: Partial<Fornecedor>) {
+    if (!isSupabaseConfigured()) return;
+    const { error } = await supabase.from('fornecedores').update(data).eq('id', id);
+    if (!error) {
+      const idx = this.fornecedores.findIndex(f => f.id === id);
+      if (idx >= 0) this.fornecedores[idx] = { ...this.fornecedores[idx], ...data };
+      this.saveToLocalStorage(); this.notify();
+    }
+  }
+
+  // ================================================
+  // FINANCEIRO
+  // ================================================
+  async addLancamentoFinanceiro(data: Omit<LancamentoFinanceiro, 'id' | 'criado_em'>) {
+    const novo = { ...data, id: crypto.randomUUID(), criado_em: new Date().toISOString() };
+    const ok = await this.supabaseInsert('lancamentos_financeiros', novo as unknown as Record<string, unknown>);
+    if (ok) { this.lancamentos.unshift(novo); this.saveToLocalStorage(); this.notify(); }
+    return novo;
+  }
+
+  async deleteLancamentoFinanceiro(id: string) {
+    const ok = await this.supabaseDelete('lancamentos_financeiros', id);
+    if (ok) { this.lancamentos = this.lancamentos.filter(l => l.id !== id); this.saveToLocalStorage(); this.notify(); }
+  }
+
+  async registrarPagamentoPedido(pedidoId: string, valor: number, formaPagamento?: string, dataLancamento?: string) {
+    const pedido = this.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return null;
+    const cliente = this.clientes.find(c => c.id === pedido.cliente_id);
+    const catVenda = this.categoriasFinanceiro.find(c => c.tipo === 'receita');
+    return await this.addLancamentoFinanceiro({
+      data_lancamento: dataLancamento || new Date().toISOString().split('T')[0],
+      valor,
+      tipo: 'receita',
+      categoria_id: catVenda?.id || 1,
+      descricao: `Pagamento pedido #${pedidoId.slice(-6)} - ${cliente?.nome || 'Cliente'}`,
+      pedido_id: pedidoId,
+      forma_pagamento: formaPagamento,
+    });
+  }
+
+  // ================================================
+  // PLANEJAMENTO DE COMPRAS
+  // ================================================
+  async gerarSugestoesCompra() {
+    return await this.fetchAll<PlanejamentoCompra>('planejamento_compras', 'data_sugerida ASC');
   }
 }

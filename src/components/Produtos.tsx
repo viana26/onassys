@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade } from '../lib/calculos';
 import { compressImage } from '../lib/imageOptimizer';
+import { uploadProdutoImage, deleteProdutoImage, isStorageUrl, isBase64Image, base64ToBlob } from '../lib/imageUpload';
 
 interface ProdutosProps {
   store: MiniFactoryStore;
@@ -29,7 +30,7 @@ interface ProdutosProps {
 
 export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('todos');
+  const [categoryFilter, setCategoryFilter] = useState<number | 'todos'>('todos');
   const [expandedProdutoId, setExpandedProdutoId] = useState<string | null>(null);
 
   // Form state
@@ -37,9 +38,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [editId, setEditId] = useState<string | null>(null);
   
   const [nome, setNome] = useState('');
-  const [categoria, setCategoria] = useState<'salgado' | 'doce' | 'bolo' | 'bebida' | 'outro'>('salgado');
+  const [categoriaId, setCategoriaId] = useState<number>(2);
   const [descricao, setDescricao] = useState('');
-  const [unidadeProducao, setUnidadeProducao] = useState('por dúzia');
+  const [unidadeProducaoId, setUnidadeProducaoId] = useState<number>(5);
   const [tempoProducao, setTempoProducao] = useState(30);
   const [ativo, setAtivo] = useState(true);
 
@@ -50,20 +51,20 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [imageCompressing, setImageCompressing] = useState(false);
 
   // Ficha técnica temporary builder list in the form
-  const [recipeItems, setRecipeItems] = useState<{ material_id: string; quantidade_necessaria: number; unidade: 'kg' | 'g' | 'L' | 'mL' | 'un' }[]>([]);
+  const [recipeItems, setRecipeItems] = useState<{ material_id: string; quantidade_necessaria: number; unidade_id: number }[]>([]);
 
   // Calculate dynamic live recipe cost for real-time markup editing
-  const liveCustoProducao = React.useMemo(() => {
+  const liveCustoProducao = (() => {
     let total = 0;
     recipeItems.forEach(item => {
       const mat = store.materiais.find(m => m.id === item.material_id);
       if (mat) {
-        const qtyNormalizada = normalizarQuantidade(item.quantidade_necessaria, item.unidade, mat.unidade);
+        const qtyNormalizada = normalizarQuantidade(item.quantidade_necessaria, item.unidade_id, mat.unidade_id, store.unidades);
         total += qtyNormalizada * mat.custo_unitario;
       }
     });
     return Number(total.toFixed(2));
-  }, [recipeItems, store.materiais]);
+  })();
 
   // Synchronizers
   const handleMargemChange = (val: number) => {
@@ -87,6 +88,21 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     try {
       setImageCompressing(true);
       const optimized = await compressImage(file, 600, 600, 0.7);
+
+      if (navigator.onLine && editId) {
+        const blob = base64ToBlob(optimized);
+        const url = await uploadProdutoImage(
+          blob,
+          editId,
+          isStorageUrl(imagem) ? imagem : undefined
+        );
+        if (url) {
+          setImagem(url);
+          setImageCompressing(false);
+          return;
+        }
+      }
+
       setImagem(optimized);
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
@@ -111,7 +127,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                           p.descricao.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (categoryFilter !== 'todos') {
-      return matchesSearch && p.categoria === categoryFilter;
+      return matchesSearch && p.categoria_id === categoryFilter;
     }
     return matchesSearch;
   });
@@ -120,9 +136,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setIsFormOpen(true);
     setEditId(null);
     setNome('');
-    setCategoria('salgado');
+    setCategoriaId(2);
     setDescricao('');
-    setUnidadeProducao('por dúzia');
+    setUnidadeProducaoId(5);
     setTempoProducao(30);
     setAtivo(true);
     setRecipeItems([]);
@@ -135,9 +151,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setIsFormOpen(true);
     setEditId(p.id);
     setNome(p.nome);
-    setCategoria(p.categoria);
+    setCategoriaId(p.categoria_id);
     setDescricao(p.descricao);
-    setUnidadeProducao(p.unidade_producao);
+    setUnidadeProducaoId(p.unidade_producao_id);
     setTempoProducao(p.tempo_producao_minutos);
     setAtivo(p.ativo);
     setMargemLucro(p.margem_lucro !== undefined ? p.margem_lucro : 100);
@@ -150,7 +166,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       .map(f => ({
         material_id: f.material_id,
         quantidade_necessaria: f.quantidade_necessaria,
-        unidade: f.unidade
+        unidade_id: f.unidade_id
       }));
     setRecipeItems(activeRecipe);
   };
@@ -166,7 +182,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       {
         material_id: defaultMat.id,
         quantidade_necessaria: 1,
-        unidade: defaultMat.unidade
+        unidade_id: defaultMat.unidade_id
       }
     ]);
   };
@@ -183,21 +199,20 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     if (fields.material_id) {
       const selectedMat = store.materiais.find(m => m.id === fields.material_id);
       if (selectedMat) {
-        next[index].unidade = selectedMat.unidade;
+        next[index].unidade_id = selectedMat.unidade_id;
       }
     }
 
     setRecipeItems(next);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !unidadeProducao.trim()) {
+    if (!nome.trim()) {
       alert('Favor preencher o nome do produto e a unidade de produção.');
       return;
     }
 
-    // Check duplicate material in recipe
     const matIds = recipeItems.map(r => r.material_id);
     const hasDuplicate = matIds.some((val, i) => matIds.indexOf(val) !== i);
     if (hasDuplicate) {
@@ -205,30 +220,72 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       return;
     }
 
+    let finalImagem = imagem;
+
     if (editId) {
-      store.updateProduto(editId, {
+      const oldProd = store.produtos.find(p => p.id === editId);
+      const oldImageUrl = oldProd?.imagem;
+      const imageChanged = imagem !== oldImageUrl;
+
+      if (imageChanged && oldImageUrl && isStorageUrl(oldImageUrl)) {
+        if (imagem && isBase64Image(imagem) && navigator.onLine) {
+          const blob = base64ToBlob(imagem);
+          const url = await uploadProdutoImage(blob, editId, oldImageUrl);
+          if (url) finalImagem = url;
+        } else if (!imagem) {
+          deleteProdutoImage(oldImageUrl).catch(() => {});
+        }
+      }
+
+      await store.updateProduto(editId, {
         nome,
-        categoria,
+        categoria_id: categoriaId,
         descricao,
-        unidade_producao: unidadeProducao,
+        unidade_producao_id: unidadeProducaoId,
         tempo_producao_minutos: Number(tempoProducao),
         ativo,
         margem_lucro: Number(margemLucro),
         preco_venda: Number(precoVenda),
-        imagem
-      }, recipeItems);
+        imagem: finalImagem
+      });
+
+      const oldFichas = store.fichas.filter(f => f.produto_id === editId);
+      for (const f of oldFichas) await store.deleteFichaTecnica(f.id);
+      for (const item of recipeItems) {
+        await store.addFichaTecnica({
+          produto_id: editId,
+          material_id: item.material_id,
+          quantidade_necessaria: item.quantidade_necessaria,
+          unidade_id: item.unidade_id
+        });
+      }
     } else {
-      store.addProduto({
+      const prod = await store.addProduto({
         nome,
-        categoria,
+        categoria_id: categoriaId,
         descricao,
-        unidade_producao: unidadeProducao,
+        unidade_producao_id: unidadeProducaoId,
         tempo_producao_minutos: Number(tempoProducao),
         ativo,
         margem_lucro: Number(margemLucro),
         preco_venda: Number(precoVenda),
-        imagem
-      }, recipeItems);
+        imagem: finalImagem
+      });
+
+      for (const item of recipeItems) {
+        await store.addFichaTecnica({
+          produto_id: prod.id,
+          material_id: item.material_id,
+          quantidade_necessaria: item.quantidade_necessaria,
+          unidade_id: item.unidade_id
+        });
+      }
+
+      if (imagem && isBase64Image(imagem) && navigator.onLine) {
+        const blob = base64ToBlob(imagem);
+        const url = await uploadProdutoImage(blob, prod.id);
+        if (url) store.updateProduto(prod.id, { imagem: url });
+      }
     }
 
     setIsFormOpen(false);
@@ -245,7 +302,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   // Viability test trigger
   const handleTestViability = (prodId: string) => {
     const qty = viabilityTestQty[prodId] || 1;
-    const res = verificarViabilidadeProducao(prodId, qty, store.fichas, store.materiais);
+    const res = verificarViabilidadeProducao(prodId, qty, store.fichas, store.materiais, store.unidades);
     setViabilityResults({
       ...viabilityResults,
       [prodId]: res
@@ -291,17 +348,28 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
-          {['todos', 'salgado', 'doce', 'bolo', 'outro'].map(cat => (
+          <button
+            key="todos"
+            onClick={() => setCategoryFilter('todos')}
+            className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition cursor-pointer ${
+              categoryFilter === 'todos'
+                ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800'
+                : 'bg-white dark:bg-[#1d160e] text-gray-500 dark:text-amber-200/50 border-amber-100 dark:border-[#2e1f0e] hover:bg-amber-50 dark:hover:bg-amber-950/20'
+            }`}
+          >
+            Todos
+          </button>
+          {store.categorias.map(cat => (
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
+              key={cat.id}
+              onClick={() => setCategoryFilter(cat.id)}
               className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition cursor-pointer ${
-                categoryFilter === cat 
-                  ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800' 
+                categoryFilter === cat.id
+                  ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800'
                   : 'bg-white dark:bg-[#1d160e] text-gray-500 dark:text-amber-200/50 border-amber-100 dark:border-[#2e1f0e] hover:bg-amber-50 dark:hover:bg-amber-950/20'
               }`}
             >
-              {cat === 'todos' ? 'Todos' : cat}
+              {cat.nome}
             </button>
           ))}
         </div>
@@ -319,7 +387,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           {filteredProdutos.map(p => {
             const ingreds = store.fichas.filter(f => f.produto_id === p.id);
             const isExpanded = expandedProdutoId === p.id;
-            const maxQtd = sugerirMaximoProduzivel(p.id, store.fichas, store.materiais);
+            const maxQtd = sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades);
 
             return (
               <div 
@@ -330,12 +398,19 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 <div className="p-4 sm:p-5 space-y-3">
                   <div className="flex gap-4 items-start">
                     {p.imagem ? (
-                      <img 
-                        src={p.imagem} 
-                        alt={p.nome} 
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-amber-200/50 dark:border-amber-955/50 flex-shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="relative flex-shrink-0">
+                        <img 
+                          src={p.imagem} 
+                          alt={p.nome} 
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-amber-200/50 dark:border-amber-955/50"
+                          referrerPolicy="no-referrer"
+                        />
+                        {isBase64Image(p.imagem) && (
+                          <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full shadow-md" title="Imagem pendente de upload">
+                            ⏫
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-50 dark:bg-amber-950/20 text-amber-600/40 dark:text-amber-200/30 rounded-xl flex items-center justify-center border border-amber-100/50 dark:border-[#22160b]/50 flex-shrink-0">
                         <Utensils size={24} />
@@ -346,7 +421,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       <div className="flex items-start justify-between gap-1">
                         <div>
                           <span className="text-[9px] bg-amber-50 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border border-amber-100 dark:border-[#382613] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono">
-                            {p.categoria}
+                            {store.categoriaNome(p.categoria_id)}
                           </span>
                           <h3 className="font-semibold text-base sm:text-lg font-display text-amber-950 dark:text-amber-100 mt-1.5 flex items-center gap-1 leading-tight">
                             {p.nome}
@@ -359,7 +434,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                           `}>
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                          <p className="text-[9px] text-gray-400 dark:text-amber-100/30 font-mono">Rend: {p.unidade_producao}</p>
+                          <p className="text-[9px] text-gray-400 dark:text-amber-100/30 font-mono">Rend: {store.unidadeNome(p.unidade_producao_id)}</p>
                         </div>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-amber-100/40 line-clamp-2 mt-1">{p.descricao || 'Sem descrição cadastrada.'}</p>
@@ -388,13 +463,25 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       <span className="text-[9px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold flex items-center justify-center gap-0.5 whitespace-nowrap">
                         💰 Preço / Lucro
                       </span>
-                      <p className="text-[10px] sm:text-xs font-bold text-emerald-700 dark:text-emerald-450 font-mono mt-0.5 truncate" title={formatCurrency(p.preco_venda || 0)}>
-                        {formatCurrency(p.preco_venda || 0)}
-                        {p.margem_lucro !== undefined && p.margem_lucro > 0 ? (
-                          <span className="text-[8px] text-emerald-600 dark:text-emerald-400 ml-0.5 font-bold">
-                            ({p.margem_lucro}%)
-                          </span>
-                        ) : null}
+                      <p className={`text-[10px] sm:text-xs font-mono mt-0.5 truncate ${
+                        !p.preco_venda || p.preco_venda <= 0
+                          ? 'text-gray-400 dark:text-amber-100/30'
+                          : p.preco_venda < p.custo_producao_calculado
+                            ? 'text-red-600 dark:text-red-400 font-semibold'
+                            : 'text-emerald-700 dark:text-emerald-450 font-bold'
+                      }`}>
+                        {!p.preco_venda || p.preco_venda <= 0 ? (
+                          <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded text-[8px] font-bold">Sem Preço</span>
+                        ) : (
+                          <>
+                            {formatCurrency(p.preco_venda)}
+                            {p.preco_venda < p.custo_producao_calculado ? (
+                              <span className="text-[8px] text-red-600 dark:text-red-400 ml-0.5 font-bold">(Prejuízo)</span>
+                            ) : p.margem_lucro !== undefined && p.margem_lucro > 0 ? (
+                              <span className="text-[8px] text-emerald-600 dark:text-emerald-400 ml-0.5 font-bold">({p.margem_lucro}%)</span>
+                            ) : null}
+                          </>
+                        )}
                       </p>
                     </div>
                     <div>
@@ -403,8 +490,8 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       </span>
                       <p className={`text-[10px] sm:text-xs font-bold font-mono mt-0.5 truncate
                         ${maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500 font-medium'}
-                      `} title={`${maxQtd} ${p.unidade_producao.replace('por ', '')}`}>
-                        {maxQtd} {p.unidade_producao.split(' ')[1] || ''}
+                      `} title={`${maxQtd} ${store.unidadeSigla(p.unidade_producao_id)}`}>
+                        {maxQtd} {store.unidadeSigla(p.unidade_producao_id)}
                       </p>
                     </div>
                   </div>
@@ -433,7 +520,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                 <div key={ing.id} className="flex items-center justify-between p-2 rounded-lg bg-orange-50/10 dark:bg-amber-950/10 border border-amber-100/50 dark:border-[#22160b]/50 text-[11px] font-sans">
                                   <span className="font-semibold text-amber-900 dark:text-amber-200">{mat?.nome || 'Ingrediente Deletado'}</span>
                                   <span className="font-mono text-gray-500 dark:text-amber-100/50">
-                                    {ing.quantidade_necessaria} {ing.unidade} 
+                                    {ing.quantidade_necessaria} {store.unidadeSigla(ing.unidade_id)} 
                                     <span className="text-[9px] text-gray-400 dark:text-amber-100/30 ml-1 font-mono">
                                       ({formatCurrency((ing.quantidade_necessaria * (mat?.custo_unitario || 0)))} )
                                     </span>
@@ -556,15 +643,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   <div className="space-y-1">
                     <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Categoria *</label>
                     <select 
-                      value={categoria}
-                      onChange={(e) => setCategoria(e.target.value as any)}
+                      value={categoriaId}
+                      onChange={(e) => setCategoriaId(Number(e.target.value))}
                       className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
                     >
-                      <option value="salgado" className="dark:bg-[#1c140c]">Salgado</option>
-                      <option value="doce" className="dark:bg-[#1c140c]">Doce</option>
-                      <option value="bolo" className="dark:bg-[#1c140c]">Bolo</option>
-                      <option value="bebida" className="dark:bg-[#1c140c]">Bebida</option>
-                      <option value="outro" className="dark:bg-[#1c140c]">Outro / Geral</option>
+                      {store.categorias.map(cat => (
+                        <option key={cat.id} value={cat.id} className="dark:bg-[#1c140c]">{cat.nome}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -572,14 +657,16 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Unidade de Produção *</label>
-                    <input 
-                      type="text" 
-                      value={unidadeProducao}
-                      onChange={(e) => setUnidadeProducao(e.target.value)}
-                      placeholder="Ex: por dúzia, por kg, por unidade"
-                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs font-sans bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400"
+                    <select 
+                      value={unidadeProducaoId}
+                      onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
+                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
                       required
-                    />
+                    >
+                      {store.unidades.map(u => (
+                        <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.nome} ({u.sigla})</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="space-y-1">
@@ -761,7 +848,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                               className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100"
                             >
                               {store.materiais.map(m => (
-                                <option key={m.id} value={m.id} className="dark:bg-[#1a1109]">{m.nome} (Estoque: {m.quantidade_atual}{m.unidade})</option>
+                                <option key={m.id} value={m.id} className="dark:bg-[#1a1109]">{m.nome} (Estoque: {m.quantidade_atual}{store.unidadeSigla(m.unidade_id)})</option>
                               ))}
                             </select>
                           </div>
@@ -781,7 +868,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                 required
                               />
                               <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                                {item.unidade}
+                                {store.unidadeSigla(item.unidade_id)}
                               </span>
                             </div>
                           </div>

@@ -6,11 +6,14 @@ import Produtos from './components/Produtos';
 import EstoqueProdutos from './components/EstoqueProdutos';
 import Clientes from './components/Clientes';
 import Pedidos from './components/Pedidos';
+import Caixa from './components/Caixa';
 import SetupInstructions from './components/SetupInstructions';
 import Login from './components/Login';
 import AddAdmin from './components/AddAdmin';
 import Usuarios from './components/Usuarios';
-import DataMigrator from './components/DataMigrator';
+import Financeiro from './components/Financeiro';
+import Configuracao from './components/Configuracao';
+import SyncStatus from './components/SyncStatus';
 import { 
     isSupabaseConfigured, 
     verificarAdminExiste,
@@ -22,7 +25,6 @@ import {
 import { User } from '@supabase/supabase-js';
 
 import { 
-  Beef, 
   ChefHat, 
   LayoutDashboard, 
   Coins, 
@@ -31,7 +33,9 @@ import {
   Users, 
   ShoppingBag, 
   Shield,
-  PlusCircle,
+  DollarSign,
+  Wallet,
+  Settings,
   Menu,
   X,
   Plus,
@@ -40,7 +44,7 @@ import {
   LogOut
 } from 'lucide-react';
 
-type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'sync' | 'app';
+type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'app';
 
 export default function App() {
   // =====================================================
@@ -55,8 +59,11 @@ export default function App() {
   const [store, setStore] = useState<MiniFactoryStore | null>(null);
   const [updateTick, setUpdateTick] = useState(0);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [appName, setAppName] = useState(() => localStorage.getItem('appName') || 'Mini Fábrica');
+  const [currentTab, setCurrentTab] = useState<string>(() => localStorage.getItem('currentTab') || 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [caixaPreselectedId, setCaixaPreselectedId] = useState<string | null>(null);
   const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
   const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
 
@@ -75,7 +82,7 @@ export default function App() {
         
         if (session?.user) {
           setCurrentUser(session.user);
-          setAuthScreen('sync');
+          setAuthScreen('app');
         } else {
           const adminExiste = await verificarAdminExiste();
           setAuthScreen(adminExiste ? 'login' : 'add-admin');
@@ -90,7 +97,7 @@ export default function App() {
     const unsubscribe = onAuthStateChange(async (user) => {
       if (user) {
         setCurrentUser(user);
-        setAuthScreen('sync');
+        setAuthScreen('app');
       } else {
         setCurrentUser(null);
         setStore(null);
@@ -135,6 +142,10 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('currentTab', currentTab);
+  }, [currentTab]);
+
   // =====================================================
   // HANDLERS
   // =====================================================
@@ -144,6 +155,11 @@ export default function App() {
 
   const handleAddAdminSuccess = () => {
     setAuthScreen('login');
+  };
+
+  const handleSaveAppName = (name: string) => {
+    setAppName(name);
+    localStorage.setItem('appName', name);
   };
 
   const handleLogout = async () => {
@@ -168,6 +184,13 @@ export default function App() {
       const event = new MouseEvent('click', { bubbles: true, cancelable: true });
       document.querySelector('button[class*="bg-emerald-600"]')?.dispatchEvent(event);
     }, 50);
+  };
+
+  const handleGoToCaixa = (pedidoId?: string) => {
+    if (pedidoId) setCaixaPreselectedId(pedidoId);
+    setCurrentTab('caixa');
+    setIsSidebarOpen(false);
+    setIsMobileMenuOpen(false);
   };
 
   // =====================================================
@@ -203,12 +226,6 @@ export default function App() {
     );
   }
 
-  if (authScreen === 'sync') {
-    return (
-      <DataMigrator onComplete={() => setAuthScreen('app')} />
-    );
-  }
-
   // =====================================================
   // APP PRINCIPAL
   // =====================================================
@@ -231,7 +248,7 @@ export default function App() {
               <ChefHat size={20} />
             </div>
             <div className="min-w-0">
-              <h2 className="font-display font-semibold text-xs lg:text-sm tracking-tight leading-snug truncate">Mini Fábrica</h2>
+              <h2 className="font-display font-semibold text-xs lg:text-sm tracking-tight leading-snug truncate">{appName}</h2>
               <p className="text-[8px] lg:text-[10px] text-amber-700 dark:text-amber-400 font-mono tracking-wider font-semibold truncate">ESTOQUE & PEDIDOS</p>
             </div>
           </div>
@@ -244,7 +261,10 @@ export default function App() {
               { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} /> },
               { id: 'clientes', label: 'Clientes', icon: <Users size={15} /> },
               { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} /> },
+              { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} /> },
+              { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} /> },
               { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} /> },
+              { id: 'config', label: 'Configurações', icon: <Settings size={15} /> },
             ].map(item => {
               const active = currentTab === item.id;
               return (
@@ -294,6 +314,8 @@ export default function App() {
             </button>
           </div>
 
+          <SyncStatus store={store} />
+
           <div className="text-xs space-y-2">
             <div className="text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
               <p className="font-semibold text-amber-700 dark:text-amber-400 font-sans truncate">
@@ -315,28 +337,95 @@ export default function App() {
       {/* MOBILE HEADER */}
       <header className="md:hidden bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-100 p-4 border-b border-[#ebdcc9] dark:border-[#1e1005] flex items-center justify-between sticky top-0 z-40 transition-colors duration-200">
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-1.5 -ml-1 rounded-lg hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] transition"
+          >
+            <Menu size={18} />
+          </button>
           <div className="bg-amber-600 p-1.5 rounded-lg text-amber-950">
             <ChefHat size={16} />
           </div>
-          <span className="font-display font-bold text-sm tracking-tight text-[#2e2315] dark:text-white">Mini Fábrica</span>
+          <span className="font-display font-bold text-sm tracking-tight text-[#2e2315] dark:text-white">{appName}</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
             className="p-1.5 rounded-lg bg-[#f0eade] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#1e1005] text-amber-700 dark:text-amber-400 hover:opacity-85 transition"
           >
             {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
           </button>
-
-          <p className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40 px-2 py-0.5 rounded font-bold font-mono border border-amber-200/40 dark:border-amber-950/20">
-            ADMIN
-          </p>
         </div>
       </header>
 
+      {/* MOBILE DRAWER MENU */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="absolute left-0 top-0 bottom-0 w-64 bg-[#f8f5ee] dark:bg-[#0c0703] shadow-2xl border-r border-[#ebdcc9] dark:border-[#1e1005] p-5 animate-in slide-in-from-left-1 overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#ebdcc9] dark:border-[#1e1005]">
+              <div className="flex items-center gap-2">
+                <div className="bg-amber-600 p-1.5 rounded-lg text-amber-950">
+                  <ChefHat size={16} />
+                </div>
+                <span className="font-display font-bold text-sm text-[#2e2315] dark:text-white">{appName}</span>
+              </div>
+              <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            <nav className="space-y-1">
+              {[
+                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} /> },
+                { id: 'clientes', label: 'Clientes', icon: <Users size={16} /> },
+                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={16} /> },
+                { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={16} /> },
+                { id: 'usuarios', label: 'Usuários', icon: <Shield size={16} /> },
+                { id: 'config', label: 'Configurações', icon: <Settings size={16} /> },
+              ].map(item => {
+                const active = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setCurrentTab(item.id);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition ${
+                      active
+                        ? 'bg-amber-700 dark:bg-amber-600 text-white font-bold shadow-sm'
+                        : 'hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] text-[#5c4a37] dark:text-amber-100/70'
+                    }`}
+                  >
+                    <div className="shrink-0">{item.icon}</div>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="mt-6 pt-4 border-t border-[#ebdcc9] dark:border-[#1e1005]">
+              <div className="text-xs text-[#5c4a37]/60 dark:text-amber-100/40 font-mono mb-3">
+                <p className="font-semibold text-amber-700 dark:text-amber-400 font-sans truncate">
+                  {currentUser?.email || 'Usuário'}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-medium text-[#5c4a37]/60 dark:text-amber-100/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+              >
+                <LogOut size={14} />
+                <span>Sair</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MAIN VIEWPORT BODY */}
-      <main className="flex-1 p-5 md:p-8 pb-20 md:pb-8 w-full max-w-7xl mx-auto overflow-x-hidden space-y-6">
+      <main className="flex-1 p-5 md:p-8 pb-20 md:pb-8 w-full max-w-7xl mx-auto overflow-x-hidden space-y-6 relative">
         
         {currentTab === 'dashboard' && (
           <Dashboard 
@@ -368,11 +457,30 @@ export default function App() {
             store={store} 
             onUpdate={() => setUpdateTick(t => t + 1)} 
             forceOpenNewOrderRef={newOrderTriggerRef}
+            onNavigateToCaixa={handleGoToCaixa}
           />
         )}
 
+        {currentTab === 'caixa' && (
+          <Caixa
+            store={store}
+            onUpdate={() => setUpdateTick(t => t + 1)}
+            preselectedPedidoId={caixaPreselectedId || undefined}
+            onClearPreselected={() => setCaixaPreselectedId(null)}
+            appName={appName}
+          />
+        )}
+
+        {currentTab === 'financeiro' && (
+          <Financeiro store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
+        )}
+
+        {currentTab === 'config' && (
+          <Configuracao appName={appName} onSaveAppName={handleSaveAppName} />
+        )}
+
         {currentTab === 'usuarios' && (
-          <Usuarios />
+          <Usuarios store={store} />
         )}
 
       </main>

@@ -86,7 +86,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     setLoteObs('Lote de forno regular');
   };
 
-  const handleSaveLote = (e: React.FormEvent) => {
+  const handleSaveLote = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     if (loteQtd <= 0) {
@@ -94,13 +94,12 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       return;
     }
 
-    try {
-      store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteNumero, loteValidade, loteObs);
+    const result = await store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteNumero, loteValidade, loteObs);
+    if (result.success) {
       setIsLoteOpen(false);
       onUpdate();
-    } catch (err: any) {
-      // Catch checking ingredient exhaustion
-      setErrorMessage(err.message || 'Erro ao lançar produção de lote.');
+    } else {
+      setErrorMessage(result.error || 'Erro ao lançar produção de lote.');
     }
   };
 
@@ -239,7 +238,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       <div className="flex items-start justify-between">
                         <div>
                           <span className="text-[9px] bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-50 dark:border-[#2c1d0e] px-2 py-0.5 rounded-full font-bold uppercase font-mono">
-                            {prod.categoria}
+                            {store.categoriaNome(prod.categoria_id)}
                           </span>
                           <h4 className="font-semibold text-sm sm:text-base font-display text-amber-950 dark:text-amber-100 mt-1.5">
                             {prod.nome}
@@ -265,14 +264,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       <div className="grid grid-cols-2 gap-2 bg-gradient-to-br from-amber-50/10 to-orange-50/10 dark:from-amber-950/10 dark:to-orange-950/10 p-3 rounded-xl border border-amber-50 dark:border-[#2c1d0e] text-center text-xs">
                         <div>
                           <p className="text-[10px] text-gray-500 dark:text-amber-100/40 uppercase font-semibold whitespace-nowrap">Livre P/ Venda</p>
-                          <p className="text-sm sm:text-base font-bold font-mono text-amber-950 dark:text-amber-100 mt-1 truncate" title={`${ep.quantidade_disponivel} ${prod.unidade_producao.replace('por ', '')}`}>
-                            {ep.quantidade_disponivel} <span className="text-[10px] font-sans font-normal text-gray-400 dark:text-amber-100/30">{prod.unidade_producao.replace('por ', '')}</span>
+                          <p className="text-sm sm:text-base font-bold font-mono text-amber-950 dark:text-amber-100 mt-1 truncate" title={`${ep.quantidade_disponivel} ${store.unidadeNome(prod.unidade_producao_id)}`}>
+                            {ep.quantidade_disponivel} <span className="text-[10px] font-sans font-normal text-gray-400 dark:text-amber-100/30">{store.unidadeNome(prod.unidade_producao_id)}</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-[10px] text-gray-500 dark:text-amber-100/40 uppercase font-semibold whitespace-nowrap">Reservado Clientes</p>
-                          <p className="text-sm sm:text-base font-bold font-mono text-amber-800 dark:text-amber-450 mt-1 truncate" title={`${ep.quantidade_reservada} ${prod.unidade_producao.replace('por ', '')}`}>
-                            {ep.quantidade_reservada} <span className="text-[10px] font-sans font-normal text-gray-400 dark:text-amber-100/30">{prod.unidade_producao.replace('por ', '')}</span>
+                          <p className="text-sm sm:text-base font-bold font-mono text-amber-800 dark:text-amber-450 mt-1 truncate" title={`${ep.quantidade_reservada} ${store.unidadeNome(prod.unidade_producao_id)}`}>
+                            {ep.quantidade_reservada} <span className="text-[10px] font-sans font-normal text-gray-400 dark:text-amber-100/30">{store.unidadeNome(prod.unidade_producao_id)}</span>
                           </p>
                         </div>
                       </div>
@@ -297,7 +296,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     {/* Footer config indicators */}
                     <div className="flex items-center justify-between border-t border-amber-50 dark:border-[#22160b]/40 pt-2.5">
                       <div className="text-[10px] text-gray-500 dark:text-amber-100/45 font-mono">
-                        Qtd Mínima: <span className="font-bold">{ep.quantidade_minima}</span> {prod.unidade_producao.replace('por ', '')}
+                        Qtd Mínima: <span className="font-bold">{ep.quantidade_minima}</span> {store.unidadeNome(prod.unidade_producao_id)}
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -337,7 +336,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <div className="space-y-2 max-h-96 overflow-y-auto no-scrollbar">
               {store.movProdutos.map((mov, idx) => {
                 const prod = store.produtos.find(p => p.id === mov.produto_id);
-                const isBaking = mov.tipo === 'entrada_producao';
+                const isBaking = mov.tipo_id === 4;
                 return (
                   <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
@@ -351,7 +350,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     </div>
                     <div className="text-right">
                       <p className={`font-bold font-mono ${isBaking ? 'text-emerald-700 dark:text-emerald-450' : 'text-red-800 dark:text-red-400'}`}>
-                        {isBaking ? '+' : '-'}{mov.quantidade} {prod?.unidade_producao.replace('por ', '')}
+                        {isBaking ? '+' : '-'}{mov.quantidade} {store.unidadeNome(prod?.unidade_producao_id || 0)}
                       </p>
                       <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
                         {new Date(mov.criado_em).toLocaleDateString('pt-BR')} {new Date(mov.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -407,7 +406,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                   className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400"
                 >
                   {store.produtos.map(p => (
-                    <option key={p.id} value={p.id} className="dark:bg-[#1c140c]">{p.nome} (Sugerido máx: {sugerirMaximoProduzivel(p.id, store.fichas, store.materiais)})</option>
+                    <option key={p.id} value={p.id} className="dark:bg-[#1c140c]">{p.nome} (Sugerido máx: {sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})</option>
                   ))}
                 </select>
               </div>
@@ -425,7 +424,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       required
                     />
                     <span className="bg-amber-50 dark:bg-amber-950/30 px-2.5 py-2 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                      {store.produtos.find(p => p.id === loteProdutoId)?.unidade_producao.replace('por ', '')}
+                      {store.unidadeNome(store.produtos.find(p => p.id === loteProdutoId)?.unidade_producao_id || 0)}
                     </span>
                   </div>
                 </div>
@@ -457,7 +456,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 <div className="space-y-1 col-span-1">
                   <label className="text-gray-400 dark:text-amber-100/30 text-[10px] block font-sans">Cozinha Capacidade Máx.</label>
                   <p className="p-2 bg-amber-50/50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-950/35 rounded-lg text-center font-mono font-bold text-amber-900 dark:text-amber-200">
-                    {sugerirMaximoProduzivel(loteProdutoId, store.fichas, store.materiais)} unidades
+                    {sugerirMaximoProduzivel(loteProdutoId, store.fichas, store.materiais, store.unidades)} unidades
                   </p>
                 </div>
               </div>
@@ -523,7 +522,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     required
                   />
                   <span className="bg-amber-50 dark:bg-amber-950/35 px-3 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
-                    {store.produtos.find(p => p.id === thresholdProdutoId)?.unidade_producao.replace('por ', '')}
+                    {store.unidadeNome(store.produtos.find(p => p.id === thresholdProdutoId)?.unidade_producao_id || 0)}
                   </span>
                 </div>
               </div>
