@@ -492,6 +492,7 @@ export default function App() {
             onNavigate={setCurrentTab} 
             onSetQuickOrder={handleQuickOrder}
             onSetQuickLot={handleQuickLot}
+            appName={appName}
           />
         )}
         

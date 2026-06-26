@@ -13,11 +13,12 @@ interface DashboardProps {
   onNavigate: (tab: string) => void;
   onSetQuickOrder: () => void;
   onSetQuickLot: () => void;
+  appName?: string;
 }
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQuickLot }: DashboardProps) {
+export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQuickLot, appName }: DashboardProps) {
   const hoje = new Date();
   const hojeStr = hoje.toISOString().split('T')[0];
   const umaSemanaAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -135,7 +136,7 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
             Painel Geral
           </span>
           <h1 className="text-2xl md:text-3xl font-display font-semibold mt-2 tracking-tight">
-            Olá, Mini Fábrica! 🥖🍰
+            Olá, {appName || 'Mini Fábrica'}! 🥖🍰
           </h1>
           <p className="text-amber-100/90 text-sm mt-1 max-w-xl">
             Acompanhe o ritmo de produção, os insumos na cozinha e as próximas entregas de hoje.
