@@ -195,6 +195,7 @@ export default function App() {
   // HANDLERS
   // =====================================================
   const handleLoginSuccess = () => {
+    setCurrentTab('dashboard');
     setAuthScreen('app');
   };
 
