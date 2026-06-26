@@ -7,6 +7,7 @@
 - [2. Variáveis de ambiente](#2-variáveis-de-ambiente)
 - [3. Vercel](#3-vercel)
 - [4. Netlify](#4-netlify)
+- [5. GitHub Pages](#5-github-pages)
 - [Manutenção](#manutenção)
 
 ---
@@ -135,6 +136,46 @@ Em **Environment variables**, adicione:
 Clique em **Deploy site**. A Netlify detecta automaticamente o Vite e faz o build + deploy.
 
 Para deploys automáticos: na push para a branch configurada.
+
+---
+
+## 5. GitHub Pages
+
+### Pré-requisitos
+
+- Repositório público no GitHub
+- GitHub Actions habilitado (default em repositórios públicos)
+
+### Configurar Secrets
+
+Em **Settings → Secrets and variables → Actions → New repository secret**, adicione:
+
+| Secret | Valor |
+|---|---|
+| `VITE_SUPABASE_URL` | Project URL do Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Anon key |
+| `VITE_SUPABASE_SERVICE_ROLE_KEY` | Service role key |
+| `VITE_SUPABASE_BUCKET` | `imagem_produto` |
+
+### Ativar GitHub Pages
+
+1. **Settings → Pages**
+2. Em **Source**, selecione **GitHub Actions**
+3. O workflow já está configurado — deploys automáticos em todo push na `main`
+
+### Como funciona
+
+O arquivo `.github/workflows/deploy.yml` faz o build com as variáveis de ambiente (incluindo `VITE_BASE_PATH=/onassys/`) e publica o conteúdo de `dist/` no GitHub Pages.
+
+### Comparativo de deploys
+
+| Plataforma | URL final | `base` | Deploy automático |
+|---|---|---|---|
+| GitHub Pages | `https://viana26.github.io/onassys/` | `/onassys/` | via GitHub Actions |
+| Vercel | `https://onassys.vercel.app` | `/` | via conexão do repo |
+| Netlify | `https://onassys.netlify.app` | `/` | via conexão do repo |
+
+> ⚠️ As plataformas são independentes — você pode manter as 3 ativas simultaneamente. O `VITE_BASE_PATH` no GitHub Actions garante que os assets carreguem corretamente no GitHub Pages, enquanto Vercel e Netlify usam o valor padrão `/`.
 
 ---
 
