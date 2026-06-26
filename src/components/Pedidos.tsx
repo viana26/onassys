@@ -46,6 +46,12 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   // Selected Order detail popup state
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(null);
   
+  // Cancel confirmation modal
+  const [cancelConfirmPedidoId, setCancelConfirmPedidoId] = useState<string | null>(null);
+  
+  // Estorno pendente filter
+  const [showEstornoPendente, setShowEstornoPendente] = useState(false);
+  
   // Edit mode
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
   
@@ -264,7 +270,9 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     const cliName = getClienteName(p.cliente_id).toLowerCase();
     const searchLow = searchTerm.toLowerCase();
     const matchesSearch = cliName.includes(searchLow) || p.id.includes(searchLow);
-    return matchesSearch;
+    if (!matchesSearch) return false;
+    if (showEstornoPendente && !store.getEstornoPendente().some(e => e.id === p.id)) return false;
+    return true;
   });
 
   // Days of delivery workloads (Workload planner scheduler weekly calculations)
@@ -511,7 +519,11 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             {/* Card footer details */}
                             <div className="flex flex-wrap items-center justify-between pt-2 border-t border-amber-50 dark:border-[#2f1f0e] gap-1.5">
                               <span className="font-bold text-[10px] sm:text-[11px] text-amber-950 dark:text-amber-200 font-mono shrink-0">{formatCurrency(p.valor_total)}</span>
-                              
+                              {store.getEstornoPendente().some(e => e.id === p.id) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                                  ⚠️ Estorno Pendente
+                                </span>
+                              )}
                               {/* Fast click status controllers */}
                               <div className="flex items-center gap-1 shrink-0">
                                 {p.status_id === 2 && store.hasPermission('pedidos.editar') && (
@@ -634,7 +646,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       {/* ---------------------------------------------------------------------------- */}
       {activeTab === 'lista' && (
         <div className="space-y-4" id="order-list-tab">
-          <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
+          <div className="bg-white p-4 rounded-xl border border-amber-100 shadow-sm flex flex-wrap items-center gap-3">
             <div className="relative w-full md:w-80">
               <span className="absolute inset-y-0 left-3 flex items-center text-gray-400">
                 <Search size={16} />
@@ -647,6 +659,14 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                 className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 border border-amber-100 focus:outline-none focus:border-amber-400 transition"
               />
             </div>
+            <button onClick={() => setShowEstornoPendente(!showEstornoPendente)}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 ${
+                showEstornoPendente
+                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                  : 'bg-gray-100 text-gray-500 border border-gray-200'
+              }`}>
+              ⚠️ Estorno Pendente {showEstornoPendente ? '✓' : `(${store.getEstornoPendente().length})`}
+            </button>
           </div>
 
           {filteredPedidos.length === 0 ? (
@@ -689,6 +709,11 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                           `}>
                             {store.statusNome(p.status_id)}
                           </span>
+                          {store.getEstornoPendente().some(e => e.id === p.id) && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 ml-1">
+                              ⚠️ Estorno Pendente
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 text-right pr-4 whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
@@ -733,7 +758,14 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                       <span className="font-mono text-[9px] text-gray-400 font-bold">#{p.id.substring(4).toUpperCase()}</span>
                       <h4 className="font-semibold text-amber-950 text-sm mt-0.5">{cliName}</h4>
                     </div>
-                    <span className="bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase">{store.statusNome(p.status_id)}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="bg-amber-100 text-amber-900 border border-amber-200 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase">{store.statusNome(p.status_id)}</span>
+                      {store.getEstornoPendente().some(e => e.id === p.id) && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                          ⚠️
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between items-center text-gray-500 pt-2 border-t border-amber-50">
                     <span>Val: {formatCurrency(p.valor_total)}</span>
@@ -1136,7 +1168,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
 
                       {store.hasPermission('pedidos.cancelar') && p.status_id !== 5 && p.status_id !== 6 && (
                         <button
-                          onClick={() => handleTransitionStatus(p.id, 6)}
+                          onClick={() => setCancelConfirmPedidoId(p.id)}
                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-lg"
                         >
                           Cancelar Pedido ❌
@@ -1193,6 +1225,17 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                               {estaPago ? '✓ Pago' : formatCurrency(saldoRestante)}
                             </span>
                           </div>
+                          {store.getEstornoPendente().some(e => e.id === p.id) && (
+                            <button
+                              onClick={async () => {
+                                await store.estornarPagamentosPedido(p.id);
+                                onUpdate();
+                              }}
+                              className="w-full mt-3 py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold rounded-xl text-[10px] border border-orange-200 flex items-center justify-center gap-1"
+                            >
+                              🔄 Estornar agora
+                            </button>
+                          )}
                         </div>
                       );
                     })()}
@@ -1215,6 +1258,57 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           })()}
         </div>
       )}
+
+      {/* Cancel confirmation modal */}
+      {cancelConfirmPedidoId && (() => {
+        const ped = store.pedidos.find(p => p.id === cancelConfirmPedidoId);
+        if (!ped) return null;
+        const recebidos = store.lancamentos.filter(l => l.pedido_id === cancelConfirmPedidoId && l.tipo === 'receita');
+        const totalRecebido = recebidos.reduce((s, l) => s + l.valor, 0);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 space-y-4 border border-amber-100 dark:border-[#2e1a0a]">
+              <h3 className="font-bold text-amber-950 dark:text-amber-50">Cancelar Pedido</h3>
+              <p className="text-sm text-gray-600 dark:text-amber-100/70">
+                Tem certeza que deseja cancelar o pedido #{ped.id.slice(-6)}?
+              </p>
+              {totalRecebido > 0 && (
+                <div className="p-3 bg-amber-50 dark:bg-[#2d1e0d] border border-amber-200 dark:border-[#3d2e1d] rounded-xl space-y-2">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                    <AlertTriangle size={14} /> Este pedido já recebeu <strong>{formatCurrency(totalRecebido)}</strong>
+                  </p>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400">Deseja estornar os valores agora?</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setCancelConfirmPedidoId(null)}
+                  className="flex-1 py-2 px-3 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-xs font-medium text-gray-600 dark:text-amber-100 hover:bg-gray-50 dark:hover:bg-[#130b04]">
+                  Voltar
+                </button>
+                {totalRecebido > 0 && (
+                  <button onClick={async () => {
+                    await store.updatePedidoStatus(cancelConfirmPedidoId, 6);
+                    await store.estornarPagamentosPedido(cancelConfirmPedidoId);
+                    setCancelConfirmPedidoId(null);
+                    onUpdate();
+                  }}
+                    className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold">
+                    Cancelar e Estornar
+                  </button>
+                )}
+                <button onClick={async () => {
+                  await store.updatePedidoStatus(cancelConfirmPedidoId, 6);
+                  setCancelConfirmPedidoId(null);
+                  onUpdate();
+                }}
+                  className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold">
+                  Só Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

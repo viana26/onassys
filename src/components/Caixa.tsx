@@ -257,7 +257,11 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
 
   const handleSelectPedido = (id: string) => {
     setSelectedPedidoId(id);
-    setPaymentAmount('');
+    const p = store.pedidos.find(ped => ped.id === id);
+    const recebido = p
+      ? store.lancamentos.filter(l => l.pedido_id === id && l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
+      : 0;
+    setPaymentAmount((p ? p.valor_total - recebido : 0).toFixed(2));
     setFormaPagamento('pix');
     if (onClearPreselected) onClearPreselected();
   };
@@ -431,31 +435,31 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
 
           {/* Payment Panel */}
           {selectedPedido && (
-            <div className="bg-white dark:bg-[#120c06] rounded-2xl border border-amber-100 dark:border-[#2d1e0d] p-5 space-y-4">
+            <div className="bg-white dark:bg-[#120c06] rounded-2xl border border-amber-100 dark:border-[#2d1e0d] p-4 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
-                    <User size={16} /> {selectedCliente?.nome || 'Cliente'}
+                  <h3 className="font-bold text-amber-950 dark:text-amber-100 flex items-center gap-1.5 text-sm">
+                    <User size={14} /> {selectedCliente?.nome || 'Cliente'}
                   </h3>
-                  <p className="text-[10px] text-gray-400 font-mono">Pedido #{selectedPedido.id.slice(-6)}</p>
+                  <p className="text-[9px] text-gray-400 font-mono">Pedido #{selectedPedido.id.slice(-6)}</p>
                 </div>
                 <button onClick={() => setSelectedPedidoId(null)} className="text-gray-400 hover:text-amber-950 p-1">
-                  <X size={16} />
+                  <X size={14} />
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-amber-50 dark:bg-[#1c140c] rounded-xl p-3">
-                  <p className="text-[9px] text-gray-500 uppercase font-bold">Total</p>
-                  <p className="font-bold font-mono text-sm text-amber-950 dark:text-amber-100">{brl(selectedPedido.valor_total)}</p>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-amber-50 dark:bg-[#1c140c] rounded-xl p-2">
+                  <p className="text-[8px] text-gray-500 uppercase font-bold">Total</p>
+                  <p className="font-bold font-mono text-xs text-amber-950 dark:text-amber-100">{brl(selectedPedido.valor_total)}</p>
                 </div>
-                <div className="bg-emerald-50 dark:bg-[#0d2215] rounded-xl p-3">
-                  <p className="text-[9px] text-gray-500 uppercase font-bold">Recebido</p>
-                  <p className="font-bold font-mono text-sm text-emerald-700">{brl(totalRecebido)}</p>
+                <div className="bg-emerald-50 dark:bg-[#0d2215] rounded-xl p-2">
+                  <p className="text-[8px] text-gray-500 uppercase font-bold">Recebido</p>
+                  <p className="font-bold font-mono text-xs text-emerald-700">{brl(totalRecebido)}</p>
                 </div>
-                <div className={`rounded-xl p-3 ${isPago ? 'bg-emerald-50 dark:bg-[#0d2215]' : 'bg-red-50 dark:bg-[#2d0d0d]'}`}>
-                  <p className="text-[9px] text-gray-500 uppercase font-bold">Saldo</p>
-                  <p className={`font-bold font-mono text-sm ${isPago ? 'text-emerald-700' : 'text-red-500'}`}>
+                <div className={`rounded-xl p-2 ${isPago ? 'bg-emerald-50 dark:bg-[#0d2215]' : 'bg-red-50 dark:bg-[#2d0d0d]'}`}>
+                  <p className="text-[8px] text-gray-500 uppercase font-bold">Saldo</p>
+                  <p className={`font-bold font-mono text-xs ${isPago ? 'text-emerald-700' : 'text-red-500'}`}>
                     {isPago ? '✓ Pago' : brl(saldoRestante)}
                   </p>
                 </div>
@@ -463,76 +467,17 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
 
               {!isPago && (
                 <>
-                  {/* Amount Input */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-gray-500">Valor a Receber</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">R$</span>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={paymentAmount}
-                        onChange={e => setPaymentAmount(e.target.value)}
-                        placeholder={saldoRestante.toFixed(2).replace('.', ',')}
-                        className="w-full pl-10 pr-3 py-3 border-2 border-amber-200 dark:border-[#2d1e0d] rounded-xl text-lg font-bold font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 text-center"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Quick Amount Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPaymentAmount(saldoRestante.toFixed(2))}
-                      className="flex-1 py-2 bg-amber-100 dark:bg-[#2d1e0d] hover:bg-amber-200 dark:hover:bg-[#3d2e1d] rounded-xl text-xs font-bold text-amber-950 dark:text-amber-100 transition"
-                    >
-                      Pagar Total
-                    </button>
-                    <button
-                      onClick={() => setPaymentAmount((saldoRestante / 2).toFixed(2))}
-                      className="flex-1 py-2 bg-amber-100 dark:bg-[#2d1e0d] hover:bg-amber-200 dark:hover:bg-[#3d2e1d] rounded-xl text-xs font-bold text-amber-950 dark:text-amber-100 transition"
-                    >
-                      Pagar Metade
-                    </button>
-                    <button
-                      onClick={() => {
-                        const resto = saldoRestante % 50;
-                        const sug = resto === 0 ? saldoRestante : (Math.ceil(saldoRestante / 50) * 50);
-                        setPaymentAmount(sug.toFixed(2));
-                      }}
-                      className="flex-1 py-2 bg-amber-100 dark:bg-[#2d1e0d] hover:bg-amber-200 dark:hover:bg-[#3d2e1d] rounded-xl text-xs font-bold text-amber-950 dark:text-amber-100 transition"
-                    >
-                      Arredondar
-                    </button>
-                  </div>
-
-                  {/* Troco Alert */}
-                  {troco > 0 && (
-                    <div className="p-3 bg-blue-50 dark:bg-[#0d1b2d] border border-blue-200 dark:border-[#1d2d4d] rounded-xl flex items-center justify-between">
-                      <span className="text-xs font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1">
-                        <ArrowLeftRight size={14} /> Troco a Devolver:
-                      </span>
-                      <span className="font-bold font-mono text-lg text-blue-700 dark:text-blue-300">{brl(troco)}</span>
-                    </div>
-                  )}
-
-                  {valorNumerico > saldoRestante && formaPagamento !== 'dinheiro' && (
-                    <div className="p-2.5 bg-amber-50 dark:bg-[#2d1e0d] border border-amber-200 dark:border-[#3d2e1d] rounded-xl flex items-center gap-1.5 text-[10px] text-amber-800 dark:text-amber-300">
-                      <AlertTriangle size={12} />
-                      Valor maior que o saldo. Será registrado apenas {brl(saldoRestante)}.
-                    </div>
-                  )}
-
                   {/* Payment Method Buttons */}
-                  <div className="space-y-1">
+                  <div>
                     <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-5 gap-1.5 mt-1">
                       {FORMAS_PAGAMENTO.map(f => (
                         <button
                           key={f.value}
-                          onClick={() => setFormaPagamento(f.value)}
-                          className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-[10px] font-bold text-white transition shadow-sm ${
+                          onClick={() => { setFormaPagamento(f.value); if (f.value !== 'dinheiro' && troco > 0) setPaymentAmount(saldoRestante.toFixed(2)); }}
+                          className={`flex flex-col items-center py-1.5 rounded-xl text-[9px] font-bold text-white transition shadow-sm ${
                             formaPagamento === f.value
-                              ? f.color + ' ring-2 ring-offset-2 ring-amber-500 scale-105'
+                              ? f.color + ' ring-2 ring-offset-1 ring-amber-500 scale-105'
                               : 'bg-gray-200 dark:bg-[#2d1e0d] text-gray-600 dark:text-amber-200 hover:bg-gray-300 dark:hover:bg-[#3d2e1d]'
                           }`}
                         >
@@ -543,13 +488,58 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                     </div>
                   </div>
 
+                  {/* Amount Input + Troco inline */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase text-gray-500">Valor a Receber</label>
+                      <div className="relative mt-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">R$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={paymentAmount}
+                          onChange={e => setPaymentAmount(e.target.value)}
+                          placeholder={saldoRestante.toFixed(2).replace('.', ',')}
+                          className="w-full pl-10 pr-3 py-2 border-2 border-amber-200 dark:border-[#2d1e0d] rounded-xl text-base font-bold font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 text-center"
+                        />
+                      </div>
+                    </div>
+                    {troco > 0 ? (
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500">Troco a Devolver</label>
+                        <div className="relative mt-1">
+                          <div className="w-full h-11 flex items-center justify-between px-3 bg-blue-50 dark:bg-[#0d1b2d] border border-blue-200 dark:border-[#1d2d4d] rounded-xl">
+                            <ArrowLeftRight size={14} className="text-blue-700 dark:text-blue-300 shrink-0" />
+                            <span className="font-bold font-mono text-lg text-blue-700 dark:text-blue-300">{brl(troco)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[10px] font-bold uppercase text-gray-500">Troco</label>
+                        <div className="relative mt-1">
+                          <div className="w-full h-11 flex items-center justify-center px-3 bg-gray-50 dark:bg-[#1c140c] border border-gray-200 dark:border-[#2d1e0d] rounded-xl">
+                            <span className="font-mono text-sm text-gray-400">R$ 0,00</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {valorNumerico > saldoRestante && formaPagamento !== 'dinheiro' && (
+                    <div className="p-1.5 bg-amber-50 dark:bg-[#2d1e0d] border border-amber-200 dark:border-[#3d2e1d] rounded-xl flex items-center gap-1 text-[9px] text-amber-800 dark:text-amber-300">
+                      <AlertTriangle size={10} />
+                      Valor maior que o saldo. Será registrado apenas {brl(saldoRestante)}.
+                    </div>
+                  )}
+
                   {/* Receber Button */}
                   <button
                     onClick={handleReceberPagamento}
                     disabled={!paymentAmount || valorNumerico <= 0}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white disabled:text-gray-500 rounded-xl font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
                   >
-                    <CheckCircle2 size={18} />
+                    <CheckCircle2 size={16} />
                     Receber {brl(valorRegistrar > 0 ? valorRegistrar : saldoRestante)}
                   </button>
                 </>

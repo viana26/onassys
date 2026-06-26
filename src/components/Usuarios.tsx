@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Copy, CheckCircle } from 'lucide-react';
+import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Copy, CheckCircle, Pencil } from 'lucide-react';
 import { supabase, supabaseAdmin, signOut } from '../lib/supabaseClient';
 
 interface UsuarioRow {
@@ -37,6 +37,7 @@ export default function Usuarios({ store }: UsuariosProps) {
   const [recoveryCopied, setRecoveryCopied] = useState(false);
   const [createdUserCode, setCreatedUserCode] = useState('');
   const [createdUserName, setCreatedUserName] = useState('');
+  const [editUser, setEditUser] = useState<UsuarioRow | null>(null);
 
   useEffect(() => { carregarUsuarios(); }, [store]);
 
@@ -95,12 +96,6 @@ export default function Usuarios({ store }: UsuariosProps) {
     carregarUsuarios();
   };
 
-  const atualizarPerfil = async (userId: string, perfil_id: number) => {
-    if (userId === store.currentUserId) return;
-    await supabase.from('perfis_usuario').update({ perfil_id }).eq('id', userId);
-    carregarUsuarios();
-  };
-
   const confirmarExclusao = (user: UsuarioRow) => {
     setDeleteConfirm({ user, isSelf: user.id === store.currentUserId });
   };
@@ -145,6 +140,25 @@ export default function Usuarios({ store }: UsuariosProps) {
       setResetError(e instanceof Error ? e.message : 'Erro ao redefinir senha');
     }
     setResetSaving(false);
+  };
+
+  const salvarEdicao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser || !nome.trim()) return;
+    setError('');
+    setSaving(true);
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(editUser.id, { user_metadata: { nome: nome.trim() } });
+      await supabase.from('perfis_usuario').update({ nome: nome.trim(), perfil_id: perfilId }).eq('id', editUser.id);
+      setEditUser(null);
+      setNome('');
+      setPerfilId(1);
+      setError('');
+      carregarUsuarios();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao atualizar usuário');
+    }
+    setSaving(false);
   };
 
   return (
@@ -218,17 +232,12 @@ export default function Usuarios({ store }: UsuariosProps) {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {store.hasPermission('usuarios.editar') && user.id !== store.currentUserId ? (
-                        <select value={user.perfil_id} onChange={e => atualizarPerfil(user.id, Number(e.target.value))}
-                          className="text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-2 py-1 bg-[#f8f5ee] dark:bg-[#130b04] text-[#2e2315] dark:text-amber-50">
-                          {store.perfis.map(p => (
-                            <option key={p.id} value={p.id}>{p.nome}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs font-semibold text-[#5c4a37] dark:text-amber-100/70">
-                          {store.perfilNome(user.perfil_id)}
-                        </span>
+                      {store.hasPermission('usuarios.editar') && (
+                        <button onClick={() => { setEditUser(user); setNome(user.nome || ''); setEmail(user.email); setPerfilId(user.perfil_id); setError(''); }}
+                          className="p-1.5 text-amber-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition"
+                          title="Editar usuário">
+                          <Pencil size={16} />
+                        </button>
                       )}
                       {store.hasPermission('usuarios.excluir') && (
                         <button onClick={() => confirmarExclusao(user)}
@@ -263,16 +272,16 @@ export default function Usuarios({ store }: UsuariosProps) {
         </div>
       )}
 
-      {showModal && store.hasPermission('usuarios.criar') && (
+      {(showModal || editUser) && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
-            <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-4">Criar Novo Usuário</h3>
+            <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-4">{editUser ? 'Editar Usuário' : 'Criar Novo Usuário'}</h3>
 
             {error && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">{error}</div>
             )}
 
-            <form onSubmit={criarUsuario} className="space-y-4">
+            <form onSubmit={editUser ? salvarEdicao : criarUsuario} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Nome</label>
                 <input type="text" value={nome} onChange={e => setNome(e.target.value)} required
@@ -280,31 +289,33 @@ export default function Usuarios({ store }: UsuariosProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required readOnly={!!editUser}
+                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 read-only:opacity-60 read-only:cursor-not-allowed" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Senha</label>
-                <input type="password" value={senha} onChange={e => setSenha(e.target.value)} required minLength={6}
-                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-              </div>
+              {!editUser && (
+                <div>
+                  <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Senha</label>
+                  <input type="password" value={senha} onChange={e => setSenha(e.target.value)} required minLength={6}
+                    className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Perfil de Acesso</label>
-                <select value={perfilId} onChange={e => setPerfilId(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <select value={perfilId} onChange={e => setPerfilId(Number(e.target.value))} disabled={editUser?.id === store.currentUserId}
+                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed">
                   {store.perfis.map(p => (
                     <option key={p.id} value={p.id}>{p.nome} — {p.descricao}</option>
                   ))}
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setShowModal(false); setError(''); }}
+                <button type="button" onClick={() => { setShowModal(false); setEditUser(null); setNome(''); setEmail(''); setSenha(''); setPerfilId(1); setError(''); }}
                   className="flex-1 py-2 px-4 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
                   Cancelar
                 </button>
                 <button type="submit" disabled={saving}
                   className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl transition disabled:cursor-not-allowed">
-                  {saving ? 'Criando...' : 'Criar'}
+                  {saving ? 'Salvando...' : (editUser ? 'Salvar' : 'Criar')}
                 </button>
               </div>
             </form>

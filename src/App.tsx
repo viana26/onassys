@@ -299,9 +299,9 @@ export default function App() {
             </div>
 
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 font-sans truncate leading-tight">
-                {currentUser?.user_metadata?.nome || 'Usuário'}
-              </p>
+              <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 w-fit">
+                <Shield size={12} /> {store.perfilNome(store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id ?? 3)}: {store.perfisUsuarios.find(u => u.id === store.currentUserId)?.nome || currentUser?.user_metadata?.nome || 'Usuário'}
+              </span>
               <p className="text-[10px] text-[#5c4a37]/60 dark:text-amber-100/40 font-mono truncate leading-tight">
                 {currentUser?.email || ''}
               </p>

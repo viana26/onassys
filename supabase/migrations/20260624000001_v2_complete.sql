@@ -273,7 +273,8 @@ INSERT INTO public.categorias_financeiro (nome, tipo, cor) VALUES
     ('Água', 'despesa', '#0891b2'),
     ('Manutenção', 'despesa', '#6b7280'),
     ('Marketing', 'despesa', '#db2777'),
-    ('Outras Despesas', 'despesa', '#4b5563')
+    ('Outras Despesas', 'despesa', '#4b5563'),
+    ('Estorno', 'despesa', '#7c3aed')
 ON CONFLICT (nome) DO NOTHING;
 
 -- =====================================================

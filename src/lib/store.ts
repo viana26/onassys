@@ -59,6 +59,24 @@ export class MiniFactoryStore {
   perfilNome(id: number): string { return this.perfis.find(p => p.id === id)?.nome || `?(${id})`; }
   tipoMovNome(id: number): string { return this.tiposMovimentacao.find(t => t.id === id)?.nome || `?(${id})`; }
   categoriaFinanceiroNome(id: number): string { return this.categoriasFinanceiro.find(c => c.id === id)?.nome || `?(${id})`; }
+  private getCategoriaEstornoId(): number {
+    return this.categoriasFinanceiro.find(c => c.nome === 'Estorno')?.id || 0;
+  }
+
+  getEstornoPendente(): Pedido[] {
+    return this.pedidos.filter(p => {
+      if (p.status_id !== 6) return false;
+      const receitas = this.lancamentos.filter(l => l.pedido_id === p.id && l.tipo === 'receita');
+      if (receitas.length === 0) return false;
+      const estornado = receitas.every(r => this.lancamentos.some(l =>
+        l.pedido_id === p.id &&
+        l.tipo === 'despesa' &&
+        l.valor === r.valor &&
+        l.forma_pagamento === r.forma_pagamento
+      ));
+      return !estornado;
+    });
+  }
 
   setCurrentUser(userId: string | null) {
     this.currentUserId = userId;
@@ -820,6 +838,42 @@ if (estoque) {
       pedido_id: pedidoId,
       forma_pagamento: formaPagamento,
     });
+  }
+
+  async estornarPagamentosPedido(pedidoId: string): Promise<{ success: boolean; error?: string }> {
+    const pedido = this.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return { success: false, error: 'Pedido não encontrado' };
+    const catEstornoId = this.getCategoriaEstornoId();
+    if (!catEstornoId) return { success: false, error: 'Categoria Estorno não configurada' };
+    const receitas = this.lancamentos.filter(l => l.pedido_id === pedidoId && l.tipo === 'receita');
+    if (receitas.length === 0) return { success: false, error: 'Nenhum pagamento para estornar' };
+
+    for (const rec of receitas) {
+      const jaEstornado = this.lancamentos.some(l =>
+        l.pedido_id === pedidoId &&
+        l.tipo === 'despesa' &&
+        l.valor === rec.valor &&
+        l.forma_pagamento === rec.forma_pagamento
+      );
+      if (jaEstornado) continue;
+
+      const estorno = {
+        id: crypto.randomUUID(),
+        data_lancamento: new Date().toISOString().split('T')[0],
+        valor: rec.valor,
+        tipo: 'despesa' as const,
+        categoria_id: catEstornoId,
+        descricao: `Estorno pedido #${pedidoId.slice(-6)} - ${rec.forma_pagamento || 'pagamento'}`,
+        pedido_id: pedidoId,
+        forma_pagamento: rec.forma_pagamento,
+        criado_em: new Date().toISOString(),
+      };
+      const ok = await this.supabaseInsert('lancamentos_financeiros', estorno as unknown as Record<string, unknown>);
+      if (ok) this.lancamentos.unshift(estorno);
+    }
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
   }
 
   // ================================================
