@@ -11,11 +11,11 @@ export function normalizarQuantidade(
 
   if (uf === um) return qtdFicha;
 
-  if (uf === 'g' && um === 'kg') return qtdFicha / 1000;
-  if (uf === 'kg' && um === 'g') return qtdFicha * 1000;
+  if (uf === 'g' && um === 'kg') return Number((qtdFicha / 1000).toFixed(3));
+  if (uf === 'kg' && um === 'g') return Number((qtdFicha * 1000).toFixed(3));
 
-  if (uf === 'ml' && um === 'l') return qtdFicha / 1000;
-  if (uf === 'l' && um === 'ml') return qtdFicha * 1000;
+  if (uf === 'ml' && um === 'l') return Number((qtdFicha / 1000).toFixed(3));
+  if (uf === 'l' && um === 'ml') return Number((qtdFicha * 1000).toFixed(3));
 
   return qtdFicha;
 }

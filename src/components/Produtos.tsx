@@ -124,7 +124,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
   const filteredProdutos = store.produtos.filter(p => {
     const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          p.descricao.toLowerCase().includes(searchTerm.toLowerCase());
+                          (p.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     if (categoryFilter !== 'todos') {
       return matchesSearch && p.categoria_id === categoryFilter;
@@ -324,12 +324,14 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           <p className="text-sm text-amber-900/60 dark:text-amber-100/60 mt-1">Defina quais ingredientes compõem seus salgados, bolos e doces. Calcule custos reais de fabricação e sugira capacidades.</p>
         </div>
 
-        <button 
-          onClick={handleOpenNew}
-          className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
-        >
-          <PlusCircle size={16} /> Novo Produto & Receita
-        </button>
+        {store.hasPermission('produtos.criar') && (
+          <button 
+            onClick={handleOpenNew}
+            className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
+          >
+            <PlusCircle size={16} /> Novo Produto & Receita
+          </button>
+        )}
       </div>
 
       {/* Control Filter Panel */}
@@ -585,18 +587,22 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
                 {/* Footer buttons row */}
                 <div className="bg-amber-50/20 dark:bg-[#150f09]/40 px-4 py-3 border-t border-amber-100 dark:border-[#22160b] flex items-center justify-between gap-3">
-                  <button 
-                    onClick={() => handleDelete(p.id, p.nome)}
-                    className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-600 dark:text-red-405 transition text-xs flex items-center gap-1 font-semibold cursor-pointer font-sans"
-                  >
-                    <Trash2 size={14} /> Excluir
-                  </button>
-                  <button 
-                    onClick={() => handleOpenEdit(p)}
-                    className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-100 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer font-sans"
-                  >
-                    <Edit3 size={13} /> Editar Produto / Ficha
-                  </button>
+                  {store.hasPermission('produtos.excluir') && (
+                    <button 
+                      onClick={() => handleDelete(p.id, p.nome)}
+                      className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-600 dark:text-red-405 transition text-xs flex items-center gap-1 font-semibold cursor-pointer font-sans"
+                    >
+                      <Trash2 size={14} /> Excluir
+                    </button>
+                  )}
+                  {store.hasPermission('produtos.editar') && (
+                    <button 
+                      onClick={() => handleOpenEdit(p)}
+                      className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-100 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer font-sans"
+                    >
+                      <Edit3 size={13} /> Editar Produto / Ficha
+                    </button>
+                  )}
                 </div>
 
               </div>
@@ -606,7 +612,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       )}
 
       {/* MODAL: NEW / EDIT PRODUCT + FICHA TECNICA */}
-      {isFormOpen && (
+      {isFormOpen && (store.hasPermission('produtos.criar') || store.hasPermission('produtos.editar')) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans animate-fade-in" id="modal-product-form">
           <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
             <div className="p-6 border-b border-amber-100 dark:border-[#2d1e0d] flex items-center justify-between sticky top-0 bg-white dark:bg-[#120c06] z-10">
@@ -670,7 +676,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans text-xs">Tempo Estimado de Produção (Minutos)</label>
+                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans text-xs">Tempo de Produção (min)</label>
                     <input 
                       type="number" 
                       value={tempoProducao}

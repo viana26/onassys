@@ -69,7 +69,7 @@ export async function isAuthenticated(): Promise<boolean> {
     }
 }
 
-export async function signUp(email: string, password: string, nome: string): Promise<{ success: boolean; needsConfirmation?: boolean; error?: string }> {
+export async function signUp(email: string, password: string, nome: string): Promise<{ success: boolean; needsConfirmation?: boolean; userId?: string; error?: string }> {
     try {
         const { data, error } = await supabase.auth.signUp({
             email,
@@ -88,11 +88,13 @@ export async function signUp(email: string, password: string, nome: string): Pro
             return { success: false, error: error.message };
         }
 
+        const userId = data.user?.id;
+
         if (data.user && !data.session) {
-            return { success: true, needsConfirmation: true };
+            return { success: true, needsConfirmation: true, userId };
         }
 
-        return { success: true };
+        return { success: true, userId };
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Erro ao criar conta';
         return { success: false, error: message };

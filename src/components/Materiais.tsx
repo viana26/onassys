@@ -236,12 +236,14 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </span>
               </label>
 
-              <button 
-                onClick={handleOpenNew}
-                className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2 px-3 rounded-xl transition flex items-center gap-1 w-full sm:w-auto justify-center cursor-pointer"
-              >
-                <Plus size={14} /> Novo Ingrediente
-              </button>
+              {store.hasPermission('materiais.criar') && (
+                <button 
+                  onClick={handleOpenNew}
+                  className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2 px-3 rounded-xl transition flex items-center gap-1 w-full sm:w-auto justify-center cursor-pointer"
+                >
+                  <Plus size={14} /> Novo Ingrediente
+                </button>
+              )}
             </div>
           </div>
 
@@ -315,24 +317,30 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                           <td className="p-3 text-gray-400 dark:text-amber-100/30 whitespace-nowrap">{new Date(m.data_ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
-                              <button 
-                                onClick={() => handleOpenInbound(m)}
-                                className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
-                              >
-                                + Compra/Entrada
-                              </button>
-                              <button 
-                                onClick={() => handleOpenEdit(m)}
-                                className="hover:bg-amber-100 dark:hover:bg-amber-950 p-1.5 rounded-lg text-amber-900 dark:text-amber-200 transition cursor-pointer"
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteMaterial(m.id, m.nome)}
-                                className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1.5 rounded-lg text-red-650 dark:text-red-400 transition cursor-pointer"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              {store.hasPermission('materiais.editar') && (
+                                <button 
+                                  onClick={() => handleOpenInbound(m)}
+                                  className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
+                                >
+                                  + Compra/Entrada
+                                </button>
+                              )}
+                              {store.hasPermission('materiais.editar') && (
+                                <button 
+                                  onClick={() => handleOpenEdit(m)}
+                                  className="hover:bg-amber-100 dark:hover:bg-amber-950 p-1.5 rounded-lg text-amber-900 dark:text-amber-200 transition cursor-pointer"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                              )}
+                              {store.hasPermission('materiais.excluir') && (
+                                <button 
+                                  onClick={() => handleDeleteMaterial(m.id, m.nome)}
+                                  className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1.5 rounded-lg text-red-650 dark:text-red-400 transition cursor-pointer"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -378,24 +386,30 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       </div>
 
                       <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-amber-50 dark:border-[#22160b]">
-                        <button 
-                          onClick={() => handleOpenInbound(m)}
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-800 dark:hover:bg-emerald-750 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg text-center cursor-pointer font-sans"
-                        >
-                          + Entrada/Compra
-                        </button>
-                        <button 
-                          onClick={() => handleOpenEdit(m)}
-                          className="bg-amber-100 dark:bg-amber-950 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-100 p-1.5 rounded-lg text-xs font-sans cursor-pointer"
-                        >
-                          Editar
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteMaterial(m.id, m.nome)}
-                          className="bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-650 dark:text-red-300 p-1.5 rounded-lg text-xs font-sans cursor-pointer"
-                        >
-                          Excluir
-                        </button>
+                        {store.hasPermission('materiais.editar') && (
+                          <button 
+                            onClick={() => handleOpenInbound(m)}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-800 dark:hover:bg-emerald-750 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg text-center cursor-pointer font-sans"
+                          >
+                            + Entrada/Compra
+                          </button>
+                        )}
+                        {store.hasPermission('materiais.editar') && (
+                          <button 
+                            onClick={() => handleOpenEdit(m)}
+                            className="bg-amber-100 dark:bg-amber-950 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-100 p-1.5 rounded-lg text-xs font-sans cursor-pointer"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {store.hasPermission('materiais.excluir') && (
+                          <button 
+                            onClick={() => handleDeleteMaterial(m.id, m.nome)}
+                            className="bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-650 dark:text-red-300 p-1.5 rounded-lg text-xs font-sans cursor-pointer"
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -457,7 +471,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       )}
 
       {/* MODAL / BOTTOM SHEET 1: CRUD MATERIAL FORM */}
-      {isEditing && (
+      {isEditing && (store.hasPermission('materiais.criar') || store.hasPermission('materiais.editar')) && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" id="modal-material">
           <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
             <div className="flex items-center justify-between">
@@ -577,7 +591,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       )}
 
       {/* MODAL / BOTTOM SHEET 2: QUICK INBOUND STOCK FORM */}
-      {isInbounding && (
+      {isInbounding && store.hasPermission('materiais.editar') && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" id="modal-inbound">
           <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
             <div className="flex items-center justify-between">

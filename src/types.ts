@@ -187,6 +187,11 @@ export interface ItemPedido {
   observacao?: string;
 }
 
+export interface PerfilPermissao {
+  perfil_id: number;
+  permissao_id: number;
+}
+
 export interface PerfilUsuario {
   id: string;
   nome: string;

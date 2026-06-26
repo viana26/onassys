@@ -1,4 +1,4 @@
-import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario } from '../types';
+import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario, PerfilPermissao } from '../types';
 import { calcularCustoProducao, normalizarQuantidade } from './calculos';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { deleteProdutoImage, isStorageUrl } from './imageUpload';
@@ -22,11 +22,15 @@ export class MiniFactoryStore {
   fornecedores: Fornecedor[] = [];
   permissoes: Permissao[] = [];
   perfis: Perfil[] = [];
+  perfisPermissoes: PerfilPermissao[] = [];
   categoriasFinanceiro: CategoriaFinanceiro[] = [];
 
   lancamentos: LancamentoFinanceiro[] = [];
   planejamentoCompras: PlanejamentoCompra[] = [];
   perfisUsuarios: PerfilUsuario[] = [];
+
+  currentUserId: string | null = null;
+  currentUserPermissionsCache: string[] = [];
 
   loading = true;
   error: string | null = null;
@@ -56,6 +60,61 @@ export class MiniFactoryStore {
   tipoMovNome(id: number): string { return this.tiposMovimentacao.find(t => t.id === id)?.nome || `?(${id})`; }
   categoriaFinanceiroNome(id: number): string { return this.categoriasFinanceiro.find(c => c.id === id)?.nome || `?(${id})`; }
 
+  setCurrentUser(userId: string | null) {
+    this.currentUserId = userId;
+    if (!userId) { this.currentUserPermissionsCache = []; return; }
+    const perfilUser = this.perfisUsuarios.find(u => u.id === userId);
+    if (!perfilUser) { this.currentUserPermissionsCache = []; return; }
+    const permissaoIds = this.perfisPermissoes
+      .filter(pp => pp.perfil_id === perfilUser.perfil_id)
+      .map(pp => pp.permissao_id);
+    this.currentUserPermissionsCache = this.permissoes
+      .filter(p => permissaoIds.includes(p.id))
+      .map(p => p.chave);
+  }
+
+  hasPermission(chave: string): boolean {
+    return this.currentUserPermissionsCache.includes(chave);
+  }
+
+  async ensureUserProfile(userId: string, nome: string, perfilId?: number) {
+    const cached = this.perfisUsuarios.find(u => u.id === userId);
+    if (cached) {
+      this.currentUserId = userId;
+      if (!this.loading) this.setCurrentUser(userId);
+      return;
+    }
+    const { data: existing } = await supabase
+      .from('perfis_usuario')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    if (existing) {
+      this.perfisUsuarios.push(existing as PerfilUsuario);
+      this.saveToLocalStorage();
+      this.currentUserId = userId;
+      if (!this.loading) this.setCurrentUser(userId);
+      return;
+    }
+    const { error } = await supabase.from('perfis_usuario').insert({
+      id: userId,
+      nome,
+      perfil_id: perfilId ?? 3,
+      ativo: true,
+    });
+    if (!error) {
+      this.perfisUsuarios.push({
+        id: userId,
+        nome,
+        perfil_id: perfilId ?? 3,
+        ativo: true,
+      });
+      this.saveToLocalStorage();
+    }
+    this.currentUserId = userId;
+    if (!this.loading) this.setCurrentUser(userId);
+  }
+
   // ================================================
   // PERSISTÊNCIA LOCAL (cache)
   // ================================================
@@ -72,7 +131,8 @@ export class MiniFactoryStore {
         unidades: this.unidades, categorias: this.categorias,
         statusPedido: this.statusPedido, tiposCliente: this.tiposCliente,
         fornecedores: this.fornecedores, permissoes: this.permissoes,
-        perfis: this.perfis, tiposMovimentacao: this.tiposMovimentacao,
+        perfis: this.perfis, perfisPermissoes: this.perfisPermissoes,
+        tiposMovimentacao: this.tiposMovimentacao,
         categoriasFinanceiro: this.categoriasFinanceiro,
       };
       Object.entries(data).forEach(([key, val]) => localStorage.setItem(`oc_${key}`, JSON.stringify(val)));
@@ -104,6 +164,7 @@ export class MiniFactoryStore {
       this.fornecedores = get('fornecedores', []);
       this.permissoes = get('permissoes', []);
       this.perfis = get('perfis', []);
+      this.perfisPermissoes = get('perfisPermissoes', []);
       this.tiposMovimentacao = get('tiposMovimentacao', []);
       this.categoriasFinanceiro = get('categoriasFinanceiro', []);
     } catch { /* ignore */ }
@@ -144,22 +205,23 @@ export class MiniFactoryStore {
   // ================================================
   async loadLookups() {
     if (!isSupabaseConfigured()) return;
-    const [
-      u, cat, st, tm, tc, f, perm, perf, cf
-    ] = await Promise.all([
-      this.fetchAll<Unidade>('unidades'),
-      this.fetchAll<Categoria>('categorias'),
-      this.fetchAll<StatusPedido>('status_pedido'),
-      this.fetchAll<TipoMovimentacao>('tipos_movimentacao'),
-      this.fetchAll<TipoCliente>('tipos_cliente'),
-      this.fetchAll<Fornecedor>('fornecedores'),
-      this.fetchAll<Permissao>('permissoes'),
-      this.fetchAll<Perfil>('perfis'),
-      this.fetchAll<CategoriaFinanceiro>('categorias_financeiro'),
-    ]);
-    this.unidades = u; this.categorias = cat; this.statusPedido = st;
-    this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
-    this.permissoes = perm; this.perfis = perf; this.categoriasFinanceiro = cf;
+      const [
+        u, cat, st, tm, tc, f, perm, perf, pp, cf
+      ] = await Promise.all([
+        this.fetchAll<Unidade>('unidades'),
+        this.fetchAll<Categoria>('categorias'),
+        this.fetchAll<StatusPedido>('status_pedido'),
+        this.fetchAll<TipoMovimentacao>('tipos_movimentacao'),
+        this.fetchAll<TipoCliente>('tipos_cliente'),
+        this.fetchAll<Fornecedor>('fornecedores'),
+        this.fetchAll<Permissao>('permissoes'),
+        this.fetchAll<Perfil>('perfis'),
+        this.fetchAll<PerfilPermissao>('perfis_permissoes'),
+        this.fetchAll<CategoriaFinanceiro>('categorias_financeiro'),
+      ]);
+      this.unidades = u; this.categorias = cat; this.statusPedido = st;
+      this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
+      this.permissoes = perm; this.perfis = perf; this.perfisPermissoes = pp; this.categoriasFinanceiro = cf;
   }
 
   // ================================================
@@ -198,6 +260,7 @@ export class MiniFactoryStore {
     this.loading = false;
     this.recalcularCustosProdutos();
     this.saveToLocalStorage();
+    if (this.currentUserId) this.setCurrentUser(this.currentUserId);
     this.notify();
   }
 
@@ -208,6 +271,7 @@ export class MiniFactoryStore {
     this.loading = false;
     this.recalcularCustosProdutos();
     this.saveToLocalStorage();
+    if (this.currentUserId) this.setCurrentUser(this.currentUserId);
     this.notify();
   }
 
@@ -543,9 +607,9 @@ export class MiniFactoryStore {
 
     // Consumir insumos
     for (const matId of Object.keys(materiaisUsados)) {
-      const totalQtd = materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0);
+       const totalQtd = Number(materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0).toFixed(3));
       const mat = this.materiais.find(m => m.id === matId)!;
-      mat.quantidade_atual -= totalQtd;
+       mat.quantidade_atual = Number((mat.quantidade_atual - totalQtd).toFixed(3));
       mat.data_ultima_atualizacao = new Date().toISOString();
       await this.supabaseUpdate('materiais', matId, mat as unknown as Record<string, unknown>);
 

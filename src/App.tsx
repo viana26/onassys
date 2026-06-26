@@ -41,7 +41,9 @@ import {
   Plus,
   Sun,
   Moon,
-  LogOut
+  LogOut,
+  Key,
+  Copy
 } from 'lucide-react';
 
 type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'app';
@@ -64,6 +66,9 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [caixaPreselectedId, setCaixaPreselectedId] = useState<string | null>(null);
+  const [showRecoveryCode, setShowRecoveryCode] = useState(false);
+  const [recoveryCodeValue, setRecoveryCodeValue] = useState('');
+  const [recoveryCopied, setRecoveryCopied] = useState(false);
   const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
   const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
 
@@ -124,6 +129,46 @@ export default function App() {
       return () => unsubscribe();
     }
   }, [authScreen]);
+
+  useEffect(() => {
+    if (store && currentUser) {
+      const nome = currentUser.user_metadata?.nome || currentUser.email || 'Usuário';
+      store.ensureUserProfile(currentUser.id, nome);
+    }
+  }, [store, currentUser]);
+
+  // Mostrar código de recuperação no primeiro login
+  useEffect(() => {
+    if (!store || !currentUser) return;
+    let cancelled = false;
+    const checkCode = async () => {
+      try {
+        await new Promise(r => setTimeout(r, 500));
+        const { data: perfil, error } = await supabase
+          .from('perfis_usuario')
+          .select('recovery_code_shown')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+        if (cancelled || error || !perfil || perfil.recovery_code_shown) return;
+        const { data: code, error: rpcError } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: currentUser.id });
+        if (cancelled || rpcError || !code) return;
+        await supabase.from('perfis_usuario').update({ recovery_code_shown: true }).eq('id', currentUser.id);
+        setRecoveryCodeValue(code);
+        setShowRecoveryCode(true);
+      } catch {
+        // coluna ou RPC ainda não existem no banco — ignora
+      }
+    };
+    const timer = setTimeout(checkCode, 1500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [store, currentUser]);
+
+  // =====================================================
+  // EFFECTS - Sync app name to browser tab
+  // =====================================================
+  useEffect(() => {
+    document.title = appName;
+  }, [appName]);
 
   // =====================================================
   // EFFECTS - Theme
@@ -241,97 +286,105 @@ export default function App() {
     <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex flex-col md:flex-row relative text-[#2e2315] dark:text-[#f7f4f0] transition-colors duration-200">
       
       {/* DESKTOP SIDEBAR */}
-      <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 justify-between border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
-        <div className="space-y-6">
-          <div className="flex items-center gap-2.5 lg:gap-3 pb-4 border-b border-[#ebdcc9] dark:border-[#1e1005]">
-            <div className="bg-amber-600 p-1.5 lg:p-2 rounded-xl text-amber-950 shrink-0">
-              <ChefHat size={20} />
+      <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
+          <div className="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0 no-scrollbar">
+            <div className="flex items-center gap-2.5 lg:gap-3">
+              <div className="bg-amber-600 p-1.5 lg:p-2 rounded-xl text-amber-950 shrink-0">
+                <ChefHat size={20} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-display font-semibold text-xs lg:text-sm tracking-tight leading-snug truncate">{appName}</h2>
+                <p className="text-[8px] lg:text-[10px] text-amber-700 dark:text-amber-400 font-mono tracking-wider font-semibold truncate">ESTOQUE & PEDIDOS</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h2 className="font-display font-semibold text-xs lg:text-sm tracking-tight leading-snug truncate">{appName}</h2>
-              <p className="text-[8px] lg:text-[10px] text-amber-700 dark:text-amber-400 font-mono tracking-wider font-semibold truncate">ESTOQUE & PEDIDOS</p>
-            </div>
-          </div>
 
-          <nav className="space-y-1" id="desktop-nav">
-            {[
-              { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} /> },
-              { id: 'materiais', label: 'Despensa Insumos', icon: <Coins size={15} /> },
-              { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={15} /> },
-              { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} /> },
-              { id: 'clientes', label: 'Clientes', icon: <Users size={15} /> },
-              { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} /> },
-              { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} /> },
-              { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} /> },
-              { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} /> },
-              { id: 'config', label: 'Configurações', icon: <Settings size={15} /> },
-            ].map(item => {
-              const active = currentTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setCurrentTab(item.id);
-                    setIsSidebarOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-2 lg:py-2.5 rounded-xl text-xs font-semibold tracking-wide transition ${
-                    active 
-                      ? 'bg-amber-700 dark:bg-amber-600 text-white font-bold shadow-sm' 
-                      : 'hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] text-[#5c4a37] dark:text-amber-100/70'
-                  }`}
-                >
-                  <div className="shrink-0">{item.icon}</div>
-                  <span className="truncate">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-[#ebdcc9] dark:border-[#1e1005]">
-          <div className="flex items-center justify-between bg-[#f0eade] dark:bg-[#130b04] p-1 rounded-xl border border-[#ebdcc9] dark:border-[#1e1005]">
-            <button
-              onClick={() => setTheme('light')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider transition ${
-                theme === 'light'
-                  ? 'bg-amber-700 text-white shadow-sm'
-                  : 'text-[#5c4a37]/60 dark:text-amber-100/30 hover:text-[#5c4a37] dark:hover:text-amber-100/60'
-              }`}
-            >
-              <Sun size={12} />
-              <span>CLARO</span>
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider transition ${
-                theme === 'dark'
-                  ? 'bg-amber-700 text-white shadow-sm'
-                  : 'text-[#5c4a37]/60 dark:text-amber-100/30 hover:text-[#5c4a37] dark:hover:text-amber-100/60'
-              }`}
-            >
-              <Moon size={12} />
-              <span>ESCURO</span>
-            </button>
-          </div>
-
-          <SyncStatus store={store} />
-
-          <div className="text-xs space-y-2">
-            <div className="text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
-              <p className="font-semibold text-amber-700 dark:text-amber-400 font-sans truncate">
-                {currentUser?.email || 'Usuário'}
+            <div className="space-y-0.5">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 font-sans truncate leading-tight">
+                {currentUser?.user_metadata?.nome || 'Usuário'}
               </p>
-              <p className="text-[9px]">Administrador | V.1.0</p>
+              <p className="text-[10px] text-[#5c4a37]/60 dark:text-amber-100/40 font-mono truncate leading-tight">
+                {currentUser?.email || ''}
+              </p>
             </div>
+
+            <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
+
+            <nav className="space-y-1" id="desktop-nav">
+              {[
+                { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
+                { id: 'materiais', label: 'Despensa Insumos', icon: <Coins size={15} />, perm: 'materiais.ver' },
+                { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={15} />, perm: 'produtos.ver' },
+                { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} />, perm: 'estoque.ver' },
+                { id: 'clientes', label: 'Clientes', icon: <Users size={15} />, perm: 'clientes.ver' },
+                { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
+                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
+                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
+                { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} />, perm: 'usuarios.ver' },
+                { id: 'config', label: 'Configurações', icon: <Settings size={15} />, perm: 'config.editar' },
+              ].filter(item => {
+                if (item.id === 'usuarios') {
+                  return store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1;
+                }
+                return !item.perm || store.hasPermission(item.perm);
+              }).map(item => {
+                const active = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setCurrentTab(item.id);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2.5 lg:gap-3 px-2.5 lg:px-3 py-2 lg:py-2.5 rounded-xl text-xs font-semibold tracking-wide transition ${
+                      active 
+                        ? 'bg-amber-700 dark:bg-amber-600 text-white font-bold shadow-sm' 
+                        : 'hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] text-[#5c4a37] dark:text-amber-100/70'
+                    }`}
+                  >
+                    <div className="shrink-0">{item.icon}</div>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t border-[#ebdcc9] dark:border-[#1e1005] mt-auto">
+            <div className="flex items-center justify-between bg-[#f0eade] dark:bg-[#130b04] p-1 rounded-xl border border-[#ebdcc9] dark:border-[#1e1005]">
+              <button
+                onClick={() => setTheme('light')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider transition ${
+                  theme === 'light'
+                    ? 'bg-amber-700 text-white shadow-sm'
+                    : 'text-[#5c4a37]/60 dark:text-amber-100/30 hover:text-[#5c4a37] dark:hover:text-amber-100/60'
+                }`}
+              >
+                <Sun size={12} />
+                <span>CLARO</span>
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider transition ${
+                  theme === 'dark'
+                    ? 'bg-amber-700 text-white shadow-sm'
+                    : 'text-[#5c4a37]/60 dark:text-amber-100/30 hover:text-[#5c4a37] dark:hover:text-amber-100/60'
+                }`}
+              >
+                <Moon size={12} />
+                <span>ESCURO</span>
+              </button>
+            </div>
+
+            <SyncStatus store={store} />
+
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 text-[10px] font-medium text-[#5c4a37]/60 dark:text-amber-100/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 text-xs font-semibold text-[#5c4a37]/60 dark:text-amber-100/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-transparent hover:border-red-200 dark:hover:border-red-800 transition"
             >
-              <LogOut size={12} />
+              <LogOut size={14} />
               <span>Sair</span>
             </button>
           </div>
-        </div>
       </aside>
 
       {/* MOBILE HEADER */}
@@ -378,13 +431,18 @@ export default function App() {
 
             <nav className="space-y-1">
               {[
-                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} /> },
-                { id: 'clientes', label: 'Clientes', icon: <Users size={16} /> },
-                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={16} /> },
-                { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={16} /> },
-                { id: 'usuarios', label: 'Usuários', icon: <Shield size={16} /> },
-                { id: 'config', label: 'Configurações', icon: <Settings size={16} /> },
-              ].map(item => {
+                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} />, perm: 'financeiro.ver' },
+                { id: 'clientes', label: 'Clientes', icon: <Users size={16} />, perm: 'clientes.ver' },
+                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={16} />, perm: 'financeiro.ver' },
+                { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={16} />, perm: 'produtos.ver' },
+                { id: 'usuarios', label: 'Usuários', icon: <Shield size={16} />, perm: 'usuarios.ver' },
+                { id: 'config', label: 'Configurações', icon: <Settings size={16} />, perm: 'config.editar' },
+              ].filter(item => {
+                if (item.id === 'usuarios') {
+                  return store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1;
+                }
+                return !item.perm || store.hasPermission(item.perm);
+              }).map(item => {
                 const active = currentTab === item.id;
                 return (
                   <button
@@ -436,23 +494,23 @@ export default function App() {
           />
         )}
         
-        {currentTab === 'materiais' && (
+        {currentTab === 'materiais' && store.hasPermission('materiais.ver') && (
           <Materiais store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
-        {currentTab === 'produtos' && (
+        {currentTab === 'produtos' && store.hasPermission('produtos.ver') && (
           <Produtos store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
-        {currentTab === 'estoque' && (
+        {currentTab === 'estoque' && store.hasPermission('estoque.ver') && (
           <EstoqueProdutos store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
-        {currentTab === 'clientes' && (
+        {currentTab === 'clientes' && store.hasPermission('clientes.ver') && (
           <Clientes store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
-        {currentTab === 'pedidos' && (
+        {currentTab === 'pedidos' && store.hasPermission('pedidos.ver') && (
           <Pedidos 
             store={store} 
             onUpdate={() => setUpdateTick(t => t + 1)} 
@@ -461,7 +519,7 @@ export default function App() {
           />
         )}
 
-        {currentTab === 'caixa' && (
+        {currentTab === 'caixa' && store.hasPermission('financeiro.ver') && (
           <Caixa
             store={store}
             onUpdate={() => setUpdateTick(t => t + 1)}
@@ -471,15 +529,15 @@ export default function App() {
           />
         )}
 
-        {currentTab === 'financeiro' && (
+        {currentTab === 'financeiro' && store.hasPermission('financeiro.ver') && (
           <Financeiro store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
-        {currentTab === 'config' && (
+        {currentTab === 'config' && store.hasPermission('config.editar') && (
           <Configuracao appName={appName} onSaveAppName={handleSaveAppName} />
         )}
 
-        {currentTab === 'usuarios' && (
+        {currentTab === 'usuarios' && store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1 && (
           <Usuarios store={store} />
         )}
 
@@ -488,11 +546,11 @@ export default function App() {
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#f8f5ee] dark:bg-[#0c0703] border-t border-[#ebdcc9] dark:border-[#1e1005] text-[#2e2315] dark:text-amber-100 flex items-center justify-around py-2 px-1 z-40 shadow-xl navbar-mobile transition-colors duration-200">
         {[
-          { id: 'dashboard', label: 'Monitor', icon: <LayoutDashboard size={18} /> },
-          { id: 'materiais', label: 'Insumos', icon: <Coins size={18} /> },
-          { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag size={18} /> },
-          { id: 'estoque', label: 'Prateleira', icon: <Warehouse size={18} /> },
-        ].map(item => {
+          { id: 'dashboard', label: 'Monitor', icon: <LayoutDashboard size={18} />, perm: null },
+          { id: 'materiais', label: 'Insumos', icon: <Coins size={18} />, perm: 'materiais.ver' },
+          { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag size={18} />, perm: 'pedidos.ver' },
+          { id: 'estoque', label: 'Prateleira', icon: <Warehouse size={18} />, perm: 'estoque.ver' },
+        ].filter(item => !item.perm || store.hasPermission(item.perm)).map(item => {
           const active = currentTab === item.id;
           return (
             <button
@@ -517,6 +575,79 @@ export default function App() {
         </button>
       </nav>
 
+      {showRecoveryCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a] text-center shadow-2xl">
+            <div className="bg-amber-100 dark:bg-amber-900/30 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Key size={28} className="text-amber-600 dark:text-amber-400" />
+            </div>
+            <h2 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-1">
+              Seu Código de Recuperação
+            </h2>
+            <p className="text-xs text-[#5c4a37]/70 dark:text-amber-100/60 mb-4">
+              Guarde este código em local seguro. Ele permite redefinir sua senha sem precisar do administrador.
+            </p>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-4">
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+                Código de Recuperação
+              </span>
+              <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-4 py-3 mt-2">
+                <span className="text-2xl font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">
+                  {recoveryCodeValue}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(recoveryCodeValue);
+                  } catch {
+                    const ta = document.createElement('textarea');
+                    ta.value = recoveryCodeValue;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                  }
+                  setRecoveryCopied(true);
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 transition"
+              >
+                <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar código'}
+              </button>
+            </div>
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl mb-4">
+              <p className="text-xs text-red-700 dark:text-red-300">
+                ⚠️ Este código não é sua senha. É uma chave de recuperação exibida apenas uma vez. Se perder, peça ao administrador para gerar um novo.
+              </p>
+            </div>
+            <button onClick={() => {
+              setShowRecoveryCode(false);
+              setRecoveryCopied(false);
+              const firstTab = [
+                { id: 'dashboard', perm: null },
+                { id: 'materiais', perm: 'materiais.ver' },
+                { id: 'produtos', perm: 'produtos.ver' },
+                { id: 'estoque', perm: 'estoque.ver' },
+                { id: 'clientes', perm: 'clientes.ver' },
+                { id: 'pedidos', perm: 'pedidos.ver' },
+                { id: 'caixa', perm: 'financeiro.ver' },
+                { id: 'financeiro', perm: 'financeiro.ver' },
+                { id: 'usuarios', perm: '' },
+                { id: 'config', perm: 'config.editar' },
+              ].find(t => {
+                if (t.id === 'usuarios') return store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1;
+                return !t.perm || store.hasPermission(t.perm);
+              });
+              if (firstTab) setCurrentTab(firstTab.id);
+            }}
+              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-sm transition">
+              Entendi, guardar o código
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

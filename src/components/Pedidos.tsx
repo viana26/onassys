@@ -322,12 +322,14 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore rascunhos, confirme pedidos, verifique insumos deficientes e trace o Kanban semanal.</p>
         </div>
 
-        <button 
-          onClick={handleOpenNewOrder}
-          className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium"
-        >
-          <PlusCircle size={16} /> Novo Pedido de Cliente
-        </button>
+        {store.hasPermission('pedidos.criar') && (
+          <button 
+            onClick={handleOpenNewOrder}
+            className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium"
+          >
+            <PlusCircle size={16} /> Novo Pedido de Cliente
+          </button>
+        )}
       </div>
 
       {/* Segment tabs */}
@@ -512,7 +514,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                               
                               {/* Fast click status controllers */}
                               <div className="flex items-center gap-1 shrink-0">
-                                {p.status_id === 2 && (
+                                {p.status_id === 2 && store.hasPermission('pedidos.editar') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -523,7 +525,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                                     Cozinha
                                   </button>
                                 )}
-                                {p.status_id === 3 && (
+                                {p.status_id === 3 && store.hasPermission('pedidos.editar') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -534,7 +536,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                                     Pronto!
                                   </button>
                                 )}
-                                {p.status_id === 4 && (
+                                {p.status_id === 4 && store.hasPermission('pedidos.editar') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -696,17 +698,19 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             >
                               Ver Ficha
                             </button>
-                            <button 
-                              onClick={() => {
-                                if (confirm('Tem certeza de que deseja deletar este pedido? As reservas físicas também serão desfeitas.')) {
-                                  store.deletePedido(p.id);
-                                  onUpdate();
-                                }
-                              }}
-                              className="text-red-500 hover:text-red-700 p-1"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {store.hasPermission('pedidos.excluir') && (
+                              <button 
+                                onClick={() => {
+                                  if (confirm('Tem certeza de que deseja deletar este pedido? As reservas físicas também serão desfeitas.')) {
+                                    store.deletePedido(p.id);
+                                    onUpdate();
+                                  }
+                                }}
+                                className="text-red-500 hover:text-red-700 p-1"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1084,7 +1088,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                   <div className="space-y-2">
                     <label className="text-[9px] font-bold uppercase text-amber-900/60 block">Mudança de Fase Operacional</label>
                     <div className="flex flex-wrap gap-2">
-                      {(p.status_id === 1 || p.status_id === 2) && (
+                      {store.hasPermission('pedidos.editar') && (p.status_id === 1 || p.status_id === 2) && (
                         <button
                           onClick={() => handleOpenEditOrder(p.id)}
                           className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg"
@@ -1093,7 +1097,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         </button>
                       )}
 
-                      {p.status_id === 1 && (
+                      {store.hasPermission('pedidos.aprovar') && p.status_id === 1 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 2)}
                           className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-3 rounded-lg"
@@ -1102,7 +1106,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         </button>
                       )}
                       
-                      {p.status_id === 2 && (
+                      {store.hasPermission('pedidos.editar') && p.status_id === 2 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 3)}
                           disabled={!analise.tudoDisponivelEmEstoquePronto && !analise.podeProduzirRestante}
@@ -1112,7 +1116,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         </button>
                       )}
 
-                      {p.status_id === 3 && (
+                      {store.hasPermission('pedidos.editar') && p.status_id === 3 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 4)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
@@ -1121,7 +1125,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         </button>
                       )}
 
-                      {p.status_id === 4 && (
+                      {store.hasPermission('pedidos.editar') && p.status_id === 4 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 5)}
                           className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
@@ -1130,7 +1134,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         </button>
                       )}
 
-                      {p.status_id !== 5 && p.status_id !== 6 && (
+                      {store.hasPermission('pedidos.cancelar') && p.status_id !== 5 && p.status_id !== 6 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 6)}
                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-lg"

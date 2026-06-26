@@ -28,10 +28,12 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
           <h2 className="text-xl font-bold text-[#2e2315] dark:text-amber-50">Financeiro</h2>
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Receitas, despesas e fluxo de caixa</p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
-          <Plus size={18} /> Novo Lançamento
-        </button>
+        {store.hasPermission('financeiro.lancar') && (
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
+            <Plus size={18} /> Novo Lançamento
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -114,12 +116,14 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 <td className={`px-4 py-3 text-right text-sm font-bold font-mono ${l.tipo === 'receita' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                   {l.tipo === 'receita' ? '+' : '-'}{brl(l.valor)}
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={async () => { await store.deleteLancamentoFinanceiro(l.id); onUpdate(); }}
-                    className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-red-600 dark:hover:text-red-400 transition">
-                    <Trash2 size={14} />
-                  </button>
-                </td>
+                {store.hasPermission('financeiro.lancar') && (
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={async () => { await store.deleteLancamentoFinanceiro(l.id); onUpdate(); }}
+                      className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-red-600 dark:hover:text-red-400 transition">
+                      <Trash2 size={14} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -178,7 +182,7 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">{error}</div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-2">Tipo</label>
             <div className="flex gap-2">
@@ -197,46 +201,48 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Categoria</label>
-            <select value={categoriaId} onChange={e => setCategoriaId(Number(e.target.value))} required
-              className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
-              {categorias.map(c => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Categoria</label>
+              <select value={categoriaId} onChange={e => setCategoriaId(Number(e.target.value))} required
+                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                {categorias.map(c => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Pagamento</label>
+              <select value={formaPagamento} onChange={e => setFormaPagamento(e.target.value)}
+                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="">Selecione</option>
+                <option value="dinheiro">Dinheiro</option>
+                <option value="pix">Pix</option>
+                <option value="cartao_credito">Crédito</option>
+                <option value="cartao_debito">Débito</option>
+                <option value="boleto">Boleto</option>
+                <option value="transferencia">Transferência</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>
-            <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} required placeholder="0,00"
-              className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Data</label>
-            <input type="date" value={dataLancamento} onChange={e => setDataLancamento(e.target.value)} required
-              className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>
+              <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} required placeholder="0,00"
+                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Data</label>
+              <input type="date" value={dataLancamento} onChange={e => setDataLancamento(e.target.value)} required
+                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Descrição</label>
             <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Descrição do lançamento"
               className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Forma de Pagamento</label>
-            <select value={formaPagamento} onChange={e => setFormaPagamento(e.target.value)}
-              className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
-              <option value="">Selecione</option>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">Pix</option>
-              <option value="cartao_credito">Cartão de Crédito</option>
-              <option value="cartao_debito">Cartão de Débito</option>
-              <option value="boleto">Boleto</option>
-              <option value="transferencia">Transferência</option>
-            </select>
           </div>
 
           <div className="flex gap-3 pt-2">

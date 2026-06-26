@@ -134,12 +134,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
           <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore coxinhas, brigadeiros e bolos assados livres para venda ou reservados para encomendas.</p>
         </div>
 
-        <button 
-          onClick={() => handleOpenLoteForm()}
-          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
-        >
-          <Layers size={16} /> Lançar Lote de Produção
-        </button>
+        {store.hasPermission('estoque.criar') && (
+          <button 
+            onClick={() => handleOpenLoteForm()}
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
+          >
+            <Layers size={16} /> Lançar Lote de Produção
+          </button>
+        )}
       </div>
 
       {/* Tabs navigation */}
@@ -299,18 +301,22 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                         Qtd Mínima: <span className="font-bold">{ep.quantidade_minima}</span> {store.unidadeNome(prod.unidade_producao_id)}
                       </div>
                       <div className="flex items-center gap-2">
+                        {store.hasPermission('estoque.editar') && (
                         <button 
                           onClick={() => handleOpenThreshold(ep)}
                           className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1 rounded transition text-[10px] font-bold cursor-pointer"
                         >
                           Ajustar Mínimo
                         </button>
-                        <button 
-                          onClick={() => handleOpenLoteForm(ep.produto_id)}
-                          className="bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/20 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-0.5 cursor-pointer"
-                        >
-                          + Forno
-                        </button>
+                        )}
+                        {store.hasPermission('estoque.criar') && (
+                          <button 
+                            onClick={() => handleOpenLoteForm(ep.produto_id)}
+                            className="bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/20 px-2 py-1 rounded text-[10px] font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            + Forno
+                          </button>
+                        )}
                       </div>
                     </div>
 

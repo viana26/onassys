@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Users as UsersIcon, Plus, Shield, AlertCircle } from 'lucide-react';
-import { supabase, supabaseAdmin } from '../lib/supabaseClient';
+import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Copy, CheckCircle } from 'lucide-react';
+import { supabase, supabaseAdmin, signOut } from '../lib/supabaseClient';
 
 interface UsuarioRow {
   id: string;
@@ -26,6 +26,17 @@ export default function Usuarios({ store }: UsuariosProps) {
   const [perfilId, setPerfilId] = useState(1);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ user: UsuarioRow; isSelf: boolean } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [resetPassUser, setResetPassUser] = useState<UsuarioRow | null>(null);
+  const [resetPass, setResetPass] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [userRecoveryCode, setUserRecoveryCode] = useState('');
+  const [recoveryCopied, setRecoveryCopied] = useState(false);
+  const [createdUserCode, setCreatedUserCode] = useState('');
+  const [createdUserName, setCreatedUserName] = useState('');
 
   useEffect(() => { carregarUsuarios(); }, [store]);
 
@@ -66,6 +77,9 @@ export default function Usuarios({ store }: UsuariosProps) {
         await supabase.from('perfis_usuario').upsert({
           id: data.user.id, perfil_id: perfilId, ativo: true
         });
+        const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: data.user.id });
+        setCreatedUserCode(code || '');
+        setCreatedUserName(nome);
       }
       setShowModal(false);
       setEmail(''); setSenha(''); setNome(''); setPerfilId(1);
@@ -82,8 +96,55 @@ export default function Usuarios({ store }: UsuariosProps) {
   };
 
   const atualizarPerfil = async (userId: string, perfil_id: number) => {
+    if (userId === store.currentUserId) return;
     await supabase.from('perfis_usuario').update({ perfil_id }).eq('id', userId);
     carregarUsuarios();
+  };
+
+  const confirmarExclusao = (user: UsuarioRow) => {
+    setDeleteConfirm({ user, isSelf: user.id === store.currentUserId });
+  };
+
+  const excluirUsuario = async () => {
+    if (!deleteConfirm) return;
+    setDeleting(true);
+    const { user, isSelf } = deleteConfirm;
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(user.id);
+      await supabase.from('perfis_usuario').delete().eq('id', user.id);
+      setDeleteConfirm(null);
+      carregarUsuarios();
+      if (isSelf) {
+        await signOut();
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao excluir usuário');
+    }
+    setDeleting(false);
+  };
+
+  const usuariosOrdenados = [...usuarios].sort((a, b) => {
+    if (a.id === store.currentUserId) return -1;
+    if (b.id === store.currentUserId) return 1;
+    return 0;
+  });
+
+  const redefinirSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError('');
+    if (resetPass !== resetConfirm) { setResetError('As senhas não coincidem'); return; }
+    if (resetPass.length < 6) { setResetError('A senha deve ter pelo menos 6 caracteres'); return; }
+    if (!resetPassUser) return;
+    setResetSaving(true);
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(resetPassUser.id, { password: resetPass });
+      setResetPassUser(null);
+      setResetPass('');
+      setResetConfirm('');
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : 'Erro ao redefinir senha');
+    }
+    setResetSaving(false);
   };
 
   return (
@@ -93,10 +154,12 @@ export default function Usuarios({ store }: UsuariosProps) {
           <h2 className="text-xl font-bold text-[#2e2315] dark:text-amber-50">Usuários do Sistema</h2>
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Gerencie usuários e níveis de acesso</p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
-          <Plus size={18} /> Novo Usuário
-        </button>
+        {store.hasPermission('usuarios.criar') && (
+          <button onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
+            <Plus size={18} /> Novo Usuário
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -115,12 +178,17 @@ export default function Usuarios({ store }: UsuariosProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
-              {usuarios.map(user => (
-                <tr key={user.id} className="hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition">
+              {usuariosOrdenados.map(user => (
+                <tr key={user.id} className={`hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition ${user.id === store.currentUserId ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-[#2e2315] dark:text-amber-50">{user.nome}</p>
-                      <p className="text-xs text-[#5c4a37]/60 dark:text-amber-100/50">{user.email}</p>
+                    <div className="flex items-center gap-2">
+                      {user.id === store.currentUserId && (
+                        <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">(Você)</span>
+                      )}
+                      <div>
+                        <p className="font-medium text-[#2e2315] dark:text-amber-50">{user.nome}</p>
+                        <p className="text-xs text-[#5c4a37]/60 dark:text-amber-100/50">{user.email}</p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">
@@ -129,22 +197,61 @@ export default function Usuarios({ store }: UsuariosProps) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => toggleAtivo(user.id, user.ativo)}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition ${
+                    {store.hasPermission('usuarios.editar') ? (
+                      <button onClick={() => toggleAtivo(user.id, user.ativo)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold transition ${
+                          user.ativo
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                        {user.ativo ? 'Ativo' : 'Inativo'}
+                      </button>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${
                         user.ativo
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                           : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                       }`}>
-                      {user.ativo ? 'Ativo' : 'Inativo'}
-                    </button>
+                        {user.ativo ? 'Ativo' : 'Inativo'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <select value={user.perfil_id} onChange={e => atualizarPerfil(user.id, Number(e.target.value))}
-                      className="text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-2 py-1 bg-[#f8f5ee] dark:bg-[#130b04] text-[#2e2315] dark:text-amber-50">
-                      {store.perfis.map(p => (
-                        <option key={p.id} value={p.id}>{p.nome}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center justify-end gap-2">
+                      {store.hasPermission('usuarios.editar') && user.id !== store.currentUserId ? (
+                        <select value={user.perfil_id} onChange={e => atualizarPerfil(user.id, Number(e.target.value))}
+                          className="text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-2 py-1 bg-[#f8f5ee] dark:bg-[#130b04] text-[#2e2315] dark:text-amber-50">
+                          {store.perfis.map(p => (
+                            <option key={p.id} value={p.id}>{p.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs font-semibold text-[#5c4a37] dark:text-amber-100/70">
+                          {store.perfilNome(user.perfil_id)}
+                        </span>
+                      )}
+                      {store.hasPermission('usuarios.excluir') && (
+                        <button onClick={() => confirmarExclusao(user)}
+                          className="p-1.5 text-red-500 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                      {store.hasPermission('usuarios.editar') && (
+                        <button onClick={async () => {
+                          setResetPassUser(user);
+                          setResetPass('');
+                          setResetConfirm('');
+                          setResetError('');
+                          setUserRecoveryCode('');
+                          const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: user.id });
+                          setUserRecoveryCode(code || '');
+                        }}
+                          className="p-1.5 text-amber-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition"
+                          title="Recuperação de senha">
+                          <Key size={16} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -156,7 +263,7 @@ export default function Usuarios({ store }: UsuariosProps) {
         </div>
       )}
 
-      {showModal && (
+      {showModal && store.hasPermission('usuarios.criar') && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
             <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-4">Criar Novo Usuário</h3>
@@ -201,6 +308,150 @@ export default function Usuarios({ store }: UsuariosProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">
+                {deleteConfirm.isSelf ? 'Excluir seu próprio acesso?' : 'Excluir Usuário?'}
+              </h3>
+            </div>
+            <p className="text-sm text-[#5c4a37] dark:text-amber-100/70 mb-2">
+              O usuário <strong>{deleteConfirm.user.nome}</strong> ({deleteConfirm.user.email}) será removido permanentemente do sistema.
+            </p>
+            {deleteConfirm.isSelf && (
+              <p className="text-sm text-red-600 dark:text-red-400 mb-4 font-semibold">
+                Você está prestes a excluir seu próprio usuário. Esta ação irá encerrar sua sessão e o sistema voltará para a tela de configuração inicial.
+              </p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => { setDeleteConfirm(null); setError(''); }}
+                className="flex-1 py-2 px-4 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={excluirUsuario} disabled={deleting}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 disabled:bg-red-400 text-white font-semibold rounded-xl transition disabled:cursor-not-allowed">
+                {deleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetPassUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                <Key size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">Recuperação de Senha</h3>
+                <p className="text-xs text-[#5c4a37] dark:text-amber-100/70">
+                  {resetPassUser.nome} ({resetPassUser.email})
+                </p>
+              </div>
+            </div>
+
+            {resetError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">{resetError}</div>
+            )}
+
+            <div className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-[#5c4a37] dark:text-amber-100 mb-2">Código de Recuperação</label>
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
+                  <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-3 py-2 mb-2 text-center">
+                    <span className="text-lg font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">
+                      {userRecoveryCode || '────────'}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => {
+                      try { navigator.clipboard.writeText(userRecoveryCode); } catch {
+                        const ta = document.createElement('textarea');
+                        ta.value = userRecoveryCode; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                      }
+                      setRecoveryCopied(true); setTimeout(() => setRecoveryCopied(false), 2000);
+                    }}
+                      className="flex-1 py-1.5 text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-white dark:hover:bg-[#130b04] transition flex items-center justify-center gap-1">
+                      <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                    <button onClick={async () => {
+                      const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: resetPassUser.id });
+                      if (code) setUserRecoveryCode(code);
+                    }}
+                      className="flex-1 py-1.5 text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-white dark:hover:bg-[#130b04] transition">
+                      Regenerar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <hr className="border-[#ebdcc9] dark:border-[#2e1a0a]" />
+
+              <div>
+                <label className="block text-sm font-semibold text-[#5c4a37] dark:text-amber-100 mb-2">Redefinir Senha</label>
+                <form onSubmit={redefinirSenha} className="space-y-3">
+                  <input type="password" value={resetPass} onChange={e => setResetPass(e.target.value)} required minLength={6} placeholder="Nova senha"
+                    className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} required minLength={6} placeholder="Confirmar nova senha"
+                    className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={resetSaving}
+                      className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl text-sm transition disabled:cursor-not-allowed">
+                      {resetSaving ? 'Redefinindo...' : 'Redefinir'}
+                    </button>
+                    <button type="button" onClick={() => { setResetPassUser(null); setResetPass(''); setResetConfirm(''); setResetError(''); }}
+                      className="flex-1 py-2 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium text-sm hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
+                      Fechar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {createdUserCode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a] text-center">
+            <div className="bg-emerald-100 dark:bg-emerald-900/30 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
+              <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-1">Usuário Criado!</h3>
+            <p className="text-sm text-[#5c4a37] dark:text-amber-100/70 mb-4">{createdUserName}</p>
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-3">
+              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 block mb-2">CÓDIGO DE RECUPERAÇÃO</span>
+              <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-3 py-2 mb-2">
+                <span className="text-lg font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">{createdUserCode}</span>
+              </div>
+              <button onClick={() => {
+                try { navigator.clipboard.writeText(createdUserCode); } catch {
+                  const ta = document.createElement('textarea');
+                  ta.value = createdUserCode; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                }
+                setRecoveryCopied(true); setTimeout(() => setRecoveryCopied(false), 2000);
+              }}
+                className="text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 transition flex items-center justify-center gap-1 mx-auto">
+                <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar código'}
+              </button>
+            </div>
+            <p className="text-xs text-red-600 dark:text-red-400 mb-4">⚠️ Guarde o código. Sem ele, só o admin poderá redefinir a senha.</p>
+            <button onClick={() => { setCreatedUserCode(''); setCreatedUserName(''); }}
+              className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-sm transition">
+              Ok
+            </button>
           </div>
         </div>
       )}

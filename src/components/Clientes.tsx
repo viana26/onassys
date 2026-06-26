@@ -122,7 +122,8 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
 
         <button 
           onClick={handleOpenNew}
-          className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium"
+          disabled={!store.hasPermission('clientes.criar')}
+          className={`${store.hasPermission('clientes.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium`}
         >
           <PlusCircle size={16} /> Novo Cliente
         </button>
@@ -224,13 +225,15 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-3">
                   <button 
                     onClick={() => handleDelete(c.id, c.nome)}
-                    className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-500 transition text-[11px] flex items-center gap-1 font-semibold"
+                    disabled={!store.hasPermission('clientes.excluir')}
+                    className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1.5 rounded-lg text-red-500 transition text-[11px] flex items-center gap-1 font-semibold`}
                   >
                     <Trash2 size={13} /> Deletar
                   </button>
                   <button 
                     onClick={() => handleOpenEdit(c)}
-                    className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-950 dark:text-amber-200 font-bold px-3 py-1 rounded-xl text-xs flex items-center gap-1 transition"
+                    disabled={!store.hasPermission('clientes.editar')}
+                    className={`${store.hasPermission('clientes.editar') ? 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900' : 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'} text-amber-950 dark:text-amber-200 font-bold px-3 py-1 rounded-xl text-xs flex items-center gap-1 transition`}
                   >
                     <Edit3 size={12} /> Editar Ficha
                   </button>
