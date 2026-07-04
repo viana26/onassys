@@ -41,6 +41,7 @@ export interface Fornecedor {
   contato?: string;
   telefone?: string;
   email?: string;
+  ativo: boolean;
   criado_em?: string;
 }
 

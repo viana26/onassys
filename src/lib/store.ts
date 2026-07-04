@@ -240,6 +240,51 @@ export class MiniFactoryStore {
       this.unidades = u; this.categorias = cat; this.statusPedido = st;
       this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
       this.permissoes = perm; this.perfis = perf; this.perfisPermissoes = pp; this.categoriasFinanceiro = cf;
+      await this.ensureFornecedorPermissions();
+  }
+
+  private async ensureFornecedorPermissions() {
+    if (!isSupabaseConfigured()) return;
+    const hasPerm = this.permissoes.some(p => p.chave === 'fornecedores.ver');
+    if (hasPerm) return;
+
+    const novasPerms = [
+      { chave: 'fornecedores.ver', nome: 'Ver Fornecedores', grupo: 'Fornecedores' },
+      { chave: 'fornecedores.criar', nome: 'Criar Fornecedores', grupo: 'Fornecedores' },
+      { chave: 'fornecedores.editar', nome: 'Editar Fornecedores', grupo: 'Fornecedores' },
+      { chave: 'fornecedores.excluir', nome: 'Excluir Fornecedores', grupo: 'Fornecedores' },
+    ];
+
+    const inserted: Permissao[] = [];
+    for (const p of novasPerms) {
+      const { data } = await supabase.from('permissoes').insert(p).select().single();
+      if (data) inserted.push(data as Permissao);
+    }
+    if (inserted.length === 0) return;
+
+    this.permissoes.push(...inserted);
+    const perfis = this.perfis;
+
+    for (const permissao of inserted) {
+      for (const perfil of perfis) {
+        const podeTer =
+          perfil.nome === 'Admin' ||
+          perfil.nome === 'Gerente' ||
+          (perfil.nome === 'Operador' && permissao.chave !== 'fornecedores.excluir') ||
+          (perfil.nome === 'Visualizador' && permissao.chave === 'fornecedores.ver');
+
+        if (podeTer) {
+          await supabase.from('perfis_permissoes').insert({
+            perfil_id: perfil.id,
+            permissao_id: permissao.id,
+          });
+          this.perfisPermissoes.push({ perfil_id: perfil.id, permissao_id: permissao.id });
+        }
+      }
+    }
+
+    this.saveToLocalStorage();
+    if (this.currentUserId) this.setCurrentUser(this.currentUserId);
   }
 
   // ================================================
@@ -807,6 +852,26 @@ if (estoque) {
       if (idx >= 0) this.fornecedores[idx] = { ...this.fornecedores[idx], ...data };
       this.saveToLocalStorage(); this.notify();
     }
+  }
+
+  async toggleFornecedorAtivo(id: number) {
+    const f = this.fornecedores.find(f => f.id === id);
+    if (!f || !isSupabaseConfigured()) return;
+    const novoAtivo = !f.ativo;
+    const { error } = await supabase.from('fornecedores').update({ ativo: novoAtivo }).eq('id', id);
+    if (!error) {
+      f.ativo = novoAtivo;
+      this.saveToLocalStorage(); this.notify();
+    }
+  }
+
+  async deleteFornecedor(id: number): Promise<boolean> {
+    const ok = await this.supabaseDelete('fornecedores', String(id));
+    if (ok) {
+      this.fornecedores = this.fornecedores.filter(f => f.id !== id);
+      this.saveToLocalStorage(); this.notify();
+    }
+    return ok;
   }
 
   // ================================================

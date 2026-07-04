@@ -52,6 +52,12 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   // Estorno pendente filter
   const [showEstornoPendente, setShowEstornoPendente] = useState(false);
   
+  // Delete pedido confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  
+  // Estorno confirmation
+  const [estornoConfirm, setEstornoConfirm] = useState<string | null>(null);
+  
   // Edit mode
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
   
@@ -725,12 +731,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             </button>
                             {store.hasPermission('pedidos.excluir') && (
                               <button 
-                                onClick={() => {
-                                  if (confirm('Tem certeza de que deseja deletar este pedido? As reservas físicas também serão desfeitas.')) {
-                                    store.deletePedido(p.id);
-                                    onUpdate();
-                                  }
-                                }}
+                                onClick={() => setDeleteConfirm(p.id)}
                                 className="text-red-500 hover:text-red-700 p-1"
                               >
                                 <Trash2 size={13} />
@@ -1227,10 +1228,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                           </div>
                           {store.getEstornoPendente().some(e => e.id === p.id) && (
                             <button
-                              onClick={async () => {
-                                await store.estornarPagamentosPedido(p.id);
-                                onUpdate();
-                              }}
+                              onClick={() => setEstornoConfirm(p.id)}
                               className="w-full mt-3 py-2 px-3 bg-orange-100 hover:bg-orange-200 text-orange-800 font-bold rounded-xl text-[10px] border border-orange-200 flex items-center justify-center gap-1"
                             >
                               🔄 Estornar agora
@@ -1303,6 +1301,73 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                 }}
                   className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold">
                   Só Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Delete pedido confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Excluir Pedido?</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              O pedido <strong>#{deleteConfirm.slice(-6)}</strong> será excluído permanentemente. As reservas físicas de estoque também serão desfeitas.
+            </p>
+            <p className="text-xs text-gray-400 dark:text-amber-100/40 mb-4">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={async () => { store.deletePedido(deleteConfirm); setDeleteConfirm(null); onUpdate(); }}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Estorno confirmation modal */}
+      {estornoConfirm && (() => {
+        const ped = store.pedidos.find(p => p.id === estornoConfirm);
+        if (!ped) return null;
+        const recebidos = store.lancamentos.filter(l => l.pedido_id === estornoConfirm && l.tipo === 'receita');
+        const totalRecebido = recebidos.reduce((s, l) => s + l.valor, 0);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                  <AlertTriangle size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Estornar Pagamentos?</h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+                Os pagamentos do pedido <strong>#{ped.id.slice(-6)}</strong> serão estornados como despesas na categoria <strong>Estorno</strong>.
+              </p>
+              {totalRecebido > 0 && (
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                  Valor total a estornar: <strong>{formatCurrency(totalRecebido)}</strong>
+                </p>
+              )}
+              <p className="text-xs text-gray-400 dark:text-amber-100/40 mb-4">Esta operação criará lançamentos de despesa no financeiro.</p>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setEstornoConfirm(null)}
+                  className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                  Cancelar
+                </button>
+                <button onClick={async () => { await store.estornarPagamentosPedido(estornoConfirm); setEstornoConfirm(null); onUpdate(); }}
+                  className="flex-1 py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl transition">
+                  Confirmar Estorno
                 </button>
               </div>
             </div>

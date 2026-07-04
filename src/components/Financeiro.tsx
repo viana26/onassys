@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X } from 'lucide-react';
+import { LancamentoFinanceiro } from '../types';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle } from 'lucide-react';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -12,6 +13,7 @@ interface FinanceiroProps {
 export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const [filtroTipo, setFiltroTipo] = useState<'todas' | 'receita' | 'despesa'>('todas');
   const [showModal, setShowModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<LancamentoFinanceiro | null>(null);
 
   const lancamentosFiltrados = filtroTipo === 'todas'
     ? store.lancamentos
@@ -118,7 +120,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 </td>
                 {store.hasPermission('financeiro.lancar') && (
                   <td className="px-4 py-3 text-right">
-                    <button onClick={async () => { await store.deleteLancamentoFinanceiro(l.id); onUpdate(); }}
+                    <button onClick={() => setDeleteConfirm(l)}
                       className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-red-600 dark:hover:text-red-400 transition">
                       <Trash2 size={14} />
                     </button>
@@ -134,6 +136,37 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
       </div>
 
       {showModal && <NovoLancamentoModal store={store} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); onUpdate(); }} />}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">Excluir Lançamento?</h3>
+            </div>
+            <p className="text-sm text-[#5c4a37] dark:text-amber-100/70 mb-2">
+              {deleteConfirm.descricao ? (
+                <>O lançamento <strong>"{deleteConfirm.descricao}"</strong> de {brl(deleteConfirm.valor)} será excluído permanentemente.</>
+              ) : (
+                <>O lançamento de {brl(deleteConfirm.valor)} será excluído permanentemente.</>
+              )}
+            </p>
+            <p className="text-xs text-[#5c4a37]/50 dark:text-amber-100/40 mb-4">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={async () => { await store.deleteLancamentoFinanceiro(deleteConfirm.id); setDeleteConfirm(null); onUpdate(); }}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
+                Confirmar Exclusão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

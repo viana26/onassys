@@ -46,6 +46,9 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [novoFornecedorEmail, setNovoFornecedorEmail] = useState('');
   const [savingFornecedor, setSavingFornecedor] = useState(false);
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
   // Quick Inbound replenishment state
   const [isInbounding, setIsInbounding] = useState(false);
   const [inboundMaterialId, setInboundMaterialId] = useState<string>('');
@@ -115,13 +118,6 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
 
     setIsEditing(false);
     onUpdate();
-  };
-
-  const handleDeleteMaterial = (id: string, name: string) => {
-    if (confirm(`Tem certeza que de deseja excluir o ingrediente "${name}"? Todas as fichas técnicas associadas a ele também serão impactadas.`)) {
-      store.deleteMaterial(id);
-      onUpdate();
-    }
   };
 
   // Stock Inbound purchase helper
@@ -335,7 +331,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                               )}
                               {store.hasPermission('materiais.excluir') && (
                                 <button 
-                                  onClick={() => handleDeleteMaterial(m.id, m.nome)}
+                                  onClick={() => setDeleteConfirm({ id: m.id, name: m.nome })}
                                   className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1.5 rounded-lg text-red-650 dark:text-red-400 transition cursor-pointer"
                                 >
                                   <Trash2 size={14} />
@@ -404,7 +400,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                         )}
                         {store.hasPermission('materiais.excluir') && (
                           <button 
-                            onClick={() => handleDeleteMaterial(m.id, m.nome)}
+                            onClick={() => setDeleteConfirm({ id: m.id, name: m.nome })}
                             className="bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-650 dark:text-red-300 p-1.5 rounded-lg text-xs font-sans cursor-pointer"
                           >
                             Excluir
@@ -535,9 +531,12 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     required
                   >
                     <option value={0} className="dark:bg-[#1c140c]">-- Selecione --</option>
-                    {store.fornecedores.map(f => (
+                    {store.fornecedores.filter(f => f.ativo !== false).map(f => (
                       <option key={f.id} value={f.id} className="dark:bg-[#1c140c]">{f.nome_fantasia}</option>
                     ))}
+                    {fornecedorId > 0 && store.fornecedores.find(f => f.id === fornecedorId)?.ativo === false && (
+                      <option value={fornecedorId} className="dark:bg-[#1c140c]">{store.fornecedorNome(fornecedorId)} (inativo)</option>
+                    )}
                   </select>
                   <button type="button" onClick={() => setShowNovoFornecedor(true)}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
@@ -741,6 +740,33 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Excluir Ingrediente?</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              O ingrediente <strong>"{deleteConfirm.name}"</strong> será excluído permanentemente. Todas as fichas técnicas associadas a ele também serão impactadas.
+            </p>
+            <p className="text-xs text-gray-400 dark:text-amber-100/40 mb-4">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={async () => { store.deleteMaterial(deleteConfirm.id); setDeleteConfirm(null); onUpdate(); }}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}

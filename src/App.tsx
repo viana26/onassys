@@ -5,6 +5,7 @@ import Materiais from './components/Materiais';
 import Produtos from './components/Produtos';
 import EstoqueProdutos from './components/EstoqueProdutos';
 import Clientes from './components/Clientes';
+import Fornecedores from './components/Fornecedores';
 import Pedidos from './components/Pedidos';
 import Caixa from './components/Caixa';
 import SetupInstructions from './components/SetupInstructions';
@@ -31,6 +32,7 @@ import {
   Layers, 
   Warehouse, 
   Users, 
+  Building,
   ShoppingBag, 
   Shield,
   DollarSign,
@@ -317,6 +319,7 @@ export default function App() {
                 { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={15} />, perm: 'produtos.ver' },
                 { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} />, perm: 'estoque.ver' },
                 { id: 'clientes', label: 'Clientes', icon: <Users size={15} />, perm: 'clientes.ver' },
+                { id: 'fornecedores', label: 'Fornecedores', icon: <Building size={15} />, perm: 'fornecedores.ver' },
                 { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
                 { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
@@ -434,6 +437,7 @@ export default function App() {
               {[
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} />, perm: 'financeiro.ver' },
                 { id: 'clientes', label: 'Clientes', icon: <Users size={16} />, perm: 'clientes.ver' },
+                { id: 'fornecedores', label: 'Fornecedores', icon: <Building size={16} />, perm: 'fornecedores.ver' },
                 { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={16} />, perm: 'financeiro.ver' },
                 { id: 'produtos', label: 'Fichas & Cardápio', icon: <Layers size={16} />, perm: 'produtos.ver' },
                 { id: 'usuarios', label: 'Usuários', icon: <Shield size={16} />, perm: 'usuarios.ver' },
@@ -510,6 +514,10 @@ export default function App() {
 
         {currentTab === 'clientes' && store.hasPermission('clientes.ver') && (
           <Clientes store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
+        )}
+
+        {currentTab === 'fornecedores' && store.hasPermission('fornecedores.ver') && (
+          <Fornecedores store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
         {currentTab === 'pedidos' && store.hasPermission('pedidos.ver') && (
@@ -633,6 +641,7 @@ export default function App() {
                 { id: 'produtos', perm: 'produtos.ver' },
                 { id: 'estoque', perm: 'estoque.ver' },
                 { id: 'clientes', perm: 'clientes.ver' },
+                { id: 'fornecedores', perm: 'fornecedores.ver' },
                 { id: 'pedidos', perm: 'pedidos.ver' },
                 { id: 'caixa', perm: 'financeiro.ver' },
                 { id: 'financeiro', perm: 'financeiro.ver' },

@@ -118,6 +118,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setPrecoVenda(nextPreco);
   }, [liveCustoProducao]);
 
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
   // Viability calculator state
   const [viabilityTestQty, setViabilityTestQty] = useState<{ [prodId: string]: number }>({});
   const [viabilityResults, setViabilityResults] = useState<{ [prodId: string]: ReturnType<typeof verificarViabilidadeProducao> }>({});
@@ -290,13 +293,6 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
     setIsFormOpen(false);
     onUpdate();
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Tem certeza que deseja apagar o produto "${name}"? Os registros de estoque acabado dele também serão deletados.`)) {
-      store.deleteProduto(id);
-      onUpdate();
-    }
   };
 
   // Viability test trigger
@@ -589,7 +585,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 <div className="bg-amber-50/20 dark:bg-[#150f09]/40 px-4 py-3 border-t border-amber-100 dark:border-[#22160b] flex items-center justify-between gap-3">
                   {store.hasPermission('produtos.excluir') && (
                     <button 
-                      onClick={() => handleDelete(p.id, p.nome)}
+                      onClick={() => setDeleteConfirm({ id: p.id, name: p.nome })}
                       className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-600 dark:text-red-405 transition text-xs flex items-center gap-1 font-semibold cursor-pointer font-sans"
                     >
                       <Trash2 size={14} /> Excluir
@@ -937,6 +933,33 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Excluir Produto?</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              O produto <strong>"{deleteConfirm.name}"</strong> será excluído permanentemente. Os registros de estoque acabado também serão deletados.
+            </p>
+            <p className="text-xs text-gray-400 dark:text-amber-100/40 mb-4">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={async () => { store.deleteProduto(deleteConfirm.id); setDeleteConfirm(null); onUpdate(); }}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}

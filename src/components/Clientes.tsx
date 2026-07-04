@@ -15,7 +15,8 @@ import {
   Notebook,
   Building,
   Sparkles,
-  Users
+  Users,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ClientesProps {
@@ -37,6 +38,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [email, setEmail] = useState('');
   const [endereco, setEndereco] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const filteredClientes = store.clientes.filter(c => {
     const matchesSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -100,13 +102,6 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
 
     setIsOpenForm(false);
     onUpdate();
-  };
-
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Atenção: Excluir o cliente "${name}" irá remover também TODOS os pedidos históricos dele! Deseja continuar?`)) {
-      store.deleteCliente(id);
-      onUpdate();
-    }
   };
 
   return (
@@ -224,7 +219,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
 
                 <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-3">
                   <button 
-                    onClick={() => handleDelete(c.id, c.nome)}
+                    onClick={() => setDeleteConfirm({ id: c.id, name: c.nome })}
                     disabled={!store.hasPermission('clientes.excluir')}
                     className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1.5 rounded-lg text-red-500 transition text-[11px] flex items-center gap-1 font-semibold`}
                   >
@@ -351,6 +346,33 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Excluir Cliente?</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              O cliente <strong>"{deleteConfirm.name}"</strong> será excluído permanentemente junto com <strong>TODOS os pedidos históricos</strong> associados.
+            </p>
+            <p className="text-xs text-gray-400 dark:text-amber-100/40 mb-4">Esta ação não pode ser desfeita.</p>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setDeleteConfirm(null)}
+                className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                Cancelar
+              </button>
+              <button onClick={async () => { store.deleteCliente(deleteConfirm.id); setDeleteConfirm(null); onUpdate(); }}
+                className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
+                Confirmar Exclusão
+              </button>
+            </div>
           </div>
         </div>
       )}
