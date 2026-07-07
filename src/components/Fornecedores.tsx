@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Fornecedor } from '../types';
+import { phoneMask } from '../lib/mask';
 import { 
   Plus, 
   Trash2, 
@@ -278,7 +279,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
                   <input
                     type="tel"
                     value={telefone}
-                    onChange={(e) => setTelefone(e.target.value)}
+                    onChange={(e) => setTelefone(phoneMask(e.target.value))}
                     placeholder="Ex: (11) 98888-7777"
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
                   />

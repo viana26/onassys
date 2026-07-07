@@ -14,9 +14,12 @@ import {
   ClipboardList, 
   PlusCircle, 
   X,
-  DollarSign
+  DollarSign,
+  FileText,
+  Printer
 } from 'lucide-react';
 import { analisarEstoqueParaPedido } from '../lib/calculos';
+import RelatorioPedidos from './RelatorioPedidos';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -29,6 +32,7 @@ interface PedidosProps {
 }
 
 export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavigateToCaixa }: PedidosProps) {
+  const getAppName = () => localStorage.getItem('appName') || 'Mini Fábrica';
   const [activeTab, setActiveTab] = useState<'kanban' | 'carga' | 'lista'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -51,6 +55,9 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   
   // Estorno pendente filter
   const [showEstornoPendente, setShowEstornoPendente] = useState(false);
+  
+  // Relatorio modal
+  const [relatorioOpen, setRelatorioOpen] = useState(false);
   
   // Delete pedido confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -336,14 +343,22 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore rascunhos, confirme pedidos, verifique insumos deficientes e trace o Kanban semanal.</p>
         </div>
 
-        {store.hasPermission('pedidos.criar') && (
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          {store.hasPermission('pedidos.criar') && (
+            <button 
+              onClick={handleOpenNewOrder}
+              className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 justify-center font-medium"
+            >
+              <PlusCircle size={16} /> Novo Pedido
+            </button>
+          )}
           <button 
-            onClick={handleOpenNewOrder}
-            className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium"
+            onClick={() => setRelatorioOpen(true)}
+            className="bg-white hover:bg-amber-50 border border-amber-200 shadow-sm text-amber-800 text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 justify-center font-medium"
           >
-            <PlusCircle size={16} /> Novo Pedido de Cliente
+            <FileText size={16} /> Relatório
           </button>
-        )}
+        </div>
       </div>
 
       {/* Segment tabs */}
@@ -1052,9 +1067,134 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                     <h3 className="font-display font-semibold text-lg text-amber-950">Ficha do Pedido Encomendado</h3>
                     <p className="text-[10px] text-gray-400 font-mono mt-0.5">#{p.id.substring(4).toUpperCase()} | Data: {new Date(p.data_pedido).toLocaleDateString('pt-BR')}</p>
                   </div>
-                  <button onClick={() => setSelectedPedidoId(null)} className="text-gray-450 hover:text-amber-950 p-1">
-                    <X size={20} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const printW = window.open('', '_blank');
+                        if (!printW) return;
+                        const cliNome = cli?.nome || 'N/A';
+                        const cliTel = cli?.telefone || '';
+                        const cliEnd = cli?.endereco || '';
+                        const estStr = estEntrega.toLocaleDateString('pt-BR') + ' às ' + estEntrega.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        const now = new Date().toLocaleString('pt-BR');
+                        const pagamentos = store.lancamentos.filter(l => l.pedido_id === p.id && l.tipo === 'receita');
+                        const totalPago = pagamentos.reduce((s, l) => s + l.valor, 0);
+                        const saldo = p.valor_total - totalPago;
+                        const itensHtml = itens.map((it, idx) => {
+                          const prod = store.produtos.find(prd => prd.id === it.produto_id);
+                          const bg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
+                          return `<tr>
+                            <td style="border-bottom:1px solid #e7e5e4;padding:0.55rem 0.75rem;background:${bg}">${prod?.nome || 'N/A'}${it.observacao ? `<br><span style="font-size:8px;color:#a8a29e">${it.observacao}</span>` : ''}</td>
+                            <td style="border-bottom:1px solid #e7e5e4;padding:0.55rem 0.75rem;text-align:center;font-family:monospace;background:${bg}">${it.quantidade_solicitada}</td>
+                            <td style="border-bottom:1px solid #e7e5e4;padding:0.55rem 0.75rem;text-align:right;font-family:monospace;background:${bg}">${formatCurrency(it.preco_unitario)}</td>
+                            <td style="border-bottom:1px solid #e7e5e4;padding:0.55rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;background:${bg}">${formatCurrency(it.quantidade_solicitada * it.preco_unitario)}</td>
+                          </tr>`;
+                        }).join('');
+                        const obsHtml = p.observacoes ? `<div style="margin-top:1rem;padding:0.75rem 1rem;background:#fefce8;border-left:4px solid #fbbf24;border-radius:0 0.375rem 0.375rem 0;font-size:0.75rem"><strong style="color:#92400e">Observações:</strong><br><span style="color:#57534e">${p.observacoes}</span></div>` : '';
+                        const pagHtml = pagamentos.length > 0 ? `
+                          <div style="margin-top:1.25rem;padding:0.75rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:0.375rem">
+                            <p style="margin:0 0 6px 0;font-size:9px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:1px">Pagamentos</p>
+                            ${pagamentos.map(l => `<div style="display:flex;justify-content:space-between;font-size:10px;color:#57534e;padding:2px 0"><span>${l.forma_pagamento || '—'} - ${new Date(l.data_lancamento).toLocaleDateString('pt-BR')}</span><span style="font-family:monospace;font-weight:600;color:#059669">${formatCurrency(l.valor)}</span></div>`).join('')}
+                            <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:#1c1917;margin-top:6px;padding-top:6px;border-top:1px solid #bbf7d0">
+                              <span>Total pago:</span><span style="font-family:monospace;color:#059669">${formatCurrency(totalPago)}</span>
+                            </div>
+                            ${saldo > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;color:#dc2626;margin-top:2px"><span>Saldo pendente:</span><span style="font-family:monospace">${formatCurrency(saldo)}</span></div>` : ''}
+                          </div>` : '';
+                        printW.document.write(`<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido #${p.id.substring(4).toUpperCase()} - ${getAppName()}</title>
+<style>
+  @page { margin: 1.8cm 2cm; size: A4 portrait; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1c1917; font-size: 11px; line-height: 1.5; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr { page-break-inside: avoid; }
+  hr { border: none; border-top: 2px solid #d97706; margin: 1rem 0; }
+  h1, h2, h3, p { margin: 0; }
+</style></head><body>
+
+<table style="width:100%;border:none;margin-bottom:1.25rem"><tr>
+  <td style="width:55%;vertical-align:top;border:none">
+    <div style="display:inline-block;border:2px solid #d97706;padding:0.35rem 0.75rem;border-radius:0.25rem;margin-bottom:0.5rem">
+      <h1 style="font-size:18px;font-weight:800;color:#d97706;letter-spacing:1px">${getAppName().toUpperCase()}</h1>
+    </div>
+    <p style="margin-top:4px;font-size:9px;color:#a8a29e;letter-spacing:0.5px">Sistema de Gestão de Produção e Pedidos</p>
+  </td>
+  <td style="width:45%;text-align:right;vertical-align:top;border:none">
+    <h2 style="font-size:13px;font-weight:600;color:#1c1917;margin-bottom:4px">FICHA TÉCNICA DO PEDIDO</h2>
+    <p style="font-size:9px;color:#78716c;font-weight:600">#${p.id.substring(4).toUpperCase()}</p>
+    <p style="font-size:8px;color:#a8a29e;margin-top:2px">Pedido: ${new Date(p.data_pedido).toLocaleDateString('pt-BR')}</p>
+    <p style="font-size:8px;color:#a8a29e">Impresso: ${now}</p>
+  </td>
+</tr></table>
+
+<div style="border-bottom:2px solid #d97706;margin-bottom:1.25rem"></div>
+
+<div style="background:linear-gradient(135deg,#fff7ed 0%,#fffbeb 100%);border:1px solid #fde68a;padding:1rem;border-radius:0.5rem;margin-bottom:1rem">
+  <table style="width:100%;border:none"><tr>
+    <td style="border:none;vertical-align:top;width:65%">
+      <p style="font-size:8px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Cliente</p>
+      <p style="font-size:14px;font-weight:700;color:#1c1917">${cliNome}</p>
+      ${cliEnd ? `<p style="margin-top:4px;font-size:10px;color:#57534e">${cliEnd}</p>` : ''}
+      ${cliTel ? `<p style="margin-top:2px;font-size:10px;color:#57534e">Tel: ${cliTel}</p>` : ''}
+    </td>
+    <td style="border:none;vertical-align:top;text-align:right;width:35%">
+      <p style="font-size:8px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Entrega</p>
+      <p style="font-size:11px;font-weight:600;color:#1c1917;font-family:monospace">${estStr}</p>
+    </td>
+  </tr></table>
+</div>
+
+${obsHtml}
+
+<table style="margin-top:1rem">
+  <thead><tr>
+    <th style="background:#292524;color:white;padding:0.55rem 0.75rem;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:none">Produto</th>
+    <th style="background:#292524;color:white;padding:0.55rem 0.75rem;text-align:center;font-size:8px;text-transform:uppercase;letter-spacing:0.5px">Qtd</th>
+    <th style="background:#292524;color:white;padding:0.55rem 0.75rem;text-align:right;font-size:8px;text-transform:uppercase;letter-spacing:0.5px">Preço Unit.</th>
+    <th style="background:#292524;color:white;padding:0.55rem 0.75rem;text-align:right;font-size:8px;text-transform:uppercase;letter-spacing:0.5px">Subtotal</th>
+  </tr></thead>
+  <tbody>${itensHtml}</tbody>
+  <tfoot><tr>
+    <td colspan="3" style="border-top:2px solid #d97706;padding:0.625rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;font-size:11px">TOTAL GERAL</td>
+    <td style="border-top:2px solid #d97706;padding:0.625rem 0.75rem;text-align:right;font-family:monospace;font-weight:800;color:#d97706;font-size:13px">${formatCurrency(p.valor_total)}</td>
+  </tr></tfoot>
+</table>
+
+${pagHtml}
+
+<div style="margin-top:2.5rem;padding-top:1.5rem;border-top:2px solid #e7e5e4">
+  <table style="width:100%;border:none"><tr>
+    <td style="width:45%;border:none;text-align:center">
+      <p style="margin-bottom:0.5rem;font-size:9px;color:#a8a29e">________________________________</p>
+      <p style="font-size:10px;font-weight:600;color:#57534e">Assinatura do Cliente</p>
+    </td>
+    <td style="width:10%;border:none"></td>
+    <td style="width:45%;border:none;text-align:center">
+      <p style="margin-bottom:0.5rem;font-size:9px;color:#a8a29e">________________________________</p>
+      <p style="font-size:10px;font-weight:600;color:#57534e">Assinatura do Responsável</p>
+    </td>
+  </tr></table>
+</div>
+
+<div style="margin-top:1.5rem;text-align:center;font-size:7px;color:#d6d3d1">
+  ${getAppName()} — Sistema de Gestão de Produção e Pedidos | ${now}
+</div>
+
+</body></html>`);
+                        printW.document.close();
+                        printW.print();
+                      }}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-white px-3 py-1.5 rounded-lg hover:bg-amber-700 border border-amber-200 hover:border-amber-700 transition"
+                      title="Imprimir Ficha"
+                    >
+                      <Printer size={15} /> Imprimir
+                    </button>
+                    <button onClick={() => setSelectedPedidoId(null)} className="text-gray-450 hover:text-amber-950 p-1">
+                      <X size={20} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-6 space-y-5">
@@ -1374,6 +1514,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           </div>
         );
       })()}
+
+      <RelatorioPedidos store={store} isOpen={relatorioOpen} onClose={() => setRelatorioOpen(false)} />
 
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Cliente } from '../types';
+import { phoneMask } from '../lib/mask';
 import { 
   Plus, 
   Trash2, 
@@ -75,8 +76,8 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || !telefone.trim() || !endereco.trim()) {
-      alert('Favor preencher o nome, telefone e endereço do cliente.');
+    if (!nome.trim()) {
+      alert('Favor preencher o nome do cliente.');
       return;
     }
 
@@ -170,12 +171,12 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
             return (
               <div 
                 key={c.id} 
-                className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] p-4 sm:p-5 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 transition flex flex-col justify-between space-y-4"
+                className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] p-3 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 transition flex flex-col justify-between space-y-2"
               >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono uppercase tracking-wider ${
+                <div className="space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold font-mono uppercase tracking-wider leading-tight ${
                         (store.tipoClienteNome(c.tipo_id).toLowerCase().includes('lanchonete') ? 'bg-amber-100 text-amber-900 border border-amber-200 dark:bg-amber-950 dark:text-amber-250 dark:border-[#382613]' :
                         store.tipoClienteNome(c.tipo_id).toLowerCase().includes('evento') || store.tipoClienteNome(c.tipo_id).toLowerCase().includes('buffet') ? 'bg-pink-100 text-pink-800 border border-pink-200 dark:bg-pink-950/30 dark:text-pink-350 dark:border-[#4d1624]' :
                         store.tipoClienteNome(c.tipo_id).toLowerCase().includes('particular') ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-[#1d164d]' :
@@ -183,54 +184,55 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                       }`}>
                         {store.tipoClienteNome(c.tipo_id)}
                       </span>
-                      <h3 className="font-semibold text-base font-display text-amber-950 dark:text-amber-100 mt-1.5">{c.nome}</h3>
+                      <h3 className="font-semibold text-sm font-display text-amber-950 dark:text-amber-100 truncate">{c.nome}</h3>
                     </div>
-
-                    <span className="text-[10px] text-gray-400 dark:text-amber-100/40 font-mono">
+                    <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono whitespace-nowrap mt-0.5">
                       {hasPedidosCount} pedidos
                     </span>
                   </div>
 
-                  {/* Core details list */}
-                  <div className="space-y-1.5 text-xs text-amber-950 dark:text-amber-200">
-                    <div className="flex items-center gap-2 text-gray-600 dark:text-amber-100/60">
-                      <Phone size={13} className="text-amber-800 dark:text-amber-500 flex-shrink-0" />
-                      <span className="font-mono">{c.telefone}</span>
-                    </div>
+                  <div className="space-y-1 text-[11px] text-amber-950 dark:text-amber-200">
+                    {c.telefone && (
+                      <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
+                        <Phone size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0" />
+                        <span className="font-mono truncate">{c.telefone}</span>
+                      </div>
+                    )}
                     {c.email && (
-                      <div className="flex items-center gap-2 text-gray-600 dark:text-amber-100/60">
-                        <Mail size={13} className="text-amber-800 dark:text-amber-400 flex-shrink-0" />
+                      <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
+                        <Mail size={10} className="text-amber-800 dark:text-amber-400 flex-shrink-0" />
                         <span className="truncate">{c.email}</span>
                       </div>
                     )}
-                    <div className="flex items-start gap-2 text-gray-600 dark:text-amber-100/60 pt-1">
-                      <MapPin size={13} className="text-amber-800 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-                      <span className="leading-relaxed text-[11px]">{c.endereco}</span>
-                    </div>
-
+                    {c.endereco && (
+                      <div className="flex items-start gap-1.5 text-gray-600 dark:text-amber-100/60">
+                        <MapPin size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                        <span className="truncate">{c.endereco}</span>
+                      </div>
+                    )}
                     {c.observacoes && (
-                      <div className="bg-amber-50/40 dark:bg-amber-950/20 p-2.5 rounded-lg border border-amber-50 dark:border-amber-950/30 mt-3 text-[11px] text-amber-900 dark:text-amber-250 flex items-start gap-1.5">
-                        <Notebook size={12} className="text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                        <span className="leading-snug">{c.observacoes}</span>
+                      <div className="bg-amber-50/40 dark:bg-amber-950/20 px-2 py-1 rounded-md border border-amber-50 dark:border-amber-950/30 text-gray-500 dark:text-amber-300/70 flex items-start gap-1">
+                        <Notebook size={10} className="text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                        <span className="truncate">{c.observacoes}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-3">
+                <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-2">
                   <button 
                     onClick={() => setDeleteConfirm({ id: c.id, name: c.nome })}
                     disabled={!store.hasPermission('clientes.excluir')}
-                    className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1.5 rounded-lg text-red-500 transition text-[11px] flex items-center gap-1 font-semibold`}
+                    className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1 rounded-lg text-red-500 transition text-[10px] flex items-center gap-1 font-semibold`}
                   >
-                    <Trash2 size={13} /> Deletar
+                    <Trash2 size={11} /> Deletar
                   </button>
                   <button 
                     onClick={() => handleOpenEdit(c)}
                     disabled={!store.hasPermission('clientes.editar')}
-                    className={`${store.hasPermission('clientes.editar') ? 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900' : 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'} text-amber-950 dark:text-amber-200 font-bold px-3 py-1 rounded-xl text-xs flex items-center gap-1 transition`}
+                    className={`${store.hasPermission('clientes.editar') ? 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900' : 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'} text-amber-950 dark:text-amber-200 font-bold px-2.5 py-0.5 rounded-lg text-[10px] flex items-center gap-1 transition`}
                   >
-                    <Edit3 size={12} /> Editar Ficha
+                    <Edit3 size={10} /> Editar
                   </button>
                 </div>
               </div>
@@ -284,27 +286,25 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Telefone / WhatsApp *</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Telefone / WhatsApp</label>
                   <input 
                     type="tel" 
                     value={telefone}
-                    onChange={(e) => setTelefone(e.target.value)}
+                    onChange={(e) => setTelefone(phoneMask(e.target.value))}
                     placeholder="Ex: (11) 98888-7777"
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                    required
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-amber-950 dark:text-amber-100 font-medium">Endereço de Correspondência ou Entrega *</label>
+                <label className="text-amber-950 dark:text-amber-100 font-medium">Endereço de Correspondência ou Entrega</label>
                 <input 
                   type="text" 
                   value={endereco}
                   onChange={(e) => setEndereco(e.target.value)}
                   placeholder="Ex: Rua das Rosas, 742 - Jardim Paulista"
                   className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                  required
                 />
               </div>
 
