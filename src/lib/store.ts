@@ -832,6 +832,45 @@ if (estoque) {
   }
 
   // ================================================
+  // CRUD — UNIDADES
+  // ================================================
+  async addUnidade(data: { sigla: string; nome: string; tipo: 'massa' | 'volume' | 'unidade' }) {
+    if (!isSupabaseConfigured()) return null;
+    const { data: inserted, error } = await supabase.from('unidades').insert(data).select().single();
+    if (error || !inserted) { this.error = error?.message || 'Erro ao criar unidade'; this.notify(); return null; }
+    const u = inserted as Unidade;
+    this.unidades.push(u);
+    this.saveToLocalStorage(); this.notify();
+    return u;
+  }
+
+  async updateUnidade(id: number, data: Partial<Unidade>) {
+    if (!isSupabaseConfigured()) return;
+    const { error } = await supabase.from('unidades').update(data).eq('id', id);
+    if (!error) {
+      const idx = this.unidades.findIndex(u => u.id === id);
+      if (idx >= 0) this.unidades[idx] = { ...this.unidades[idx], ...data };
+      this.saveToLocalStorage(); this.notify();
+    }
+  }
+
+  async deleteUnidade(id: number): Promise<boolean> {
+    // Verifica se há materiais usando esta unidade
+    const emUso = this.materiais.some(m => m.unidade_id === id);
+    if (emUso) {
+      this.error = 'Não é possível excluir: existem ingredientes usando esta unidade.';
+      this.notify();
+      return false;
+    }
+    const ok = await this.supabaseDelete('unidades', String(id));
+    if (ok) {
+      this.unidades = this.unidades.filter(u => u.id !== id);
+      this.saveToLocalStorage(); this.notify();
+    }
+    return ok;
+  }
+
+  // ================================================
   // FORNECEDORES
   // ================================================
   async addFornecedor(data: { nome_fantasia: string; contato?: string; telefone?: string; email?: string }) {
