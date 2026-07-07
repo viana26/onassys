@@ -32,7 +32,7 @@ export default function Configuracao({ store }: ConfiguracaoProps) {
     store.dadosEmpresa || {
       nome_empresa: '', cnpj: '', inscricao_municipal: '',
       logradouro: '', numero: '', bairro: '', cidade: '', uf: '', cep: '',
-      telefone: '', email: '', logo_url: '',
+      telefone: '', email: '', logo_url: '', slogan: '',
     }
   );
   const [saved, setSaved] = useState(false);
@@ -77,6 +77,7 @@ export default function Configuracao({ store }: ConfiguracaoProps) {
           <h3 className="text-sm font-semibold text-[#2e2315] dark:text-amber-50 mb-3">Identificação</h3>
           <div className="space-y-3">
             <Field label="Nome / Razão Social" value={dados.nome_empresa} onChange={v => handleChange('nome_empresa', v)} placeholder="Ex: Mini Fábrica de Salgados LTDA" />
+            <Field label="Slogan" value={dados.slogan} onChange={v => handleChange('slogan', v)} placeholder="Ex: Amor em Fatias" />
             <div className="grid grid-cols-2 gap-3">
               <Field label="CNPJ / CPF" value={dados.cnpj} onChange={v => handleChange('cnpj', v)} placeholder="00.000.000/0001-00" maxLength={18} />
               <Field label="Inscrição Municipal" value={dados.inscricao_municipal} onChange={v => handleChange('inscricao_municipal', v)} placeholder="Opcional" />
@@ -116,11 +117,11 @@ export default function Configuracao({ store }: ConfiguracaoProps) {
           <div className="flex items-start gap-4">
             {dados.logo_url ? (
               <div className="relative">
-                <img src={dados.logo_url} alt="Logo" className="w-20 h-20 object-contain rounded-lg border border-[#ebdcc9] dark:border-[#2e1a0a]" />
+                <img src={dados.logo_url} alt="Logo" className="w-20 h-20 object-cover rounded-xl shadow-md border border-amber-200 dark:border-amber-800/40" />
                 <button onClick={handleRemoveLogo} className="absolute -top-2 -right-2 bg-red-500 text-white p-0.5 rounded-full"><Trash2 size={12} /></button>
               </div>
             ) : (
-              <div className="w-20 h-20 rounded-lg border border-dashed border-[#ebdcc9] dark:border-[#2e1a0a] flex items-center justify-center text-gray-400 text-[10px]">Sem logo</div>
+              <div className="w-20 h-20 rounded-xl border border-dashed border-amber-200 dark:border-amber-800/40 flex items-center justify-center text-gray-400 text-[10px] shadow-sm">Sem logo</div>
             )}
             <div>
               <button onClick={() => fileRef.current?.click()} disabled={uploading}

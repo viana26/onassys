@@ -14,7 +14,8 @@ ALTER TABLE public.configuracao_sistema
   ADD COLUMN IF NOT EXISTS cep VARCHAR(10),
   ADD COLUMN IF NOT EXISTS telefone VARCHAR(20),
   ADD COLUMN IF NOT EXISTS email VARCHAR(255),
-  ADD COLUMN IF NOT EXISTS logo_url TEXT;
+  ADD COLUMN IF NOT EXISTS logo_url TEXT,
+  ADD COLUMN IF NOT EXISTS slogan VARCHAR(255);
 
 -- Bucket para logo da empresa (público)
 INSERT INTO storage.buckets (id, name, public, avif_autodetection)

@@ -5,6 +5,8 @@ import { X, Search, Download, Printer, Calendar, Filter } from 'lucide-react';
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
+const getLogoUrl = (store: MiniFactoryStore) => store.dadosEmpresa?.logo_url || '';
+const getSlogan = (store: MiniFactoryStore) => store.dadosEmpresa?.slogan || 'Sistema de Gestão de Produção e Pedidos';
 
 interface RelatorioPedidosProps {
   store: MiniFactoryStore;
@@ -87,6 +89,9 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
       </tr>`;
     }).join('');
 
+    const logoUrl = getLogoUrl(store);
+    const cnpjHtml = store.dadosEmpresa?.cnpj ? `<p style="margin:0;font-size:9px;color:#a8a29e">CNPJ: ${store.dadosEmpresa.cnpj}</p>` : '';
+
     printWindow.document.write(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Relatório de Pedidos - ${appName()}</title>
 <style>
@@ -102,8 +107,14 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
 </style></head><body>
   <table style="width:100%;border:none;margin-bottom:1rem"><tr>
     <td style="width:60%;vertical-align:top;border:none">
-      <h1 style="font-size:22px;font-weight:800;color:#d97706;margin:0">${appName()}</h1>
-      <p style="margin:2px 0 0 0;font-size:10px;color:#78716c">Sistema de Gestão de Produção e Pedidos</p>
+      <table style="border:none;width:100%"><tr>
+        ${logoUrl ? `<td style="width:auto;border:none;padding-right:0.35rem;vertical-align:middle"><img src="${logoUrl}" style="max-width:64px;height:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.12)" /></td>` : ''}
+        <td style="border:none;vertical-align:middle">
+          <h1 style="font-size:20px;font-weight:800;color:#d97706;margin:0">${appName()}</h1>
+          ${cnpjHtml}
+          <p style="margin:2px 0 0 0;font-size:10px;color:#78716c">${getSlogan(store)}</p>
+        </td>
+      </tr></table>
     </td>
     <td style="width:40%;text-align:right;vertical-align:top;border:none">
       <h2 style="font-size:14px;font-weight:600;color:#1c1917;margin:0">Relatório de Pedidos</h2>
@@ -151,7 +162,7 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
   </table>
 
   <div style="margin-top:2.5rem;padding-top:1rem;border-top:1px solid #d6d3d1;font-size:7px;color:#a8a29e;text-align:center">
-    <p style="margin:0">${appName()} — Sistema de Gestão de Produção e Pedidos | Gerado em ${now}</p>
+    <p style="margin:0">${appName()} — ${getSlogan(store)} | Gerado em ${now}</p>
     <p style="margin:2px 0 0 0">Relatório de Pedidos | Total de ${filteredPedidos.length} pedido(s) | Período: ${periodoLabel}</p>
   </div>
 </body></html>`);

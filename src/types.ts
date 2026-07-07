@@ -215,6 +215,7 @@ export interface DadosEmpresa {
   telefone: string;
   email: string;
   logo_url: string;
+  slogan: string;
 }
 
 export interface DashboardStats {

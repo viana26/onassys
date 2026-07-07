@@ -952,6 +952,7 @@ if (estoque) {
         telefone: data.telefone || '',
         email: data.email || '',
         logo_url: data.logo_url || '',
+        slogan: data.slogan || '',
       };
       this.saveToLocalStorage();
       this.notify();
@@ -976,6 +977,7 @@ if (estoque) {
         telefone: dados.telefone,
         email: dados.email,
         logo_url: dados.logo_url,
+        slogan: dados.slogan,
       })
       .eq('id', 1);
     if (error) { this.error = error.message; this.notify(); return false; }

@@ -33,6 +33,8 @@ interface PedidosProps {
 
 export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavigateToCaixa }: PedidosProps) {
   const getAppName = () => localStorage.getItem('appName') || 'Mini Fábrica';
+  const getLogoUrl = () => store.dadosEmpresa?.logo_url || '';
+  const getSlogan = () => store.dadosEmpresa?.slogan || 'Sistema de Gestão de Produção e Pedidos';
   const [activeTab, setActiveTab] = useState<'kanban' | 'carga' | 'lista'>('kanban');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -1100,6 +1102,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             </div>
                             ${saldo > 0 ? `<div style="display:flex;justify-content:space-between;font-size:10px;font-weight:600;color:#dc2626;margin-top:2px"><span>Saldo pendente:</span><span style="font-family:monospace">${formatCurrency(saldo)}</span></div>` : ''}
                           </div>` : '';
+                        const logoHtml = getLogoUrl() ? `<img src="${getLogoUrl()}" style="height:40px;width:auto;margin-bottom:0.25rem;display:block" />` : '';
                         printW.document.write(`<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido #${p.id.substring(4).toUpperCase()} - ${getAppName()}</title>
 <style>
@@ -1116,10 +1119,15 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
 
 <table style="width:100%;border:none;margin-bottom:1.25rem"><tr>
   <td style="width:55%;vertical-align:top;border:none">
-    <div style="display:inline-block;border:2px solid #d97706;padding:0.35rem 0.75rem;border-radius:0.25rem;margin-bottom:0.5rem">
-      <h1 style="font-size:18px;font-weight:800;color:#d97706;letter-spacing:1px">${getAppName().toUpperCase()}</h1>
-    </div>
-    <p style="margin-top:4px;font-size:9px;color:#a8a29e;letter-spacing:0.5px">Sistema de Gestão de Produção e Pedidos</p>
+    <table style="border:none;width:100%"><tr>
+      ${getLogoUrl() ? `<td style="width:auto;border:none;padding-right:0.35rem;vertical-align:middle"><img src="${getLogoUrl()}" style="max-width:56px;height:auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.12)" /></td>` : ''}
+      <td style="border:none;vertical-align:middle">
+        <div style="display:inline-block;border:2px solid #d97706;padding:0.25rem 0.6rem;border-radius:0.25rem;margin-bottom:0.25rem">
+          <h1 style="font-size:16px;font-weight:800;color:#d97706;letter-spacing:1px">${getAppName().toUpperCase()}</h1>
+        </div>
+        <p style="font-size:9px;color:#a8a29e;letter-spacing:0.5px">${getSlogan()}</p>
+      </td>
+    </tr></table>
   </td>
   <td style="width:45%;text-align:right;vertical-align:top;border:none">
     <h2 style="font-size:13px;font-weight:600;color:#1c1917;margin-bottom:4px">FICHA TÉCNICA DO PEDIDO</h2>
@@ -1179,7 +1187,7 @@ ${pagHtml}
 </div>
 
 <div style="margin-top:1.5rem;text-align:center;font-size:7px;color:#d6d3d1">
-  ${getAppName()} — Sistema de Gestão de Produção e Pedidos | ${now}
+  ${getAppName()} — ${getSlogan()} | ${now}
 </div>
 
 </body></html>`);
