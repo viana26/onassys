@@ -202,6 +202,21 @@ export interface PerfilUsuario {
   atualizado_em?: string;
 }
 
+export interface DadosEmpresa {
+  nome_empresa: string;
+  cnpj: string;
+  inscricao_municipal: string;
+  logradouro: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+  cep: string;
+  telefone: string;
+  email: string;
+  logo_url: string;
+}
+
 export interface DashboardStats {
   pedidosHoje: number;
   pedidosSemana: number;

@@ -122,6 +122,7 @@ export default function App() {
   useEffect(() => {
     if (authScreen === 'app') {
       const miniStore = new MiniFactoryStore();
+      miniStore.carregarDadosEmpresa();
       setStore(miniStore);
       
       const unsubscribe = miniStore.subscribe(() => {
@@ -138,6 +139,13 @@ export default function App() {
       store.ensureUserProfile(currentUser.id, nome);
     }
   }, [store, currentUser]);
+
+  useEffect(() => {
+    if (store?.dadosEmpresa?.nome_empresa) {
+      setAppName(store.dadosEmpresa.nome_empresa);
+      localStorage.setItem('appName', store.dadosEmpresa.nome_empresa);
+    }
+  }, [store?.dadosEmpresa?.nome_empresa]);
 
   // Mostrar código de recuperação no primeiro login
   useEffect(() => {
@@ -203,11 +211,6 @@ export default function App() {
 
   const handleAddAdminSuccess = () => {
     setAuthScreen('login');
-  };
-
-  const handleSaveAppName = (name: string) => {
-    setAppName(name);
-    localStorage.setItem('appName', name);
   };
 
   const handleLogout = async () => {
@@ -316,13 +319,13 @@ export default function App() {
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
+                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
                 { id: 'materiais', label: 'Despensa Insumos', icon: <Coins size={15} />, perm: 'materiais.ver' },
                 { id: 'produtos', label: 'Produtos / F. Técnicas', icon: <Layers size={16} />, perm: 'produtos.ver' },
+                { id: 'pedidos', label: 'Produção e Pedidos', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
                 { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} />, perm: 'estoque.ver' },
                 { id: 'clientes', label: 'Clientes', icon: <Users size={15} />, perm: 'clientes.ver' },
                 { id: 'fornecedores', label: 'Fornecedores', icon: <Building size={15} />, perm: 'fornecedores.ver' },
-                { id: 'pedidos', label: 'Pedidos / Cozinha', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
-                { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
                 { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} />, perm: 'usuarios.ver' },
                 { id: 'config', label: 'Configurações', icon: <Settings size={15} />, perm: 'config.editar' },
               ].filter(item => {
@@ -544,7 +547,7 @@ export default function App() {
         )}
 
         {currentTab === 'config' && store.hasPermission('config.editar') && (
-          <Configuracao appName={appName} onSaveAppName={handleSaveAppName} />
+          <Configuracao store={store} />
         )}
 
         {currentTab === 'usuarios' && store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1 && (

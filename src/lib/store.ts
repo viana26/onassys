@@ -1,4 +1,4 @@
-import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario, PerfilPermissao } from '../types';
+import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario, PerfilPermissao, DadosEmpresa } from '../types';
 import { calcularCustoProducao, normalizarQuantidade } from './calculos';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { deleteProdutoImage, isStorageUrl } from './imageUpload';
@@ -34,6 +34,7 @@ export class MiniFactoryStore {
 
   loading = true;
   error: string | null = null;
+  dadosEmpresa: DadosEmpresa | null = null;
   private onUpdateCallbacks: (() => void)[] = [];
 
   constructor() {
@@ -152,6 +153,7 @@ export class MiniFactoryStore {
         perfis: this.perfis, perfisPermissoes: this.perfisPermissoes,
         tiposMovimentacao: this.tiposMovimentacao,
         categoriasFinanceiro: this.categoriasFinanceiro,
+        dadosEmpresa: this.dadosEmpresa,
       };
       Object.entries(data).forEach(([key, val]) => localStorage.setItem(`oc_${key}`, JSON.stringify(val)));
     } catch { /* quota exceeded */ }
@@ -185,6 +187,7 @@ export class MiniFactoryStore {
       this.perfisPermissoes = get('perfisPermissoes', []);
       this.tiposMovimentacao = get('tiposMovimentacao', []);
       this.categoriasFinanceiro = get('categoriasFinanceiro', []);
+      this.dadosEmpresa = get<DadosEmpresa | null>('dadosEmpresa', null);
     } catch { /* ignore */ }
   }
 
@@ -926,6 +929,59 @@ if (estoque) {
   async deleteLancamentoFinanceiro(id: string) {
     const ok = await this.supabaseDelete('lancamentos_financeiros', id);
     if (ok) { this.lancamentos = this.lancamentos.filter(l => l.id !== id); this.saveToLocalStorage(); this.notify(); }
+  }
+
+  async carregarDadosEmpresa(): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const { data, error } = await supabase
+      .from('configuracao_sistema')
+      .select('*')
+      .eq('id', 1)
+      .single();
+    if (!error && data) {
+      this.dadosEmpresa = {
+        nome_empresa: data.nome_empresa || '',
+        cnpj: data.cnpj || '',
+        inscricao_municipal: data.inscricao_municipal || '',
+        logradouro: data.logradouro || '',
+        numero: data.numero || '',
+        bairro: data.bairro || '',
+        cidade: data.cidade || '',
+        uf: data.uf || '',
+        cep: data.cep || '',
+        telefone: data.telefone || '',
+        email: data.email || '',
+        logo_url: data.logo_url || '',
+      };
+      this.saveToLocalStorage();
+      this.notify();
+    }
+  }
+
+  async salvarDadosEmpresa(dados: DadosEmpresa): Promise<boolean> {
+    this.dadosEmpresa = dados;
+    if (!isSupabaseConfigured()) { this.saveToLocalStorage(); this.notify(); return false; }
+    const { error } = await supabase
+      .from('configuracao_sistema')
+      .update({
+        nome_empresa: dados.nome_empresa,
+        cnpj: dados.cnpj,
+        inscricao_municipal: dados.inscricao_municipal,
+        logradouro: dados.logradouro,
+        numero: dados.numero,
+        bairro: dados.bairro,
+        cidade: dados.cidade,
+        uf: dados.uf,
+        cep: dados.cep,
+        telefone: dados.telefone,
+        email: dados.email,
+        logo_url: dados.logo_url,
+      })
+      .eq('id', 1);
+    if (error) { this.error = error.message; this.notify(); return false; }
+    localStorage.setItem('appName', dados.nome_empresa);
+    this.notify();
+    return true;
   }
 
   async registrarPagamentoPedido(pedidoId: string, valor: number, formaPagamento?: string, dataLancamento?: string) {
