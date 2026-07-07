@@ -17,7 +17,8 @@ import {
   PlusCircle, 
   Layers,
   ChevronDown,
-  Info
+  Info,
+  Settings
 } from 'lucide-react';
 import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade } from '../lib/calculos';
 import { compressImage } from '../lib/imageOptimizer';
@@ -49,6 +50,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [precoVenda, setPrecoVenda] = useState(0);
   const [imagem, setImagem] = useState('');
   const [imageCompressing, setImageCompressing] = useState(false);
+
+  // Quick-add unidade
+  const [showNovaUnidade, setShowNovaUnidade] = useState(false);
+  const [novaUnidadeNome, setNovaUnidadeNome] = useState('');
+  const [novaUnidadeSigla, setNovaUnidadeSigla] = useState('');
+  const [novaUnidadeTipo, setNovaUnidadeTipo] = useState<'massa' | 'volume' | 'unidade'>('massa');
+  const [savingUnidade, setSavingUnidade] = useState(false);
 
   // Ficha técnica temporary builder list in the form
   const [recipeItems, setRecipeItems] = useState<{ material_id: string; quantidade_necessaria: number; unidade_id: number }[]>([]);
@@ -209,6 +217,26 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setRecipeItems(next);
   };
 
+  const handleCriarUnidade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaUnidadeNome.trim() || !novaUnidadeSigla.trim()) return;
+    setSavingUnidade(true);
+    const u = await store.addUnidade({
+      nome: novaUnidadeNome.trim(),
+      sigla: novaUnidadeSigla.trim().toLowerCase(),
+      tipo: novaUnidadeTipo,
+    });
+    setSavingUnidade(false);
+    if (u) {
+      setUnidadeProducaoId(u.id);
+      setShowNovaUnidade(false);
+      setNovaUnidadeNome('');
+      setNovaUnidadeSigla('');
+      setNovaUnidadeTipo('massa');
+      onUpdate();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) {
@@ -316,7 +344,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <span className="text-amber-800 dark:text-amber-300 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Receitas</span>
-          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-[#f8f1ea]">Fichas Técnicas & Cardápio</h1>
+          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-[#f8f1ea]">Produtos e Fichas Técnicas</h1>
           <p className="text-sm text-amber-900/60 dark:text-amber-100/60 mt-1">Defina quais ingredientes compõem seus salgados, bolos e doces. Calcule custos reais de fabricação e sugira capacidades.</p>
         </div>
 
@@ -659,16 +687,22 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Unidade de Produção *</label>
-                    <select 
-                      value={unidadeProducaoId}
-                      onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
-                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
-                      required
-                    >
-                      {store.unidades.map(u => (
-                        <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.nome} ({u.sigla})</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select 
+                        value={unidadeProducaoId}
+                        onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
+                        className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
+                        required
+                      >
+                        {store.unidades.map(u => (
+                          <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.nome} ({u.sigla})</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => setShowNovaUnidade(true)}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                        + Nova
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-1">
@@ -932,6 +966,53 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 </button>
               </div>
 
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Quick-add unidade */}
+      {showNovaUnidade && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#120c06] max-w-sm w-full rounded-2xl p-6 border border-amber-100 dark:border-[#2d1e0d]">
+            <div className="flex items-center gap-2 mb-4">
+              <Settings size={18} className="text-amber-600 dark:text-amber-400" />
+              <h3 className="font-semibold text-base text-amber-950 dark:text-amber-100">Nova Unidade de Medida</h3>
+            </div>
+            <form onSubmit={handleCriarUnidade} className="space-y-3">
+              <div>
+                <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Nome completo *</label>
+                <input type="text" value={novaUnidadeNome} onChange={e => setNovaUnidadeNome(e.target.value)} required
+                  placeholder="Ex: Quilograma, Litro, Dúzia"
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Sigla *</label>
+                  <input type="text" value={novaUnidadeSigla} onChange={e => setNovaUnidadeSigla(e.target.value)} required
+                    placeholder="Ex: kg, L, dz"
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono placeholder:text-gray-400 dark:placeholder:text-amber-200/20" />
+                </div>
+                <div>
+                  <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Tipo *</label>
+                  <select value={novaUnidadeTipo} onChange={e => setNovaUnidadeTipo(e.target.value as 'massa' | 'volume' | 'unidade')}
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100">
+                    <option value="massa" className="dark:bg-[#1c140c]">Massa (peso)</option>
+                    <option value="volume" className="dark:bg-[#1c140c]">Volume (líquido)</option>
+                    <option value="unidade" className="dark:bg-[#1c140c]">Unidade (contável)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowNovaUnidade(false)}
+                  className="flex-1 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold rounded-xl text-xs cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingUnidade}
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl text-xs cursor-pointer disabled:cursor-not-allowed">
+                  {savingUnidade ? 'Criando...' : 'Criar Unidade'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
