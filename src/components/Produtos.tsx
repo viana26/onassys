@@ -97,7 +97,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       setImageCompressing(true);
       const optimized = await compressImage(file, 600, 600, 0.7);
 
-      if (navigator.onLine && editId) {
+      if (editId) {
         const blob = base64ToBlob(optimized);
         const url = await uploadProdutoImage(
           blob,
@@ -111,7 +111,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         }
       }
 
-      setImagem(optimized);
+      setImageCompressing(false);
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
       alert('Erro ao comprimir imagem. Tente outro arquivo.');
@@ -259,10 +259,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       const imageChanged = imagem !== oldImageUrl;
 
       if (imageChanged && oldImageUrl && isStorageUrl(oldImageUrl)) {
-        if (imagem && isBase64Image(imagem) && navigator.onLine) {
+        if (imagem && isBase64Image(imagem)) {
           const blob = base64ToBlob(imagem);
           const url = await uploadProdutoImage(blob, editId, oldImageUrl);
-          if (url) finalImagem = url;
+          if (url) finalImagem = url; else finalImagem = '';
         } else if (!imagem) {
           deleteProdutoImage(oldImageUrl).catch(() => {});
         }
@@ -312,7 +312,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         });
       }
 
-      if (imagem && isBase64Image(imagem) && navigator.onLine) {
+      if (imagem && isBase64Image(imagem)) {
         const blob = base64ToBlob(imagem);
         const url = await uploadProdutoImage(blob, prod.id);
         if (url) store.updateProduto(prod.id, { imagem: url });

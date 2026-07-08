@@ -190,5 +190,5 @@ Um guia rápido para você encontrar onde fazer cada coisa.
 
 - 🖥️ **Desktop:** Sidebar à esquerda com todas as páginas. Use arrastar no Kanban.
 - 📱 **Celular:** Menu inferior (navbar) e drawer lateral. Toque para navegar.
-- 🔄 **Offline:** O sistema funciona mesmo sem internet — sincroniza automaticamente quando voltar.
+- 🔄 **Offline:** Dados previamente carregados ficam disponíveis em cache, mas alterações exigem conexão com a internet.
 - 🏷️ **Badge laranja "⚠️ Estorno Pendente":** Aparece em pedidos cancelados que ainda têm valores a devolver.

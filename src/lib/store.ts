@@ -34,6 +34,7 @@ export class MiniFactoryStore {
 
   loading = true;
   error: string | null = null;
+  errorType: 'network' | 'server' | null = null;
   dadosEmpresa: DadosEmpresa | null = null;
   private onUpdateCallbacks: (() => void)[] = [];
 
@@ -47,6 +48,14 @@ export class MiniFactoryStore {
   }
 
   private notify() { this.onUpdateCallbacks.forEach(cb => cb()); }
+
+  clearError() { this.error = null; this.errorType = null; this.notify(); }
+
+  private setError(msg: string, type: 'network' | 'server') {
+    this.error = msg;
+    this.errorType = type;
+    this.notify();
+  }
 
   // ================================================
   // LOOKUP HELPERS
@@ -204,21 +213,36 @@ export class MiniFactoryStore {
 
   private async supabaseInsert(table: string, data: Record<string, unknown>): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
-    const { error } = await supabase.from(table).insert(data);
-    if (error) { this.error = error.message; this.notify(); return false; }
-    return true;
+    try {
+      const { error } = await supabase.from(table).insert(data);
+      if (error) { this.setError(error.message + ' — Contate o supervisor.', 'server'); return false; }
+      return true;
+    } catch {
+      this.setError('Sem conexão com o servidor. Verifique sua internet.', 'network');
+      return false;
+    }
   }
   private async supabaseUpdate(table: string, id: string, data: Record<string, unknown>): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
-    const { error } = await supabase.from(table).update(data).eq('id', id);
-    if (error) { this.error = error.message; this.notify(); return false; }
-    return true;
+    try {
+      const { error } = await supabase.from(table).update(data).eq('id', id);
+      if (error) { this.setError(error.message + ' — Contate o supervisor.', 'server'); return false; }
+      return true;
+    } catch {
+      this.setError('Sem conexão com o servidor. Verifique sua internet.', 'network');
+      return false;
+    }
   }
   private async supabaseDelete(table: string, id: string): Promise<boolean> {
     if (!isSupabaseConfigured()) return false;
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) { this.error = error.message; this.notify(); return false; }
-    return true;
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) { this.setError(error.message + ' — Contate o supervisor.', 'server'); return false; }
+      return true;
+    } catch {
+      this.setError('Sem conexão com o servidor. Verifique sua internet.', 'network');
+      return false;
+    }
   }
 
   // ================================================
@@ -323,6 +347,7 @@ export class MiniFactoryStore {
     await this.loadLookups();
     const ok = await this.loadFromSupabase();
     if (!ok) this.loadFromLocalStorage();
+    this.recalcularValoresPedidos();
     this.loading = false;
     this.recalcularCustosProdutos();
     this.saveToLocalStorage();
@@ -334,11 +359,24 @@ export class MiniFactoryStore {
     this.loading = true; this.notify();
     await this.loadLookups();
     await this.loadFromSupabase();
+    this.recalcularValoresPedidos();
     this.loading = false;
     this.recalcularCustosProdutos();
     this.saveToLocalStorage();
     if (this.currentUserId) this.setCurrentUser(this.currentUserId);
     this.notify();
+  }
+
+  private recalcularValoresPedidos() {
+    for (const pedido of this.pedidos) {
+      const total = this.itensPedido
+        .filter(i => i.pedido_id === pedido.id)
+        .reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+      if (pedido.valor_total !== total) {
+        pedido.valor_total = total;
+        this.supabaseUpdate('pedidos', pedido.id, { valor_total: total } as unknown as Record<string, unknown>);
+      }
+    }
   }
 
   async recalcularCustosProdutos() {
@@ -387,11 +425,8 @@ export class MiniFactoryStore {
   async lancarEntradaMaterial(id: string, quantidade: number, custoUnitario?: number, observacao?: string, criarDespesa?: boolean) {
     const mat = this.materiais.find(m => m.id === id);
     if (!mat) return;
-    mat.quantidade_atual += quantidade;
-    if (custoUnitario !== undefined && custoUnitario >= 0) mat.custo_unitario = custoUnitario;
-    mat.data_ultima_atualizacao = new Date().toISOString();
 
-    const unitPrice = custoUnitario !== undefined ? custoUnitario : mat.custo_unitario;
+    const unitPrice = custoUnitario !== undefined && custoUnitario >= 0 ? custoUnitario : mat.custo_unitario;
     const mov: MovimentacaoMaterial = {
       id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
       material_id: id,
@@ -405,9 +440,18 @@ export class MiniFactoryStore {
 
     const fornecedor = mat.fornecedor_id ? this.fornecedores.find(f => f.id === mat.fornecedor_id) : undefined;
 
-    const okMat = await this.supabaseUpdate('materiais', id, mat as unknown as Record<string, unknown>);
+    const dadosMat = {
+      ...mat,
+      quantidade_atual: mat.quantidade_atual + quantidade,
+      custo_unitario: unitPrice,
+      data_ultima_atualizacao: new Date().toISOString(),
+    };
+    const okMat = await this.supabaseUpdate('materiais', id, dadosMat as unknown as Record<string, unknown>);
     const okMov = await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>);
     if (okMat && okMov) {
+      mat.quantidade_atual = dadosMat.quantidade_atual;
+      mat.custo_unitario = dadosMat.custo_unitario;
+      mat.data_ultima_atualizacao = dadosMat.data_ultima_atualizacao;
       this.movMateriais.unshift(mov);
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
@@ -675,9 +719,15 @@ export class MiniFactoryStore {
     for (const matId of Object.keys(materiaisUsados)) {
        const totalQtd = Number(materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0).toFixed(3));
       const mat = this.materiais.find(m => m.id === matId)!;
-       mat.quantidade_atual = Number((mat.quantidade_atual - totalQtd).toFixed(3));
-      mat.data_ultima_atualizacao = new Date().toISOString();
-      await this.supabaseUpdate('materiais', matId, mat as unknown as Record<string, unknown>);
+      const dadosMat = {
+        ...mat,
+        quantidade_atual: Number((mat.quantidade_atual - totalQtd).toFixed(3)),
+        data_ultima_atualizacao: new Date().toISOString(),
+      };
+      if (await this.supabaseUpdate('materiais', matId, dadosMat as unknown as Record<string, unknown>)) {
+        mat.quantidade_atual = dadosMat.quantidade_atual;
+        mat.data_ultima_atualizacao = dadosMat.data_ultima_atualizacao;
+      }
 
       const mov: MovimentacaoMaterial = {
         id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
@@ -696,7 +746,9 @@ export class MiniFactoryStore {
       let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
 
 if (estoque) {
-    estoque.quantidade_reservada += item.quantidade_solicitada;
+    if (!pedidoId) {
+        estoque.quantidade_reservada += item.quantidade_solicitada;
+    }
     estoque.data_atualizacao = new Date().toISOString();
     await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
 } else {
@@ -741,6 +793,7 @@ if (estoque) {
       if (pedido) {
         pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
         pedido.atualizado_em = new Date().toISOString();
+        await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
       }
       this.saveToLocalStorage(); this.notify();
     }
@@ -758,6 +811,7 @@ if (estoque) {
       if (pedido) {
         pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
         pedido.atualizado_em = new Date().toISOString();
+        await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
       }
       this.saveToLocalStorage(); this.notify();
     }
@@ -773,6 +827,7 @@ if (estoque) {
         if (pedido) {
           pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
           pedido.atualizado_em = new Date().toISOString();
+          await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
         }
       }
       this.saveToLocalStorage(); this.notify();
@@ -840,7 +895,7 @@ if (estoque) {
   async addUnidade(data: { sigla: string; nome: string; tipo: 'massa' | 'volume' | 'unidade' }) {
     if (!isSupabaseConfigured()) return null;
     const { data: inserted, error } = await supabase.from('unidades').insert(data).select().single();
-    if (error || !inserted) { this.error = error?.message || 'Erro ao criar unidade'; this.notify(); return null; }
+    if (error || !inserted) { this.setError(error?.message || 'Erro ao criar unidade', 'server'); return null; }
     const u = inserted as Unidade;
     this.unidades.push(u);
     this.saveToLocalStorage(); this.notify();
@@ -862,6 +917,7 @@ if (estoque) {
     const emUso = this.materiais.some(m => m.unidade_id === id);
     if (emUso) {
       this.error = 'Não é possível excluir: existem ingredientes usando esta unidade.';
+      this.errorType = null;
       this.notify();
       return false;
     }
@@ -879,7 +935,7 @@ if (estoque) {
   async addFornecedor(data: { nome_fantasia: string; contato?: string; telefone?: string; email?: string }) {
     if (!isSupabaseConfigured()) return null;
     const { data: inserted, error } = await supabase.from('fornecedores').insert(data).select().single();
-    if (error || !inserted) { this.error = error?.message || 'Erro ao criar fornecedor'; this.notify(); return null; }
+    if (error || !inserted) { this.setError(error?.message || 'Erro ao criar fornecedor', 'server'); return null; }
     const f = inserted as Fornecedor;
     this.fornecedores.push(f);
     this.saveToLocalStorage(); this.notify();
@@ -980,7 +1036,7 @@ if (estoque) {
         slogan: dados.slogan,
       })
       .eq('id', 1);
-    if (error) { this.error = error.message; this.notify(); return false; }
+    if (error) { this.setError(error.message + ' — Contate o supervisor.', 'server'); return false; }
     localStorage.setItem('appName', dados.nome_empresa);
     this.notify();
     return true;

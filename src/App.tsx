@@ -20,8 +20,7 @@ import {
     verificarAdminExiste,
     onAuthStateChange, 
     signOut,
-    supabase,
-    checkDatabaseEmpty 
+    supabase
 } from './lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -45,7 +44,10 @@ import {
   Moon,
   LogOut,
   Key,
-  Copy
+  Copy,
+  Wifi,
+  WifiOff,
+  AlertCircle
 } from 'lucide-react';
 
 type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'app';
@@ -73,6 +75,23 @@ export default function App() {
   const [recoveryCopied, setRecoveryCopied] = useState(false);
   const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
   const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
+
+  // =====================================================
+  // NETWORK STATUS
+  // =====================================================
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showReconnected, setShowReconnected] = useState(false);
+
+  useEffect(() => {
+    const onln = () => { setIsOnline(true); setShowReconnected(true); setTimeout(() => setShowReconnected(false), 4000); };
+    const offln = () => setIsOnline(false);
+    window.addEventListener('online', onln);
+    window.addEventListener('offline', offln);
+    return () => {
+      window.removeEventListener('online', onln);
+      window.removeEventListener('offline', offln);
+    };
+  }, []);
 
   // =====================================================
   // EFFECTS - Auth
@@ -504,6 +523,34 @@ export default function App() {
       {/* MAIN VIEWPORT BODY */}
       <main className="flex-1 p-5 md:p-8 pb-20 md:pb-8 w-full max-w-7xl mx-auto overflow-x-hidden space-y-6 relative">
         
+        {/* NETWORK ERROR BANNER */}
+        {(!isOnline || store.errorType === 'network') && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold animate-in slide-in-from-top-1">
+            <WifiOff size={14} className="shrink-0" />
+            <span className="flex-1">Sem conexão com o servidor. Suas alterações não serão salvas. Verifique sua internet e tente novamente.</span>
+            {store.error && (
+              <button onClick={() => store.clearError()} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 font-bold text-sm px-1 leading-none">&times;</button>
+            )}
+          </div>
+        )}
+
+        {/* SERVER ERROR BANNER */}
+        {store.errorType === 'server' && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold animate-in slide-in-from-top-1">
+            <AlertCircle size={14} className="shrink-0" />
+            <span className="flex-1">Erro no servidor — contate o supervisor. {store.error}</span>
+            <button onClick={() => store.clearError()} className="text-red-500 hover:text-red-700 dark:hover:text-red-200 font-bold text-sm px-1 leading-none">&times;</button>
+          </div>
+        )}
+
+        {/* CONEXÃO RESTAURADA TOAST */}
+        {showReconnected && (
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-semibold animate-in slide-in-from-top-1">
+            <Wifi size={14} className="shrink-0" />
+            <span className="flex-1">Conexão restaurada! Você já pode salvar seus dados novamente.</span>
+          </div>
+        )}
+
         {currentTab === 'dashboard' && (
           <Dashboard 
             store={store} 
