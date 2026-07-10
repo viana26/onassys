@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Material } from '../types';
+import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { 
   Plus, 
   Trash2, 
@@ -12,6 +13,8 @@ import {
   FileCheck,
   Search,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   X,
   PackageOpen,
   ArrowDownLeft,
@@ -28,6 +31,8 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCritico, setFilterCritico] = useState(false);
   const [activeTab, setActiveTab] = useState<'lista' | 'historico'>('lista');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
 
   // Form states
   const [isEditing, setIsEditing] = useState(false);
@@ -66,14 +71,32 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [inboundCriarDespesa, setInboundCriarDespesa] = useState(false);
 
   // Filter materials list
-  const filteredMateriais = store.materiais.filter(m => {
-    const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (filterCritico) {
-      return batchesSearch && m.quantidade_atual < m.quantidade_minima;
-    }
-    return batchesSearch;
-  });
+  const filteredMateriais = useMemo(() => {
+    return store.materiais.filter(m => {
+      const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (filterCritico) {
+        return batchesSearch && m.quantidade_atual < m.quantidade_minima;
+      }
+      return batchesSearch;
+    });
+  }, [store.materiais, searchTerm, filterCritico]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMateriais.length / pageSize));
+  const paginatedMateriais = filteredMateriais.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handleSearchChange = (v: string) => {
+    setSearchTerm(v);
+    setCurrentPage(1);
+  };
+
+  const handleFilterCritico = () => {
+    setFilterCritico(v => !v);
+    setCurrentPage(1);
+  };
 
   const handleOpenNew = () => {
     setIsEditing(true);
@@ -97,7 +120,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     setFornecedorId(m.fornecedor_id || 0);
   };
 
-  const handleSaveMaterial = (e: React.FormEvent) => {
+  const handleSaveMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim() || fornecedorId === 0) {
       alert('Favor preencher o nome e o fornecedor.');
@@ -105,7 +128,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     }
 
     if (editId) {
-      store.updateMaterial(editId, {
+      await store.updateMaterial(editId, {
         nome,
         unidade_id: unidadeId,
         quantidade_atual: Number(quantidadeAtual),
@@ -114,7 +137,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
         fornecedor_id: fornecedorId
       });
     } else {
-      store.addMaterial({
+      await store.addMaterial({
         nome,
         unidade_id: unidadeId,
         quantidade_atual: Number(quantidadeAtual),
@@ -179,7 +202,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     }
   };
 
-  const handleSaveInbound = (e: React.FormEvent) => {
+  const handleSaveInbound = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inboundQtd <= 0) {
       alert('A quantidade deve ser maior do que zero.');
@@ -189,7 +212,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       alert('O custo unitário não pode ser menor do que zero.');
       return;
     }
-    store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa);
+    await store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa);
     setIsInbounding(false);
     onUpdate();
   };
@@ -242,7 +265,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 type="text" 
                 placeholder="Buscar ingrediente ou fornecedor..." 
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-orange-950/10 border border-amber-100 dark:border-[#22160b] focus:outline-none focus:border-amber-400 dark:focus:border-amber-500 text-amber-950 dark:text-amber-100 transition"
               />
             </div>
@@ -252,7 +275,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <input 
                   type="checkbox" 
                   checked={filterCritico}
-                  onChange={(e) => setFilterCritico(e.target.checked)}
+                  onChange={handleFilterCritico}
                   className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500"
                 />
                 <span className="flex items-center gap-1">
@@ -314,21 +337,20 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   <thead>
                     <tr className="bg-amber-50/40 dark:bg-amber-950/20 font-medium text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
                       <th className="p-3 pl-4 whitespace-nowrap">Ingrediente</th>
-                      <th className="p-3 whitespace-nowrap">Fornecedor</th>
                       <th className="p-3 whitespace-nowrap">Estoque Atual</th>
                       <th className="p-3 whitespace-nowrap">Mínimo Crítico</th>
                       <th className="p-3 whitespace-nowrap">Preço Unitário</th>
+                      <th className="p-3 whitespace-nowrap">Preço Total</th>
                       <th className="p-3 whitespace-nowrap">Última Atualização</th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredMateriais.map(m => {
+                    {paginatedMateriais.map(m => {
                       const isAbatido = m.quantidade_atual < m.quantidade_minima;
                       return (
                         <tr key={m.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                           <td className="p-3 pl-4 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{m.nome}</td>
-                          <td className="p-3 text-gray-650 dark:text-amber-100/60 whitespace-nowrap">{store.fornecedorNome(m.fornecedor_id)}</td>
                           <td className="p-3 font-mono whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold
                               ${isAbatido ? 'bg-red-100 dark:bg-red-950/25 text-red-700 dark:text-red-350 animate-pulse' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200'}
@@ -337,7 +359,8 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                             </span>
                           </td>
                           <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{m.quantidade_minima} {store.unidadeSigla(m.unidade_id)}</td>
-                          <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{store.unidadeSigla(m.unidade_id)}</span></td>
+                          <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{store.unidadeSigla(m.unidade_id)}</span></td>
+                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/50 whitespace-nowrap">{(m.custo_unitario * m.quantidade_atual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                           <td className="p-3 text-gray-400 dark:text-amber-100/30 whitespace-nowrap">{new Date(m.data_ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">
@@ -376,14 +399,14 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
 
               {/* Mobile View (Touch Cards) */}
               <div className="grid grid-cols-1 gap-3 md:hidden">
-                {filteredMateriais.map(m => {
+                {paginatedMateriais.map(m => {
                   const isAbatido = m.quantidade_atual < m.quantidade_minima;
                   return (
                     <div key={m.id} className="bg-white dark:bg-[#150f09] p-4 rounded-xl border border-amber-100 dark:border-[#22160b] shadow-sm space-y-3">
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-semibold text-amber-950 dark:text-amber-100 text-sm font-display">{m.nome}</h4>
-                          <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5 font-sans">Forn: {store.fornecedorNome(m.fornecedor_id)}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5 font-sans">{(m.custo_unitario * m.quantidade_atual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} total</p>
                         </div>
                         {isAbatido && (
                           <span className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-350 text-[9px] px-2 py-0.5 rounded-full border border-red-100 dark:border-red-950/20 font-bold flex items-center gap-0.5 font-sans">
@@ -405,7 +428,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                         </div>
                         <div>
                           <p className="text-[9px] text-gray-500 dark:text-amber-150/40 uppercase font-medium">Custo Unit.</p>
-                          <p className="font-mono text-emerald-700 dark:text-emerald-400 text-xs font-bold mt-0.5">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                          <p className="font-mono text-emerald-700 dark:text-emerald-400 text-xs font-bold mt-0.5">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })}</p>
                         </div>
                       </div>
 
@@ -439,6 +462,39 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   );
                 })}
               </div>
+
+              {/* Pagination */}
+              {filteredMateriais.length > pageSize && (
+                <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+                  >
+                    <ChevronLeft size={14} /> Anterior
+                  </button>
+                  <span className="text-xs text-gray-500 dark:text-amber-100/50 font-mono">
+                    Pág. {currentPage} de {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+                  >
+                    Próximo <ChevronRight size={14} />
+                  </button>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    className="ml-2 px-2 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none"
+                  >
+                    <option value={6}>6 / pág</option>
+                    <option value={10}>10 / pág</option>
+                    <option value={20}>20 / pág</option>
+                    <option value={50}>50 / pág</option>
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -544,12 +600,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Custo (R$)</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Custo (R$ / {store.unidadeSigla(unidadeId)})</label>
                   <input 
                     type="number" 
                     step="any"
                     value={custoUnitario}
                     onChange={(e) => setCustoUnitario(Number(e.target.value))}
+                    {...useSmartArrowKeys(custoUnitario, setCustoUnitario)}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
@@ -587,6 +644,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     step="any"
                     value={quantidadeAtual}
                     onChange={(e) => setQuantidadeAtual(Number(e.target.value))}
+                    {...useSmartArrowKeys(quantidadeAtual, setQuantidadeAtual)}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
@@ -598,6 +656,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     step="any"
                     value={quantidadeMinima}
                     onChange={(e) => setQuantidadeMinima(Number(e.target.value))}
+                    {...useSmartArrowKeys(quantidadeMinima, setQuantidadeMinima)}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
@@ -615,7 +674,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   type="submit"
                   className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-850 dark:hover:bg-amber-800 text-white font-semibold py-2.5 rounded-xl text-center shadow-sm cursor-pointer"
                 >
-                  Salvar
+                  {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
                 </button>
               </div>
             </form>
@@ -655,6 +714,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       min="0.001"
                       value={inboundQtd}
                       onChange={(e) => setInboundQtd(Number(e.target.value))}
+                      {...useSmartArrowKeys(inboundQtd, setInboundQtd, 0.001)}
                       className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
                       required
                       placeholder="Ex: 10, 2.5"
@@ -673,12 +733,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     min="0"
                     value={inboundCustoUnitario === 0 ? '' : inboundCustoUnitario}
                     onChange={(e) => setInboundCustoUnitario(Number(e.target.value))}
+                    {...useSmartArrowKeys(inboundCustoUnitario, setInboundCustoUnitario, 0)}
                     className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] focus:outline-none focus:border-amber-400 bg-white dark:bg-[#1c140c] rounded-lg text-amber-950 dark:text-amber-100 font-mono text-xs placeholder:text-gray-400"
                     required
                     placeholder="Ex: 5.50"
                   />
                   <span className="text-[9px] text-gray-400 dark:text-amber-100/30 mt-0.5 block font-sans">
-                    Preço de custo anterior: {(store.materiais.find(m => m.id === inboundMaterialId)?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    Preço de custo anterior: {(store.materiais.find(m => m.id === inboundMaterialId)?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                   </span>
                 </div>
               </div>

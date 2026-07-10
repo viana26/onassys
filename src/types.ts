@@ -1,4 +1,4 @@
-export interface Unidade {
+﻿export interface Unidade {
   id: number;
   sigla: string;
   nome: string;
@@ -128,7 +128,6 @@ export interface EstoqueProduto {
   id: string;
   produto_id: string;
   quantidade_disponivel: number;
-  quantidade_reservada: number;
   quantidade_minima: number;
   data_validade?: string;
   lote?: string;
@@ -226,3 +225,4 @@ export interface DashboardStats {
   totalReceitaPedidosConfirmados: number;
   proximasEntregasCount: number;
 }
+

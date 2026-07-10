@@ -1,23 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Cliente } from '../types';
 import { phoneMask } from '../lib/mask';
 import { 
-  Plus, 
   Trash2, 
   Edit3, 
   Search, 
-  User, 
   Phone, 
   Mail, 
   MapPin, 
   X, 
   PlusCircle, 
   Notebook,
-  Building,
-  Sparkles,
   Users,
-  AlertTriangle
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface ClientesProps {
@@ -28,6 +26,8 @@ interface ClientesProps {
 export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('todos');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
 
   // Form states
   const [isOpenForm, setIsOpenForm] = useState(false);
@@ -41,16 +41,39 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [observacoes, setObservacoes] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
-  const filteredClientes = store.clientes.filter(c => {
-    const matchesSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.telefone.includes(searchTerm) || 
-                          c.endereco.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (typeFilter !== 'todos') {
-      return matchesSearch && c.tipo_id === Number(typeFilter);
-    }
-    return matchesSearch;
-  });
+  const filteredClientes = useMemo(() => {
+    const filtered = store.clientes.filter(c => {
+      const matchesSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            c.telefone.includes(searchTerm) || 
+                            c.endereco.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (typeFilter !== 'todos') {
+        return matchesSearch && c.tipo_id === Number(typeFilter);
+      }
+      return matchesSearch;
+    });
+    return filtered;
+  }, [store.clientes, searchTerm, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClientes.length / pageSize));
+  const paginatedClientes = filteredClientes.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  // Reset to page 1 when filters change
+  const handleSearchChange = (v: string) => {
+    setSearchTerm(v);
+    setCurrentPage(1);
+  };
+
+  const handleFilterChange = (v: string) => {
+    setTypeFilter(v);
+    setCurrentPage(1);
+  };
+
+  const pedidosCount = (clienteId: string) =>
+    store.pedidos.filter(p => p.cliente_id === clienteId).length;
 
   const handleOpenNew = () => {
     setIsOpenForm(true);
@@ -135,7 +158,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
             type="text" 
             placeholder="Buscar por nome, telefone, endereço..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2b1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
           />
         </div>
@@ -144,7 +167,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           {[{ label: 'Todos', value: 'todos' }, ...store.tiposCliente.map(t => ({ label: t.nome, value: String(t.id) }))].map(filter => (
             <button
               key={filter.value}
-              onClick={() => setTypeFilter(filter.value)}
+              onClick={() => handleFilterChange(filter.value)}
               className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition ${
                 typeFilter === filter.value 
                   ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800 dark:border-amber-700' 
@@ -157,7 +180,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
         </div>
       </div>
 
-      {/* Grid of customer sheets */}
+      {/* Empty state */}
       {filteredClientes.length === 0 ? (
         <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500 dark:text-amber-200/40">
           <Users size={36} className="mx-auto text-amber-600/30 mb-2" />
@@ -165,80 +188,170 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           <p className="text-xs text-gray-400 dark:text-amber-100/35 mt-1">Adicione o primeiro comprador clicando em '+ Novo Cliente'.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="customers-grid">
-          {filteredClientes.map(c => {
-            const hasPedidosCount = store.pedidos.filter(p => p.cliente_id === c.id).length;
-            return (
-              <div 
-                key={c.id} 
-                className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] p-3 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 transition flex flex-col justify-between space-y-2"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-bold font-mono uppercase tracking-wider leading-tight ${
-                        (store.tipoClienteNome(c.tipo_id).toLowerCase().includes('lanchonete') ? 'bg-amber-100 text-amber-900 border border-amber-200 dark:bg-amber-950 dark:text-amber-250 dark:border-[#382613]' :
-                        store.tipoClienteNome(c.tipo_id).toLowerCase().includes('evento') || store.tipoClienteNome(c.tipo_id).toLowerCase().includes('buffet') ? 'bg-pink-100 text-pink-800 border border-pink-200 dark:bg-pink-950/30 dark:text-pink-350 dark:border-[#4d1624]' :
-                        store.tipoClienteNome(c.tipo_id).toLowerCase().includes('particular') ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-[#1d164d]' :
-                        'bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700')
-                      }`}>
-                        {store.tipoClienteNome(c.tipo_id)}
+        <>
+          {/* Desktop Table */}
+          <div className="hidden md:block bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm overflow-x-auto w-full">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
+                  <th className="p-3 pl-4 whitespace-nowrap">Cliente</th>
+                  <th className="p-3 whitespace-nowrap">Telefone</th>
+                  <th className="p-3 whitespace-nowrap">Email</th>
+                  <th className="p-3 whitespace-nowrap">Endereço</th>
+                  <th className="p-3 whitespace-nowrap">Pedidos</th>
+                  <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedClientes.map(c => {
+                  const totalPedidos = pedidosCount(c.id);
+                  return (
+                    <tr key={c.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
+                      <td className="p-3 pl-4">
+                        <span className="font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{c.nome}</span>
+                      </td>
+                      <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap font-mono">{c.telefone || '—'}</td>
+                      <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap max-w-[180px] truncate">{c.email || '—'}</td>
+                      <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap max-w-[200px] truncate">{c.endereco || '—'}</td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-lg font-bold ${
+                          totalPedidos > 0
+                            ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                        }`}>
+                          {totalPedidos} {totalPedidos === 1 ? 'pedido' : 'pedidos'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right pr-4 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          {store.hasPermission('clientes.editar') && (
+                            <button
+                              onClick={() => handleOpenEdit(c)}
+                              className="hover:bg-amber-100 dark:hover:bg-amber-950 p-1.5 rounded-lg text-amber-900 dark:text-amber-200 transition"
+                              aria-label="Editar cliente"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                          )}
+                          {store.hasPermission('clientes.excluir') && (
+                            <button
+                              onClick={() => setDeleteConfirm({ id: c.id, name: c.nome })}
+                              className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1.5 rounded-lg text-red-500 dark:text-red-400 transition"
+                              aria-label="Excluir cliente"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden grid grid-cols-1 gap-3">
+            {paginatedClientes.map(c => {
+              const totalPedidos = pedidosCount(c.id);
+              return (
+                <div 
+                  key={c.id} 
+                  className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] p-3 shadow-sm hover:border-amber-200 dark:hover:border-amber-800 transition flex flex-col justify-between space-y-2"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm font-display text-amber-950 dark:text-amber-100 truncate">{c.nome}</h3>
+                      </div>
+                      <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono whitespace-nowrap mt-0.5">
+                        {totalPedidos} pedidos
                       </span>
-                      <h3 className="font-semibold text-sm font-display text-amber-950 dark:text-amber-100 truncate">{c.nome}</h3>
                     </div>
-                    <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono whitespace-nowrap mt-0.5">
-                      {hasPedidosCount} pedidos
-                    </span>
+
+                    <div className="space-y-1 text-[11px] text-amber-950 dark:text-amber-200">
+                      {c.telefone && (
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
+                          <Phone size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0" />
+                          <span className="font-mono truncate">{c.telefone}</span>
+                        </div>
+                      )}
+                      {c.email && (
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
+                          <Mail size={10} className="text-amber-800 dark:text-amber-400 flex-shrink-0" />
+                          <span className="truncate">{c.email}</span>
+                        </div>
+                      )}
+                      {c.endereco && (
+                        <div className="flex items-start gap-1.5 text-gray-600 dark:text-amber-100/60">
+                          <MapPin size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                          <span className="truncate">{c.endereco}</span>
+                        </div>
+                      )}
+                      {c.observacoes && (
+                        <div className="bg-amber-50/40 dark:bg-amber-950/20 px-2 py-1 rounded-md border border-amber-50 dark:border-amber-950/30 text-gray-500 dark:text-amber-300/70 flex items-start gap-1">
+                          <Notebook size={10} className="text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                          <span className="truncate">{c.observacoes}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="space-y-1 text-[11px] text-amber-950 dark:text-amber-200">
-                    {c.telefone && (
-                      <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
-                        <Phone size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0" />
-                        <span className="font-mono truncate">{c.telefone}</span>
-                      </div>
-                    )}
-                    {c.email && (
-                      <div className="flex items-center gap-1.5 text-gray-600 dark:text-amber-100/60">
-                        <Mail size={10} className="text-amber-800 dark:text-amber-400 flex-shrink-0" />
-                        <span className="truncate">{c.email}</span>
-                      </div>
-                    )}
-                    {c.endereco && (
-                      <div className="flex items-start gap-1.5 text-gray-600 dark:text-amber-100/60">
-                        <MapPin size={10} className="text-amber-800 dark:text-amber-500 flex-shrink-0 mt-0.5" />
-                        <span className="truncate">{c.endereco}</span>
-                      </div>
-                    )}
-                    {c.observacoes && (
-                      <div className="bg-amber-50/40 dark:bg-amber-950/20 px-2 py-1 rounded-md border border-amber-50 dark:border-amber-950/30 text-gray-500 dark:text-amber-300/70 flex items-start gap-1">
-                        <Notebook size={10} className="text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                        <span className="truncate">{c.observacoes}</span>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-2">
+                    <button 
+                      onClick={() => setDeleteConfirm({ id: c.id, name: c.nome })}
+                      disabled={!store.hasPermission('clientes.excluir')}
+                      className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1 rounded-lg text-red-500 transition text-[10px] flex items-center gap-1 font-semibold`}
+                    >
+                      <Trash2 size={11} /> Deletar
+                    </button>
+                    <button 
+                      onClick={() => handleOpenEdit(c)}
+                      disabled={!store.hasPermission('clientes.editar')}
+                      className={`${store.hasPermission('clientes.editar') ? 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900' : 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'} text-amber-950 dark:text-amber-200 font-bold px-2.5 py-0.5 rounded-lg text-[10px] flex items-center gap-1 transition`}
+                    >
+                      <Edit3 size={10} /> Editar
+                    </button>
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-2">
-                  <button 
-                    onClick={() => setDeleteConfirm({ id: c.id, name: c.nome })}
-                    disabled={!store.hasPermission('clientes.excluir')}
-                    className={`${store.hasPermission('clientes.excluir') ? 'hover:bg-red-50 dark:hover:bg-red-950/20' : 'opacity-40 cursor-not-allowed'} p-1 rounded-lg text-red-500 transition text-[10px] flex items-center gap-1 font-semibold`}
-                  >
-                    <Trash2 size={11} /> Deletar
-                  </button>
-                  <button 
-                    onClick={() => handleOpenEdit(c)}
-                    disabled={!store.hasPermission('clientes.editar')}
-                    className={`${store.hasPermission('clientes.editar') ? 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900' : 'bg-gray-200 dark:bg-gray-700 cursor-not-allowed opacity-50'} text-amber-950 dark:text-amber-200 font-bold px-2.5 py-0.5 rounded-lg text-[10px] flex items-center gap-1 transition`}
-                  >
-                    <Edit3 size={10} /> Editar
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* Pagination */}
+          {filteredClientes.length > pageSize && (
+            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+              >
+                <ChevronLeft size={14} /> Anterior
+              </button>
+              <span className="text-xs text-gray-500 dark:text-amber-100/50 font-mono">
+                Pág. {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+              >
+                Próximo <ChevronRight size={14} />
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="ml-2 px-2 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none"
+              >
+                <option value={6}>6 / pág</option>
+                <option value={10}>10 / pág</option>
+                <option value={20}>20 / pág</option>
+                <option value={50}>50 / pág</option>
+              </select>
+            </div>
+          )}
+        </>
       )}
 
       {/* CLIENT CRUD MODAL */}
@@ -341,7 +454,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                   type="submit"
                   className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-semibold py-2.5 rounded-xl text-center shadow"
                 >
-                  Confirmar Cadastro
+                  {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
                 </button>
               </div>
 
@@ -376,7 +489,6 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           </div>
         </div>
       )}
-
     </div>
   );
 }

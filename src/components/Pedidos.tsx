@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Pedido, Cliente } from '../types';
+import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { 
   Plus, 
   Trash2, 
@@ -16,7 +17,8 @@ import {
   X,
   DollarSign,
   FileText,
-  Printer
+  Printer,
+  CheckCircle
 } from 'lucide-react';
 import { analisarEstoqueParaPedido } from '../lib/calculos';
 import RelatorioPedidos from './RelatorioPedidos';
@@ -66,6 +68,20 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   
   // Estorno confirmation
   const [estornoConfirm, setEstornoConfirm] = useState<string | null>(null);
+  const [insufficientItemsEdit, setInsufficientItemsEdit] = useState<{
+    pedidoId: string;
+    items: Array<{
+      produtoId: string;
+      produtoNome: string;
+      itemPedidoId: string;
+      estoqueProdutoId: string;
+      pedidoQtd: number;
+      estoqueQtd: number;
+      originalPedidoQtd: number;
+      originalEstoqueQtd: number;
+      unidade: string;
+    }>;
+  } | null>(null);
   
   // Edit mode
   const [editingPedidoId, setEditingPedidoId] = useState<string | null>(null);
@@ -174,7 +190,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setAnaliseResultado(res);
   };
 
-  const handleSaveOrderSubmit = (e: React.FormEvent) => {
+  const handleSaveOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clienteId) {
       alert('Por favor cadastre ou selecione um cliente.');
@@ -235,7 +251,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     }
 
     // Save order
-    const savedPedido = store.addPedido({
+    const savedPedido = await store.addPedido({
       cliente_id: clienteId,
       status_id: statusId,
       data_entrega_prevista: dataEntrega,
@@ -243,16 +259,16 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       criado_by: 'Cozinha'
     });
 
-    Promise.resolve(savedPedido).then(pedido => {
-      itensPedido.forEach(item => {
-        store.addItemPedido({
-          pedido_id: pedido.id,
-          produto_id: item.produto_id,
-          quantidade_solicitada: item.quantidade_solicitada,
-          quantidade_produzida: 0,
-          preco_unitario: item.preco_unitario,
-          observacao: item.observacao
-        });
+    if (!savedPedido) return;
+
+    itensPedido.forEach(item => {
+      store.addItemPedido({
+        pedido_id: savedPedido.id,
+        produto_id: item.produto_id,
+        quantidade_solicitada: item.quantidade_solicitada,
+        quantidade_produzida: 0,
+        preco_unitario: item.preco_unitario,
+        observacao: item.observacao
       });
     });
 
@@ -261,11 +277,85 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   };
 
   const handleTransitionStatus = async (pedId: string, novoSt: number) => {
-    const result = await store.updatePedidoStatus(pedId, novoSt);
+    const result = (await store.updatePedidoStatus(pedId, novoSt)) as { success: boolean; error?: string; insufficientItems?: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> };
     if (!result.success) {
-      alert(result.error);
+      if (result.insufficientItems && result.insufficientItems.length > 0) {
+        const items = result.insufficientItems.map(item => {
+          const itemPedido = store.itensPedido.find(ip => ip.pedido_id === pedId && ip.produto_id === item.produtoId);
+          const estoque = store.estoqueProdutos.find(ep => ep.produto_id === item.produtoId);
+          return {
+            produtoId: item.produtoId,
+            produtoNome: item.produtoNome,
+            itemPedidoId: itemPedido?.id || '',
+            estoqueProdutoId: estoque?.id || '',
+            pedidoQtd: item.necessario,
+            estoqueQtd: item.disponivel,
+            originalPedidoQtd: item.necessario,
+            originalEstoqueQtd: item.disponivel,
+            unidade: item.unidade,
+          };
+        });
+        setInsufficientItemsEdit({ pedidoId: pedId, items });
+      } else {
+        alert(result.error);
+      }
     } else {
       onUpdate();
+    }
+  };
+
+  const handleInsufficientItemChange = (index: number, field: 'pedidoQtd' | 'estoqueQtd', value: number) => {
+    setInsufficientItemsEdit(prev => {
+      if (!prev) return prev;
+      const newItems = [...prev.items];
+      newItems[index] = { ...newItems[index], [field]: Math.max(0, value) };
+      return { ...prev, items: newItems };
+    });
+  };
+
+  const handleInsufficientConfirm = async () => {
+    const edit = insufficientItemsEdit;
+    if (!edit) return;
+    setInsufficientItemsEdit(null);
+
+    let changed = false;
+    for (const item of edit.items) {
+      if (item.pedidoQtd !== item.originalPedidoQtd) {
+        await store.updateItemPedido(item.itemPedidoId, { quantidade_solicitada: item.pedidoQtd });
+        changed = true;
+      }
+      if (item.estoqueQtd !== item.originalEstoqueQtd) {
+        await store.ajustarEstoqueProduto(item.estoqueProdutoId, item.estoqueQtd, 'Ajuste manual por entrega');
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      const retry = (await store.updatePedidoStatus(edit.pedidoId, 5)) as { success: boolean; error?: string; insufficientItems?: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> };
+      if (!retry.success) {
+        if (retry.insufficientItems && retry.insufficientItems.length > 0) {
+          const items = retry.insufficientItems.map(item => {
+            const itemPedido = store.itensPedido.find(ip => ip.pedido_id === edit.pedidoId && ip.produto_id === item.produtoId);
+            const estoque = store.estoqueProdutos.find(ep => ep.produto_id === item.produtoId);
+            return {
+              produtoId: item.produtoId,
+              produtoNome: item.produtoNome,
+              itemPedidoId: itemPedido?.id || '',
+              estoqueProdutoId: estoque?.id || '',
+              pedidoQtd: item.necessario,
+              estoqueQtd: item.disponivel,
+              originalPedidoQtd: item.necessario,
+              originalEstoqueQtd: item.disponivel,
+              unidade: item.unidade,
+            };
+          });
+          setInsufficientItemsEdit({ pedidoId: edit.pedidoId, items });
+        } else {
+          alert(retry.error);
+        }
+      } else {
+        onUpdate();
+      }
     }
   };
 
@@ -886,6 +976,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                               min="1"
                               value={item.quantidade_solicitada}
                               onChange={(e) => handleUpdateItemRow(idx, { quantidade_solicitada: Number(e.target.value) })}
+                              {...useSmartArrowKeys(item.quantidade_solicitada, (v) => handleUpdateItemRow(idx, { quantidade_solicitada: v }), 1)}
                               className="w-full p-1.5 focus:outline-none font-mono text-xs text-center"
                               required
                             />
@@ -903,6 +994,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             step="any"
                             value={item.preco_unitario}
                             onChange={(e) => handleUpdateItemRow(idx, { preco_unitario: Number(e.target.value) })}
+                            {...useSmartArrowKeys(item.preco_unitario, (v) => handleUpdateItemRow(idx, { preco_unitario: v }), 0)}
                             className="w-full p-1.5 border border-amber-200 rounded font-mono text-xs"
                             required
                           />
@@ -1516,6 +1608,79 @@ ${pagHtml}
                 <button onClick={async () => { await store.estornarPagamentosPedido(estornoConfirm); setEstornoConfirm(null); onUpdate(); }}
                   className="flex-1 py-2 px-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl transition">
                   Confirmar Estorno
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Estoque Insuficiente modal */}
+      {insufficientItemsEdit && (() => {
+        const { items } = insufficientItemsEdit;
+        const allResolved = items.every(i => (i.pedidoQtd - i.estoqueQtd) <= 0);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-lg w-full p-6 border border-amber-100 dark:border-[#2e1a0a] space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">Estoque Insuficiente</h3>
+                  <p className="text-xs text-gray-500 dark:text-amber-100/50">Ajuste o pedido ou o estoque para continuar</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-left text-gray-500 dark:text-amber-100/40">
+                      <th className="pb-2 pr-2 font-semibold">Produto</th>
+                      <th className="pb-2 px-2 font-semibold text-center">Pedido</th>
+                      <th className="pb-2 px-2 font-semibold text-center">Estoque</th>
+                      <th className="pb-2 pl-2 font-semibold text-center">Diferença</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => {
+                      const dif = item.pedidoQtd - item.estoqueQtd;
+                      const resolved = dif <= 0;
+                      return (
+                        <tr key={item.produtoId} className={`border-t border-amber-50 dark:border-[#22160b]/50 ${resolved ? 'bg-green-50/50 dark:bg-green-950/10' : ''}`}>
+                          <td className="py-2 pr-2 font-medium text-amber-900 dark:text-amber-200">{item.produtoNome}</td>
+                          <td className="py-2 px-2 text-center">
+                            <input type="number" min="0" value={item.pedidoQtd}
+                              onChange={e => handleInsufficientItemChange(idx, 'pedidoQtd', Number(e.target.value))}
+                              className="w-16 text-center bg-transparent border border-gray-200 dark:border-[#2e1a0a] rounded-lg py-1 text-xs font-mono text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <input type="number" min="0" value={item.estoqueQtd}
+                              onChange={e => handleInsufficientItemChange(idx, 'estoqueQtd', Number(e.target.value))}
+                              className="w-16 text-center bg-transparent border border-gray-200 dark:border-[#2e1a0a] rounded-lg py-1 text-xs font-mono text-amber-900 dark:text-amber-100 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                          </td>
+                          <td className="py-2 pl-2 text-center">
+                            <span className={`inline-flex items-center gap-1 font-mono font-bold ${resolved ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {dif > 0 ? `+${dif}` : dif}
+                              {resolved && <CheckCircle size={14} />}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setInsufficientItemsEdit(null)}
+                  className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
+                  Cancelar
+                </button>
+                <button onClick={handleInsufficientConfirm}
+                  disabled={!allResolved}
+                  className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 dark:disabled:bg-[#2e1a0a] disabled:cursor-not-allowed text-white font-semibold rounded-xl transition">
+                  {allResolved ? 'Confirmar' : 'Resolva os itens acima'}
                 </button>
               </div>
             </div>

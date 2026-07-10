@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Produto, FichaTecnicaItem } from '../types';
+import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { 
   Plus, 
   Trash2, 
   Edit3, 
   Sparkles, 
-  ChevronRight, 
-  Utensils, 
+  Utensils,
   Clock, 
   Coins, 
   Bookmark, 
@@ -17,11 +17,13 @@ import {
   PlusCircle, 
   Layers,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Info,
   Settings
 } from 'lucide-react';
 import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade } from '../lib/calculos';
-import { compressImage } from '../lib/imageOptimizer';
+import { compressImageToBlob } from '../lib/imageOptimizer';
 import { uploadProdutoImage, deleteProdutoImage, isStorageUrl, isBase64Image, base64ToBlob } from '../lib/imageUpload';
 
 interface ProdutosProps {
@@ -33,10 +35,23 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<number | 'todos'>('todos');
   const [expandedProdutoId, setExpandedProdutoId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(6);
+  const [formTab, setFormTab] = useState('dados');
 
   // Form state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (isFormOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFormOpen]);
   
   const [nome, setNome] = useState('');
   const [categoriaId, setCategoriaId] = useState<number>(2);
@@ -50,6 +65,8 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [precoVenda, setPrecoVenda] = useState(0);
   const [imagem, setImagem] = useState('');
   const [imageCompressing, setImageCompressing] = useState(false);
+  const compressedBlobRef = useRef<Blob | null>(null);
+  const previewUrlRef = useRef<string>('');
 
   // Quick-add unidade
   const [showNovaUnidade, setShowNovaUnidade] = useState(false);
@@ -95,23 +112,16 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
     try {
       setImageCompressing(true);
-      const optimized = await compressImage(file, 600, 600, 0.7);
 
-      if (editId) {
-        const blob = base64ToBlob(optimized);
-        const url = await uploadProdutoImage(
-          blob,
-          editId,
-          isStorageUrl(imagem) ? imagem : undefined
-        );
-        if (url) {
-          setImagem(url);
-          setImageCompressing(false);
-          return;
-        }
-      }
+      // Revoke previous preview URL
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
 
-      setImageCompressing(false);
+      const blob = await compressImageToBlob(file, 600, 600, 0.7);
+      compressedBlobRef.current = blob;
+
+      const previewUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = previewUrl;
+      setImagem(previewUrl);
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
       alert('Erro ao comprimir imagem. Tente outro arquivo.');
@@ -119,6 +129,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       setImageCompressing(false);
     }
   };
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
 
   // Sync selling price automatically when live recipe cost changes (unless user manual override)
   React.useEffect(() => {
@@ -133,17 +150,42 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [viabilityTestQty, setViabilityTestQty] = useState<{ [prodId: string]: number }>({});
   const [viabilityResults, setViabilityResults] = useState<{ [prodId: string]: ReturnType<typeof verificarViabilidadeProducao> }>({});
 
-  const filteredProdutos = store.produtos.filter(p => {
-    const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (p.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (categoryFilter !== 'todos') {
-      return matchesSearch && p.categoria_id === categoryFilter;
-    }
-    return matchesSearch;
-  });
+  const filteredProdutos = useMemo(() => {
+    return store.produtos.filter(p => {
+      const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            (p.descricao || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (categoryFilter !== 'todos') {
+        return matchesSearch && p.categoria_id === categoryFilter;
+      }
+      return matchesSearch;
+    });
+  }, [store.produtos, searchTerm, categoryFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProdutos.length / pageSize));
+  const paginatedProdutos = filteredProdutos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handleSearchChange = (v: string) => {
+    setSearchTerm(v);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilter = (v: number | 'todos') => {
+    setCategoryFilter(v);
+    setCurrentPage(1);
+  };
+
+  const cleanupImagePreview = () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = '';
+    compressedBlobRef.current = null;
+  };
 
   const handleOpenNew = () => {
+    cleanupImagePreview();
     setIsFormOpen(true);
     setEditId(null);
     setNome('');
@@ -159,6 +201,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   };
 
   const handleOpenEdit = (p: Produto) => {
+    cleanupImagePreview();
     setIsFormOpen(true);
     setEditId(p.id);
     setNome(p.nome);
@@ -171,15 +214,21 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setPrecoVenda(p.preco_venda !== undefined ? p.preco_venda : 0);
     setImagem(p.imagem || '');
 
-    // Load active recipe items
-    const activeRecipe = store.fichas
-      .filter(f => f.produto_id === p.id)
-      .map(f => ({
-        material_id: f.material_id,
-        quantidade_necessaria: f.quantidade_necessaria,
-        unidade_id: f.unidade_id
-      }));
-    setRecipeItems(activeRecipe);
+    // Load active recipe items — deduplicate by material_id
+    const fichasDoProduto = store.fichas.filter(f => f.produto_id === p.id);
+    const grouped = new Map<string, { material_id: string; quantidade_necessaria: number; unidade_id: number }>();
+    for (const f of fichasDoProduto) {
+      if (grouped.has(f.material_id)) {
+        grouped.get(f.material_id)!.quantidade_necessaria += f.quantidade_necessaria;
+      } else {
+        grouped.set(f.material_id, {
+          material_id: f.material_id,
+          quantidade_necessaria: f.quantidade_necessaria,
+          unidade_id: f.unidade_id
+        });
+      }
+    }
+    setRecipeItems(Array.from(grouped.values()));
   };
 
   const handleAddRecipeRow = () => {
@@ -187,13 +236,18 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       alert('Por favor, cadastre matérias-primas primeiro!');
       return;
     }
-    const defaultMat = store.materiais[0];
+    const usedIds = recipeItems.map(r => r.material_id);
+    const unused = store.materiais.find(m => !usedIds.includes(m.id));
+    if (!unused) {
+      alert('Todos os ingredientes disponíveis já foram adicionados à receita.');
+      return;
+    }
     setRecipeItems([
       ...recipeItems,
       {
-        material_id: defaultMat.id,
+        material_id: unused.id,
         quantidade_necessaria: 1,
-        unidade_id: defaultMat.unidade_id
+        unidade_id: unused.unidade_id
       }
     ]);
   };
@@ -251,21 +305,22 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       return;
     }
 
-    let finalImagem = imagem;
+    let finalImagem = '';
 
     if (editId) {
-      const oldProd = store.produtos.find(p => p.id === editId);
-      const oldImageUrl = oldProd?.imagem;
-      const imageChanged = imagem !== oldImageUrl;
+      const oldImageUrl = store.produtos.find(p => p.id === editId)?.imagem;
 
-      if (imageChanged && oldImageUrl && isStorageUrl(oldImageUrl)) {
-        if (imagem && isBase64Image(imagem)) {
-          const blob = base64ToBlob(imagem);
-          const url = await uploadProdutoImage(blob, editId, oldImageUrl);
-          if (url) finalImagem = url; else finalImagem = '';
-        } else if (!imagem) {
-          deleteProdutoImage(oldImageUrl).catch(() => {});
-        }
+      if (compressedBlobRef.current) {
+        const url = await uploadProdutoImage(
+          compressedBlobRef.current,
+          editId,
+          isStorageUrl(oldImageUrl || '') ? oldImageUrl : undefined
+        );
+        if (url) finalImagem = url;
+      } else if (!imagem && isStorageUrl(oldImageUrl || '')) {
+        deleteProdutoImage(oldImageUrl!).catch(() => {});
+      } else if (isStorageUrl(imagem)) {
+        finalImagem = imagem;
       }
 
       await store.updateProduto(editId, {
@@ -300,7 +355,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         ativo,
         margem_lucro: Number(margemLucro),
         preco_venda: Number(precoVenda),
-        imagem: finalImagem
+        imagem: ''
       });
 
       for (const item of recipeItems) {
@@ -312,13 +367,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         });
       }
 
-      if (imagem && isBase64Image(imagem)) {
-        const blob = base64ToBlob(imagem);
-        const url = await uploadProdutoImage(blob, prod.id);
-        if (url) store.updateProduto(prod.id, { imagem: url });
+      if (compressedBlobRef.current) {
+        const url = await uploadProdutoImage(compressedBlobRef.current, prod.id);
+        if (url) await store.updateProduto(prod.id, { imagem: url });
       }
     }
 
+    cleanupImagePreview();
     setIsFormOpen(false);
     onUpdate();
   };
@@ -368,7 +423,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             type="text" 
             placeholder="Buscar por nome do salgado, bolo..." 
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1e150c]/30 border border-amber-100 dark:border-[#2d1e0d] focus:outline-none focus:border-amber-400 text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
           />
         </div>
@@ -376,7 +431,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
           <button
             key="todos"
-            onClick={() => setCategoryFilter('todos')}
+            onClick={() => handleCategoryFilter('todos')}
             className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition cursor-pointer ${
               categoryFilter === 'todos'
                 ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800'
@@ -388,7 +443,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           {store.categorias.map(cat => (
             <button
               key={cat.id}
-              onClick={() => setCategoryFilter(cat.id)}
+              onClick={() => handleCategoryFilter(cat.id)}
               className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition cursor-pointer ${
                 categoryFilter === cat.id
                   ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800'
@@ -409,566 +464,542 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           <p className="text-xs text-gray-400 dark:text-amber-100/30 mt-1">Crie um novo produto com sua lista de ingredientes clicando em '+ Novo Produto & Receita'.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4" id="products-cards-grid">
-          {filteredProdutos.map(p => {
-            const ingreds = store.fichas.filter(f => f.produto_id === p.id);
-            const isExpanded = expandedProdutoId === p.id;
-            const maxQtd = sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades);
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="products-cards-grid">
+            {paginatedProdutos.map(p => {
+              const ingreds = store.fichas.filter(f => f.produto_id === p.id);
+              const isExpanded = expandedProdutoId === p.id;
+              const maxQtd = sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades);
 
-            return (
-              <div 
-                key={p.id} 
-                className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm overflow-hidden flex flex-col justify-between"
-              >
-                {/* Header info */}
-                <div className="p-4 sm:p-5 space-y-3">
-                  <div className="flex gap-4 items-start">
-                    {p.imagem ? (
-                      <div className="relative flex-shrink-0">
-                        <img 
-                          src={p.imagem} 
-                          alt={p.nome} 
-                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-amber-200/50 dark:border-amber-955/50"
-                          referrerPolicy="no-referrer"
-                        />
-                        {isBase64Image(p.imagem) && (
-                          <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full shadow-md" title="Imagem pendente de upload">
-                            ⏫
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-50 dark:bg-amber-950/20 text-amber-600/40 dark:text-amber-200/30 rounded-xl flex items-center justify-center border border-amber-100/50 dark:border-[#22160b]/50 flex-shrink-0">
-                        <Utensils size={24} />
-                      </div>
-                    )}
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-1">
-                        <div>
-                          <span className="text-[9px] bg-amber-50 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border border-amber-100 dark:border-[#382613] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono">
-                            {store.categoriaNome(p.categoria_id)}
-                          </span>
-                          <h3 className="font-semibold text-base sm:text-lg font-display text-amber-950 dark:text-amber-100 mt-1.5 flex items-center gap-1 leading-tight">
-                            {p.nome}
-                          </h3>
-                        </div>
-
-                        <div className="text-right space-y-1 flex-shrink-0">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase block text-center
-                            ${p.ativo ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 font-semibold' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'}
-                          `}>
-                            {p.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                          <p className="text-[9px] text-gray-400 dark:text-amber-100/30 font-mono">Rend: {store.unidadeNome(p.unidade_producao_id)}</p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-amber-100/40 line-clamp-2 mt-1">{p.descricao || 'Sem descrição cadastrada.'}</p>
-                    </div>
-                  </div>
-
-                  {/* Custo, Margem, Preço de Venda & Max outputs suggestions */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gradient-to-br from-amber-50/20 to-orange-50/40 dark:from-amber-950/10 dark:to-orange-950/5 p-3 rounded-xl border border-amber-50 dark:border-[#22160b] font-sans text-center">
-                    <div>
-                      <span className="text-[9px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold flex items-center justify-center gap-0.5 whitespace-nowrap">
-                        <Clock size={10} className="flex-shrink-0" /> Prep
-                      </span>
-                      <p className="text-[10px] sm:text-xs font-semibold text-amber-950 dark:text-amber-100 font-mono mt-0.5 whitespace-nowrap">
-                        {p.tempo_producao_minutos} m
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold flex items-center justify-center gap-0.5 whitespace-nowrap">
-                        <Coins size={10} className="flex-shrink-0" /> Custo Unit
-                      </span>
-                      <p className="text-[10px] sm:text-xs font-semibold text-gray-600 dark:text-amber-200/65 font-mono mt-0.5 truncate" title={formatCurrency(p.custo_producao_calculado)}>
-                        {formatCurrency(p.custo_producao_calculado)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold flex items-center justify-center gap-0.5 whitespace-nowrap">
-                        💰 Preço / Lucro
-                      </span>
-                      <p className={`text-[10px] sm:text-xs font-mono mt-0.5 truncate ${
-                        !p.preco_venda || p.preco_venda <= 0
-                          ? 'text-gray-400 dark:text-amber-100/30'
-                          : p.preco_venda < p.custo_producao_calculado
-                            ? 'text-red-600 dark:text-red-400 font-semibold'
-                            : 'text-emerald-700 dark:text-emerald-450 font-bold'
-                      }`}>
-                        {!p.preco_venda || p.preco_venda <= 0 ? (
-                          <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded text-[8px] font-bold">Sem Preço</span>
-                        ) : (
-                          <>
-                            {formatCurrency(p.preco_venda)}
-                            {p.preco_venda < p.custo_producao_calculado ? (
-                              <span className="text-[8px] text-red-600 dark:text-red-400 ml-0.5 font-bold">(Prejuízo)</span>
-                            ) : p.margem_lucro !== undefined && p.margem_lucro > 0 ? (
-                              <span className="text-[8px] text-emerald-600 dark:text-emerald-400 ml-0.5 font-bold">({p.margem_lucro}%)</span>
-                            ) : null}
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold flex items-center justify-center gap-0.5 whitespace-nowrap">
-                        <Sparkles size={10} className="flex-shrink-0" /> Cap. Cozinha
-                      </span>
-                      <p className={`text-[10px] sm:text-xs font-bold font-mono mt-0.5 truncate
-                        ${maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500 font-medium'}
-                      `} title={`${maxQtd} ${store.unidadeSigla(p.unidade_producao_id)}`}>
-                        {maxQtd} {store.unidadeSigla(p.unidade_producao_id)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Accordeon for Ingredients (Ficha Técnica) */}
-                  <div className="border-t border-dashed border-amber-100 dark:border-[#22160b] pt-3">
-                    <button 
-                      onClick={() => setExpandedProdutoId(isExpanded ? null : p.id)}
-                      className="w-full flex items-center justify-between text-xs text-amber-900/85 dark:text-amber-100 font-semibold hover:text-amber-950 dark:hover:text-[#f8f1ea] cursor-pointer"
-                    >
-                      <span className="flex items-center gap-1.5 font-sans">
-                        <Layers size={14} /> Ficha Técnica ({ingreds.length} ingredientes)
-                      </span>
-                      <ChevronDown size={14} className={`transform transition ${isExpanded ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isExpanded && (
-                      <div className="mt-3 space-y-2 animate-in fade-in" id={`recipe-${p.id}`}>
-                        {ingreds.length === 0 ? (
-                           <p className="text-[10px] text-gray-400 dark:text-amber-100/30 italic">Nenhum ingrediente configurado. Favorite editar o produto para listar ingredientes.</p>
-                        ) : (
-                          <div className="space-y-1.5" id="ingredients-mobile-accordion">
-                            {ingreds.map(ing => {
-                              const mat = store.materiais.find(m => m.id === ing.material_id);
-                              return (
-                                <div key={ing.id} className="flex items-center justify-between p-2 rounded-lg bg-orange-50/10 dark:bg-amber-950/10 border border-amber-100/50 dark:border-[#22160b]/50 text-[11px] font-sans">
-                                  <span className="font-semibold text-amber-900 dark:text-amber-200">{mat?.nome || 'Ingrediente Deletado'}</span>
-                                  <span className="font-mono text-gray-500 dark:text-amber-100/50">
-                                    {ing.quantidade_necessaria} {store.unidadeSigla(ing.unidade_id)} 
-                                    <span className="text-[9px] text-gray-400 dark:text-amber-100/30 ml-1 font-mono">
-                                      ({formatCurrency((ing.quantidade_necessaria * (mat?.custo_unitario || 0)))} )
-                                    </span>
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Interactive Viability Sandbox Test */}
-                        <div className="mt-4 p-3 bg-white dark:bg-[#120c06] border border-amber-100/75 dark:border-[#22160b] rounded-xl space-y-3">
-                          <label className="block text-[10px] font-semibold text-amber-950 dark:text-amber-100 uppercase font-sans">
-                            Simular Viabilidade de Produção
-                          </label>
-                          <div className="flex gap-2">
-                            <input 
-                              type="number"
-                              min="1"
-                              placeholder="Qtd"
-                              value={viabilityTestQty[p.id] || ''}
-                              onChange={(e) => setViabilityTestQty({ ...viabilityTestQty, [p.id]: Number(e.target.value) })}
-                              className="w-16 px-2 py-1 border border-amber-100 dark:border-[#22160b] bg-amber-50/20 dark:bg-amber-950/10 text-xs rounded-lg font-mono text-amber-950 dark:text-amber-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <button 
-                              onClick={() => handleTestViability(p.id)}
-                              className="flex-1 bg-amber-800 hover:bg-amber-900 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-semibold text-[10px] px-3 py-1 rounded-lg transition cursor-pointer font-sans"
-                            >
-                              Posso Produzir?
-                            </button>
-                          </div>
-
-                          {viabilityResults[p.id] && (
-                            <div className="text-[11px] animate-in slide-in-from-top-1">
-                              {viabilityResults[p.id].viavel ? (
-                                <div className="text-emerald-800 bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-[#1c301e] p-2 rounded-lg flex items-center gap-1.5 text-[10px]">
-                                  <CheckCircle2 size={14} className="text-emerald-600 flex-shrink-0" />
-                                  <span className="font-sans">Sim! Há ingredientes em estoque para produzir {viabilityTestQty[p.id] || 1} unidades.</span>
-                                </div>
-                              ) : (
-                                <div className="text-red-800 bg-red-50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 p-2 rounded-lg space-y-1">
-                                  <div className="flex items-center gap-1.5 text-[10px] font-semibold text-red-700 dark:text-red-400 font-sans">
-                                    <AlertTriangle size={14} className="text-red-500 font-semibold" />
-                                    <span>Não há ingredientes suficientes!</span>
-                                  </div>
-                                  <ul className="list-disc list-inside text-[9px] text-red-650/90 dark:text-red-400/90 pl-1 font-sans">
-                                    {viabilityResults[p.id].deficit.map((def, dIdx) => (
-                                      <li key={dIdx}>
-                                        {def.materialNome}: faltam <span className="font-bold font-mono">{def.falta}{def.unidade}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
+              return (
+                <div 
+                  key={p.id} 
+                  className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] shadow-sm flex flex-col justify-between"
+                >
+                  {/* Image + Header */}
+                  <div className="p-2.5 space-y-2">
+                    <div className="flex gap-2 items-start">
+                      {p.imagem ? (
+                        <div className="relative flex-shrink-0">
+                          <img 
+                            src={p.imagem} 
+                            alt={p.nome} 
+                            className="w-12 h-12 sm:w-14 sm:h-14 object-cover rounded-lg border border-amber-200/50 dark:border-amber-955/50"
+                            referrerPolicy="no-referrer"
+                          />
+                          {isBase64Image(p.imagem) && (
+                            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full shadow-md leading-none">⏫</span>
                           )}
                         </div>
+                      ) : (
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 bg-amber-50 dark:bg-amber-950/20 text-amber-600/40 dark:text-amber-200/30 rounded-lg flex items-center justify-center border border-amber-100/50 dark:border-[#22160b]/50 flex-shrink-0">
+                          <Utensils size={18} />
+                        </div>
+                      )}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[8px] bg-amber-50 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border border-amber-100 dark:border-[#382613] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider font-mono">
+                                {store.categoriaNome(p.categoria_id)}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
+                                p.ativo ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300' : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
+                              }`}>
+                                {p.ativo ? 'Ativo' : 'Inativo'}
+                              </span>
+                            </div>
+                            <h3 className="font-semibold text-sm sm:text-base font-display text-amber-950 dark:text-amber-100 mt-1 leading-tight truncate">
+                              {p.nome}
+                            </h3>
+                          </div>
+                        </div>
+                        {p.descricao && (
+                          <p className="text-[10px] text-gray-500 dark:text-amber-100/40 line-clamp-1 mt-0.5">{p.descricao}</p>
+                        )}
                       </div>
+                    </div>
+
+                    {/* Metrics compact grid */}
+                    <div className="grid grid-cols-2 gap-1 bg-gradient-to-br from-amber-50/20 to-orange-50/40 dark:from-amber-950/10 dark:to-orange-950/5 p-1.5 rounded-lg border border-amber-50 dark:border-[#22160b] text-center">
+                      <div>
+                        <span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Prep</span>
+                        <p className="text-[10px] font-semibold text-amber-950 dark:text-amber-100 font-mono">{p.tempo_producao_minutos}m</p>
+                      </div>
+                      <div>
+                        <span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Custo</span>
+                        <p className="text-[10px] font-semibold text-gray-600 dark:text-amber-200/65 font-mono truncate" title={formatCurrency(p.custo_producao_calculado)}>
+                          {formatCurrency(p.custo_producao_calculado)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Preço</span>
+                        <p className={`text-[10px] font-mono truncate ${
+                          !p.preco_venda || p.preco_venda <= 0
+                            ? 'text-gray-400 dark:text-amber-100/30'
+                            : p.preco_venda < p.custo_producao_calculado
+                              ? 'text-red-600 dark:text-red-400 font-semibold'
+                              : 'text-emerald-700 dark:text-emerald-450 font-bold'
+                        }`}>
+                          {!p.preco_venda || p.preco_venda <= 0 ? (
+                            <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5 rounded text-[7px] font-bold">—</span>
+                          ) : (
+                            formatCurrency(p.preco_venda)
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Cap.</span>
+                        <p className={`text-[10px] font-bold font-mono truncate ${
+                          maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500'
+                        }`}>
+                          {maxQtd} {store.unidadeSigla(p.unidade_producao_id)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Accordion: Ficha Técnica */}
+                    <div className="border-t border-dashed border-amber-100 dark:border-[#22160b] pt-1.5">
+                      <button 
+                        onClick={() => setExpandedProdutoId(isExpanded ? null : p.id)}
+                        className="w-full flex items-center justify-between text-[10px] text-amber-900/85 dark:text-amber-100 font-semibold hover:text-amber-950 dark:hover:text-[#f8f1ea] cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Layers size={12} /> Ficha Técnica ({ingreds.length} {ingreds.length === 1 ? 'item' : 'itens'})
+                        </span>
+                        <ChevronDown size={12} className={`transform transition ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-2 space-y-2 animate-in fade-in" id={`recipe-${p.id}`}>
+                          {ingreds.length === 0 ? (
+                            <p className="text-[10px] text-gray-400 dark:text-amber-100/30 italic">Nenhum ingrediente configurado.</p>
+                          ) : (
+                            <div className="space-y-1 max-h-40 overflow-y-auto no-scrollbar">
+                              {ingreds.map(ing => {
+                                const mat = store.materiais.find(m => m.id === ing.material_id);
+                                return (
+                                  <div key={ing.id} className="flex items-center justify-between px-2 py-1 rounded bg-orange-50/10 dark:bg-amber-950/10 border border-amber-100/50 dark:border-[#22160b]/50 text-[10px]">
+                                    <span className="font-semibold text-amber-900 dark:text-amber-200 truncate mr-2">{mat?.nome || 'Deletado'}</span>
+                                    <span className="font-mono text-gray-500 dark:text-amber-100/50 whitespace-nowrap">
+                                      {ing.quantidade_necessaria} {store.unidadeSigla(ing.unidade_id)}
+                                      <span className="text-[8px] text-gray-400 dark:text-amber-100/30 ml-1">
+                                        ({formatCurrency(ing.quantidade_necessaria * (mat?.custo_unitario || 0))})
+                                      </span>
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Viability test */}
+                          <div className="p-2.5 bg-white dark:bg-[#120c06] border border-amber-100/75 dark:border-[#22160b] rounded-lg space-y-2">
+                            <label className="block text-[9px] font-semibold text-amber-950 dark:text-amber-100 uppercase">Simular Produção</label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="number" min="1" placeholder="Qtd"
+                                value={viabilityTestQty[p.id] || ''}
+                                onChange={(e) => setViabilityTestQty({ ...viabilityTestQty, [p.id]: Number(e.target.value) })}
+                                className="w-14 px-1.5 py-1 border border-amber-100 dark:border-[#22160b] bg-amber-50/20 dark:bg-amber-950/10 text-[10px] rounded-lg font-mono text-amber-950 dark:text-amber-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button 
+                                onClick={() => handleTestViability(p.id)}
+                                className="flex-1 bg-amber-800 hover:bg-amber-900 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-semibold text-[9px] px-2 py-1 rounded-lg transition cursor-pointer"
+                              >
+                                Posso Produzir?
+                              </button>
+                            </div>
+                            {viabilityResults[p.id] && (
+                              <div className="text-[10px]">
+                                {viabilityResults[p.id].viavel ? (
+                                  <div className="text-emerald-800 bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-[#1c301e] p-1.5 rounded-lg flex items-center gap-1">
+                                    <CheckCircle2 size={12} className="text-emerald-600 flex-shrink-0" />
+                                    <span>Sim! Dá para produzir.</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-red-800 bg-red-50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 p-1.5 rounded-lg">
+                                    <div className="flex items-center gap-1 text-[9px] font-semibold text-red-700 dark:text-red-400">
+                                      <AlertTriangle size={12} className="text-red-500" />
+                                      <span>Faltam insumos!</span>
+                                    </div>
+                                    <ul className="list-disc list-inside text-[8px] text-red-650/90 dark:text-red-400/90 pl-1 mt-0.5">
+                                      {viabilityResults[p.id].deficit.map((def, dIdx) => (
+                                        <li key={dIdx}>{def.materialNome}: faltam <span className="font-bold font-mono">{def.falta}{def.unidade}</span></li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="bg-amber-50/20 dark:bg-[#150f09]/40 px-2.5 py-2 border-t border-amber-100 dark:border-[#22160b] flex items-center justify-between gap-1">
+                    {store.hasPermission('produtos.excluir') && (
+                      <button 
+                        onClick={() => setDeleteConfirm({ id: p.id, name: p.nome })}
+                        className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-600 dark:text-red-405 transition text-[10px] flex items-center gap-1 font-semibold cursor-pointer"
+                      >
+                        <Trash2 size={12} /> Excluir
+                      </button>
+                    )}
+                    {store.hasPermission('produtos.editar') && (
+                      <button 
+                        onClick={() => handleOpenEdit(p)}
+                        className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-100 font-bold px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1 transition cursor-pointer"
+                      >
+                        <Edit3 size={12} /> Editar
+                      </button>
                     )}
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Footer buttons row */}
-                <div className="bg-amber-50/20 dark:bg-[#150f09]/40 px-4 py-3 border-t border-amber-100 dark:border-[#22160b] flex items-center justify-between gap-3">
-                  {store.hasPermission('produtos.excluir') && (
-                    <button 
-                      onClick={() => setDeleteConfirm({ id: p.id, name: p.nome })}
-                      className="hover:bg-red-50 dark:hover:bg-red-950/20 p-1.5 rounded-lg text-red-600 dark:text-red-405 transition text-xs flex items-center gap-1 font-semibold cursor-pointer font-sans"
-                    >
-                      <Trash2 size={14} /> Excluir
-                    </button>
-                  )}
-                  {store.hasPermission('produtos.editar') && (
-                    <button 
-                      onClick={() => handleOpenEdit(p)}
-                      className="bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-100 font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1 transition cursor-pointer font-sans"
-                    >
-                      <Edit3 size={13} /> Editar Produto / Ficha
-                    </button>
-                  )}
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
+          {/* Pagination */}
+          {filteredProdutos.length > pageSize && (
+            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+              >
+                <ChevronLeft size={14} /> Anterior
+              </button>
+              <span className="text-xs text-gray-500 dark:text-amber-100/50 font-mono">
+                Pág. {currentPage} de {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100"
+              >
+                Próximo <ChevronRight size={14} />
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                className="ml-2 px-2 py-1.5 rounded-lg text-xs font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none"
+              >
+                <option value={6}>6 / pág</option>
+                <option value={10}>10 / pág</option>
+                <option value={20}>20 / pág</option>
+                <option value={50}>50 / pág</option>
+              </select>
+            </div>
+          )}
+        </>
       )}
 
-      {/* MODAL: NEW / EDIT PRODUCT + FICHA TECNICA */}
+      {/* DRAWER: NEW / EDIT PRODUCT + FICHA TECNICA */}
       {isFormOpen && (store.hasPermission('produtos.criar') || store.hasPermission('produtos.editar')) && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans animate-fade-in" id="modal-product-form">
-          <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto no-scrollbar animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
-            <div className="p-6 border-b border-amber-100 dark:border-[#2d1e0d] flex items-center justify-between sticky top-0 bg-white dark:bg-[#120c06] z-10">
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }} />
+          <div className="fixed inset-y-0 right-0 w-full sm:max-w-xl z-50 bg-white dark:bg-[#120c06] shadow-2xl border-l border-amber-100 dark:border-[#2d1e0d] flex flex-col animate-in slide-in-from-right" id="drawer-product-form">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
               <div>
-                <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">
+                <h3 className="font-display font-semibold text-base text-amber-950 dark:text-amber-100">
                   {editId ? 'Editar Produto & Ficha' : 'Novo Produto & Ficha Técnica'}
                 </h3>
-                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-1 font-sans">Insira os dados cadastrais e monte os ingredientes necessários para preparar este produto.</p>
+                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5 font-sans">Preencha os dados e monte a receita.</p>
               </div>
-              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-amber-950 dark:hover:text-[#f8f1ea] p-1 cursor-pointer">
-                <X size={20} />
+              <button onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }} className="text-gray-400 hover:text-amber-950 dark:hover:text-[#f8f1ea] p-1 cursor-pointer flex-shrink-0">
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs font-sans">
-              
-              {/* Cadastro Básico Row */}
-              <div className="space-y-3">
-                <h4 className="font-display font-semibold text-amber-900 dark:text-amber-200 border-b border-amber-100 dark:border-[#2d1e0d] pb-1 uppercase tracking-wider text-[10px]">1. Informações Básicas de Venda</h4>
+            {/* Tabs */}
+            <div className="flex border-b border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
+              {[
+                { key: 'dados', label: '1. Informações Básicas de Venda' },
+                { key: 'receita', label: '2. Composição da Receita (Ingredientes)' },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFormTab(tab.key)}
+                  className={`flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
+                    formTab === tab.key
+                      ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100'
+                      : 'text-gray-400 dark:text-amber-100/30 hover:text-amber-950 dark:hover:text-amber-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar text-xs font-sans">
+              <div className="p-4 sm:p-5 space-y-4">
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Nome do Salgado, Bolo ou Doce *</label>
-                    <input 
-                      type="text" 
-                      value={nome}
-                      onChange={(e) => setNome(e.target.value)}
-                      placeholder="Ex: Coxinha de Frango c/ Catupiry grande"
-                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs font-sans bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                      required
-                    />
-                  </div>
+                {/* TAB: INFORMAÇÕES BÁSICAS */}
+                {formTab === 'dados' && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-amber-900 dark:text-amber-100 font-medium">Nome *</label>
+                        <input type="text" value={nome} onChange={(e) => setNome(e.target.value)}
+                          placeholder="Ex: Coxinha de Frango"
+                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400" required />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-amber-900 dark:text-amber-100 font-medium">Categoria *</label>
+                        <select value={categoriaId} onChange={(e) => setCategoriaId(Number(e.target.value))}
+                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100">
+                          {store.categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                        </select>
+                      </div>
+                    </div>
 
-                  <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Categoria *</label>
-                    <select 
-                      value={categoriaId}
-                      onChange={(e) => setCategoriaId(Number(e.target.value))}
-                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
-                    >
-                      {store.categorias.map(cat => (
-                        <option key={cat.id} value={cat.id} className="dark:bg-[#1c140c]">{cat.nome}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-amber-900 dark:text-amber-100 font-medium">Unidade *</label>
+                        <div className="flex gap-2">
+                          <select value={unidadeProducaoId} onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
+                            className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" required>
+                            {store.unidades.map(u => <option key={u.id} value={u.id}>{u.nome} ({u.sigla})</option>)}
+                          </select>
+                          <button type="button" onClick={() => setShowNovaUnidade(true)}
+                            className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold rounded-lg transition shrink-0">+ Nova</button>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-amber-900 dark:text-amber-100 font-medium">Tempo (min)</label>
+                        <input type="number" value={tempoProducao} onChange={(e) => setTempoProducao(Number(e.target.value))}
+                          {...useSmartArrowKeys(tempoProducao, setTempoProducao)}
+                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-amber-900 dark:text-amber-100 font-medium">Status</label>
+                        <div className="flex items-center gap-3 py-1.5">
+                          <label className="flex items-center gap-1 cursor-pointer font-bold text-amber-900 dark:text-amber-100">
+                            <input type="radio" checked={ativo === true} onChange={() => setAtivo(true)} className="text-amber-700 focus:ring-amber-500" /> Ativo
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer text-gray-500 dark:text-amber-100/40 font-semibold">
+                            <input type="radio" checked={ativo === false} onChange={() => setAtivo(false)} className="text-amber-700 focus:ring-amber-500" /> Inativo
+                          </label>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Unidade de Produção *</label>
-                    <div className="flex gap-2">
-                      <select 
-                        value={unidadeProducaoId}
-                        onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
-                        className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-sans"
-                        required
-                      >
-                        {store.unidades.map(u => (
-                          <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.nome} ({u.sigla})</option>
-                        ))}
-                      </select>
-                      <button type="button" onClick={() => setShowNovaUnidade(true)}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
-                        + Nova
+                    <div className="space-y-1">
+                      <label className="text-amber-900 dark:text-amber-100 font-medium">Descrição</label>
+                      <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)}
+                        placeholder="Ex: Contém trigo e derivados de leite."
+                        className="w-full h-[60px] p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400" />
+                    </div>
+
+                    {/* Photo */}
+                    <div className="space-y-1">
+                      <label className="text-amber-900 dark:text-amber-100 font-medium block">Foto do Produto</label>
+                      <div className="flex items-center gap-3 p-3 bg-amber-50/15 dark:bg-[#17100a]/40 rounded-xl border border-amber-100/50 dark:border-[#22160b]/40">
+                        {imagem ? (
+                          <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-amber-200 dark:border-amber-900/30 flex-shrink-0 bg-white dark:bg-[#1a120b]">
+                            <img src={imagem} alt="Preview" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => setImagem('')}
+                              className="absolute top-0.5 right-0.5 bg-red-650 hover:bg-red-750 text-white rounded-full p-0.5 shadow-md cursor-pointer"><X size={8} /></button>
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-lg bg-amber-50/20 dark:bg-amber-955/20 border border-dashed border-amber-200 dark:border-amber-900/40 flex items-center justify-center text-gray-400 dark:text-amber-100/20 flex-shrink-0">
+                            <Utensils size={14} className="stroke-1" />
+                          </div>
+                        )}
+                        <label className="flex-1 inline-flex items-center justify-center bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-150 font-bold px-3 py-1.5 rounded-lg cursor-pointer text-[10px] uppercase tracking-wider transition text-center">
+                          {imageCompressing ? 'Compactando...' : 'Escolher Foto'}
+                          <input type="file" accept="image/*" onChange={handleImageChange} disabled={imageCompressing} className="hidden" />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Pricing */}
+                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
+                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
+                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
+                          <div className="relative">
+                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
+                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
+                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB: FICHA TÉCNICA */}
+                {formTab === 'receita' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">Ingredientes</span>
+                      <button type="button" onClick={handleAddRecipeRow}
+                        className="text-amber-800 dark:text-amber-300 hover:text-amber-950 text-xs font-bold flex items-center gap-1 cursor-pointer">
+                        <Plus size={14} /> Adicionar
                       </button>
                     </div>
-                  </div>
 
-                  <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans text-xs">Tempo de Produção (min)</label>
-                    <input 
-                      type="number" 
-                      value={tempoProducao}
-                      onChange={(e) => setTempoProducao(Number(e.target.value))}
-                      className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Status no Cardápio</label>
-                    <div className="flex items-center gap-4 py-1.5">
-                      <label className="flex items-center gap-1 cursor-pointer font-bold text-amber-900 dark:text-amber-100 font-sans">
-                        <input 
-                          type="radio" 
-                          checked={ativo === true}
-                          onChange={() => setAtivo(true)}
-                          className="text-amber-700 focus:ring-amber-500"
-                        /> Ativo
-                      </label>
-                      <label className="flex items-center gap-1 cursor-pointer text-gray-500 dark:text-amber-100/40 font-semibold font-sans">
-                        <input 
-                          type="radio" 
-                          checked={ativo === false}
-                          onChange={() => setAtivo(false)}
-                          className="text-amber-700 focus:ring-amber-500"
-                        /> Inativo
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-amber-900 dark:text-amber-100 font-medium font-sans">Descrição Técnica (Lanchonetes, Clientes, Alergênicos...)</label>
-                  <textarea 
-                    value={descricao}
-                    onChange={(e) => setDescricao(e.target.value)}
-                    placeholder="Ex: Contém trigo e derivados de leite. Recheado com peito desfiado e temperos naturais."
-                    className="w-full h-16 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400"
-                  />
-                </div>
-
-                {/* FOTO DO PRODUTO (COMPLEX IMAGE OPTIMIZATION CARDS) */}
-                <div className="space-y-1">
-                  <label className="text-amber-900 dark:text-amber-100 font-medium font-sans block">Foto do Produto (Compactação Automática para Supabase)</label>
-                  <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-amber-50/15 dark:bg-[#17100a]/40 rounded-xl border border-amber-100/50 dark:border-[#22160b]/40">
-                    {imagem ? (
-                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-amber-200 dark:border-amber-900/30 flex-shrink-0 bg-white dark:bg-[#1a120b] shadow-sm animate-in fade-in zoom-in-95">
-                        <img src={imagem} alt="Preview" className="w-full h-full object-cover" />
-                        <button 
-                          type="button"
-                          onClick={() => setImagem('')}
-                          className="absolute top-1 right-1 bg-red-650 hover:bg-red-750 text-white rounded-full p-1 shadow-md cursor-pointer transition"
-                          title="Remover Imagem"
-                        >
-                          <X size={10} />
+                    {recipeItems.length === 0 ? (
+                      <div className="bg-amber-50/10 dark:bg-amber-950/5 rounded-xl p-4 border border-amber-50 dark:border-[#2d1e0d] text-center text-gray-400 dark:text-amber-100/30">
+                        <p className="text-xs">Nenhum ingrediente adicionado.</p>
+                        <button type="button" onClick={handleAddRecipeRow}
+                          className="mt-2 text-[10px] bg-amber-100 dark:bg-amber-950 hover:bg-amber-200 text-amber-900 dark:text-amber-100 font-bold px-3 py-1.5 rounded-lg cursor-pointer">
+                          Inserir Primeiro Ingrediente
                         </button>
                       </div>
                     ) : (
-                      <div className="w-20 h-20 rounded-xl bg-amber-50/20 dark:bg-amber-955/20 border border-dashed border-amber-200 dark:border-amber-900/40 flex flex-col items-center justify-center text-gray-400 dark:text-amber-100/20 flex-shrink-0">
-                        <Utensils size={20} className="stroke-1" />
-                        <span className="text-[8px] text-center font-bold font-mono mt-1 uppercase tracking-wider">Sem Foto</span>
+                      <>
+                        {/* Desktop table */}
+                        <div className="hidden md:block max-h-[320px] overflow-y-auto no-scrollbar">
+                          <table className="w-full text-xs">
+                            <thead className="sticky top-0 z-10">
+                              <tr className="bg-amber-50 dark:bg-[#1c140c] border-b border-amber-200 dark:border-[#2d1e0d]">
+                                <th className="text-left px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-1/2">Ingrediente</th>
+                                <th className="text-left px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-28">Quantidade</th>
+                                <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-20">Custo</th>
+                                <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-10"></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {recipeItems.map((item, idx) => {
+                                const materialRef = store.materiais.find(m => m.id === item.material_id);
+                                const usedIds = recipeItems.filter((_, i) => i !== idx).map(r => r.material_id);
+                                return (
+                                  <tr key={idx} className="border-b border-amber-100/30 dark:border-[#2d1e0d]/30 hover:bg-amber-50/20 dark:hover:bg-[#1c140c]/20">
+                                    <td className="px-2 py-1.5">
+                                      <select value={item.material_id}
+                                        onChange={(e) => handleUpdateRecipeRow(idx, { material_id: e.target.value })}
+                                        className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100">
+                                        {store.materiais.filter(m => !usedIds.includes(m.id))
+                                          .map(m => <option key={m.id} value={m.id}>{m.nome} ({m.quantidade_atual}{store.unidadeSigla(m.unidade_id)} em estoque)</option>)}
+                                      </select>
+                                    </td>
+                                    <td className="px-2 py-1.5">
+                                      <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
+                                        <input type="number" step="any" min="0.0001" placeholder="0.5"
+                                          value={item.quantidade_necessaria}
+                                          onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
+                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.0001)}
+                                          className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
+                                        <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[9px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
+                                          {store.unidadeSigla(item.unidade_id)}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-right">
+                                      <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100">
+                                        {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
+                                      </span>
+                                    </td>
+                                    <td className="px-2 py-1.5 text-right">
+                                      <button type="button" onClick={() => handleRemoveRecipeRow(idx)}
+                                        className="hover:bg-red-100 dark:hover:bg-red-950/40 p-1 rounded text-red-550 dark:text-red-400 cursor-pointer">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Mobile cards */}
+                        <div className="md:hidden space-y-2 max-h-[320px] overflow-y-auto no-scrollbar pr-1">
+                          {recipeItems.map((item, idx) => {
+                            const materialRef = store.materiais.find(m => m.id === item.material_id);
+                            return (
+                              <div key={idx} className="bg-orange-50/15 dark:bg-[#1c140c]/30 p-2.5 rounded-lg border border-amber-100/50 dark:border-[#2d1e0d]/50 space-y-2">
+                                <select value={item.material_id}
+                                  onChange={(e) => handleUpdateRecipeRow(idx, { material_id: e.target.value })}
+                                  className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100">
+                                  {(() => {
+                                    const usedIds = recipeItems.filter((_, i) => i !== idx).map(r => r.material_id);
+                                    return store.materiais.filter(m => !usedIds.includes(m.id))
+                                      .map(m => <option key={m.id} value={m.id}>{m.nome} ({m.quantidade_atual}{store.unidadeSigla(m.unidade_id)})</option>);
+                                  })()}
+                                </select>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
+                                    <input type="number" step="any" min="0.0001" placeholder="0.5"
+                                      value={item.quantidade_necessaria}
+                                      onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
+                                      {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.0001)}
+                                      className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
+                                    <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
+                                      {store.unidadeSigla(item.unidade_id)}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100 whitespace-nowrap">
+                                    {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
+                                  </span>
+                                  <button type="button" onClick={() => handleRemoveRecipeRow(idx)}
+                                    className="hover:bg-red-100 dark:hover:bg-red-950/40 p-1 rounded text-red-550 dark:text-red-400 cursor-pointer">
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    {recipeItems.length > 0 && (
+                      <div className="p-2.5 bg-emerald-50 dark:bg-[#1a3a22]/30 rounded-xl border border-emerald-100 dark:border-[#244c2f]/40 flex items-center justify-between text-[10px]">
+                        <span className="font-semibold text-emerald-950 dark:text-emerald-200 flex items-center gap-1">
+                          <Info size={12} /> Custo Unitário Projetado:
+                        </span>
+                        <span className="font-bold font-mono text-emerald-800 dark:text-emerald-400 text-sm">
+                          {formatCurrency(recipeItems.reduce((acc, item) => {
+                            const mat = store.materiais.find(m => m.id === item.material_id);
+                            return acc + (item.quantidade_necessaria * (mat?.custo_unitario || 0));
+                          }, 0))}
+                        </span>
                       </div>
                     )}
-                    
-                    <div className="flex-1 space-y-1 w-full text-center sm:text-left">
-                      <label className="inline-flex items-center justify-center bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-150 font-bold px-3 py-1.5 rounded-lg border border-amber-200/50 dark:border-amber-900/50 cursor-pointer text-[10px] uppercase tracking-wider font-sans transition">
-                        {imageCompressing ? 'Compactando Imagem...' : 'Escolher Foto do Produto'}
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleImageChange}
-                          disabled={imageCompressing}
-                          className="hidden" 
-                        />
-                      </label>
-                      <p className="text-[10px] text-gray-400 dark:text-amber-100/30 font-sans leading-tight">
-                        O compressor de imagem no navegador reduzirá e redimensionará automaticamente arquivos grandes para menos de 60KB, mantendo a performance do banco e preparando-se para o Supabase Storage.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* CALCULADORA DE PREÇO E MARGEM DE LUCRO */}
-                <div className="p-3.5 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-3 animate-in fade-in slide-in-from-top-1">
-                  <h5 className="font-display font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px] flex items-center gap-1">
-                    💸 Precificação & Margem de Lucro
-                  </h5>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-0.5">
-                      <span className="text-gray-400 dark:text-amber-100/40 font-medium font-sans text-[10px] block">Custo Unitário (Ficha Técnica)</span>
-                      <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono font-semibold text-xs h-9 flex items-center">
-                        {formatCurrency(liveCustoProducao)}
-                      </p>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <label className="text-amber-900 dark:text-amber-100 font-medium font-sans text-[10px] flex items-center gap-1">
-                        Margem de Lucro Desejada (%) *
-                      </label>
-                      <div className="relative">
-                        <input 
-                          type="number" 
-                          value={margemLucro}
-                          onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
-                          placeholder="Ex: 100 para 100% de lucro"
-                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-7"
-                          required
-                          min="0"
-                        />
-                        <span className="absolute right-2.5 top-2 text-gray-400 dark:text-amber-100/30 font-mono font-medium text-[10px]">%</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <label className="text-amber-900 dark:text-amber-100 font-medium font-sans text-[10px] block">Preço de Venda Final *</label>
-                      <div className="relative">
-                        <span className="absolute left-2.5 top-2.5 text-gray-400 dark:text-amber-100/30 font-sans text-[10px]">R$</span>
-                        <input 
-                          type="number" 
-                          step="0.01"
-                          value={precoVenda}
-                          onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
-                          placeholder="0.00"
-                          className="w-full p-2 pl-7 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold"
-                          required
-                          min="0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <p className="text-[9px] text-gray-400 dark:text-amber-100/30 italic font-sans leading-tight">
-                    Preencher o percentual de lucro calcula o preço de venda e vice-versa. O cálculo tem base dinâmica no custo da receita cadastrada.
-                  </p>
-                </div>
-              </div>
-
-              {/* Ficha técnica ingredients composer */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-amber-100 dark:border-[#2d1e0d] pb-1">
-                  <h4 className="font-display font-semibold text-amber-900 dark:text-amber-200 uppercase tracking-wider text-[10px]">2. Composição da Receita (Ingredientes)</h4>
-                  <button 
-                    type="button" 
-                    onClick={handleAddRecipeRow}
-                    className="text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-[#f8f1ea] text-xs font-bold flex items-center gap-1 cursor-pointer font-sans"
-                  >
-                    <Plus size={14} /> Adicionar Ingrediente
-                  </button>
-                </div>
-
-                {recipeItems.length === 0 ? (
-                  <div className="bg-amber-50/10 dark:bg-amber-950/5 rounded-xl p-4 border border-amber-50 dark:border-[#2d1e0d] text-center text-gray-400 dark:text-amber-100/30 font-sans">
-                    <p className="text-xs">Nenhum ingrediente adicionado para faturar custo de composição.</p>
-                    <button 
-                      type="button" 
-                      onClick={handleAddRecipeRow}
-                      className="mt-2 text-[10px] bg-amber-100 dark:bg-amber-950 hover:bg-amber-200 dark:hover:bg-amber-900 text-amber-900 dark:text-amber-100 font-bold px-3 py-1.5 rounded-lg border border-amber-100 dark:border-[#3a2714] cursor-pointer"
-                    >
-                      Inserir Primeiro Ingrediente
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recipeItems.map((item, idx) => {
-                      const materialRef = store.materiais.find(m => m.id === item.material_id);
-                      return (
-                        <div key={idx} className="flex flex-col sm:flex-row gap-3 items-center bg-orange-50/15 dark:bg-[#1c140c]/30 p-3 rounded-lg border border-amber-100/50 dark:border-[#2d1e0d]/50 font-sans">
-                          {/* Choose material element dropdown */}
-                          <div className="w-full sm:flex-1 space-y-0.5">
-                            <label className="text-[9px] font-semibold uppercase text-amber-900/60 dark:text-amber-200/50">Material / Insumo</label>
-                            <select 
-                              value={item.material_id}
-                              onChange={(e) => handleUpdateRecipeRow(idx, { material_id: e.target.value })}
-                              className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100"
-                            >
-                              {store.materiais.map(m => (
-                                <option key={m.id} value={m.id} className="dark:bg-[#1a1109]">{m.nome} (Estoque: {m.quantidade_atual}{store.unidadeSigla(m.unidade_id)})</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Ingredient unit quantity inside recipe */}
-                          <div className="w-full sm:w-36 space-y-0.5">
-                            <label className="text-[9px] font-semibold uppercase text-amber-900/60 dark:text-amber-200/50">Quantidade Necessária</label>
-                            <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
-                              <input 
-                                type="number" 
-                                step="any"
-                                min="0.0001"
-                                placeholder="0.5"
-                                value={item.quantidade_necessaria}
-                                onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
-                                className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100"
-                                required
-                              />
-                              <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                                {store.unidadeSigla(item.unidade_id)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Price preview */}
-                          <div className="w-full sm:w-28 text-center sm:text-right pt-2 sm:pt-0">
-                            <span className="text-[9px] text-gray-400 dark:text-amber-100/35 block uppercase font-medium">Subtotal Estimado</span>
-                            <span className="font-mono text-xs font-semibold text-amber-900 dark:text-amber-100">
-                              {formatCurrency((item.quantidade_necessaria * (materialRef?.custo_unitario || 0)))}
-                            </span>
-                          </div>
-
-                          {/* Delete ingredient button */}
-                          <div className="pt-2 sm:pt-4">
-                            <button 
-                              type="button" 
-                              onClick={() => handleRemoveRecipeRow(idx)}
-                              className="hover:bg-red-100 dark:hover:bg-red-950/40 p-1.5 rounded text-red-550 dark:text-red-400 cursor-pointer"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 )}
+
               </div>
-
-              {/* Composition cost preview summary */}
-              {recipeItems.length > 0 && (
-                <div className="p-3 bg-emerald-50 dark:bg-[#1a3a22]/30 rounded-xl border border-emerald-100 dark:border-[#244c2f]/40 flex items-center justify-between text-xs" id="recipe-summary-box">
-                  <span className="font-semibold text-emerald-950 dark:text-emerald-200 flex items-center gap-1 font-sans">
-                    <Info size={14} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" /> Custo Unitário Projetado da Ficha Técnica:
-                  </span>
-                  <span className="font-bold font-mono text-emerald-800 dark:text-emerald-400 text-base">
-                    {formatCurrency(recipeItems.reduce((acc, item) => {
-                      const mat = store.materiais.find(m => m.id === item.material_id);
-                      return acc + (item.quantidade_necessaria * (mat?.custo_unitario || 0));
-                    }, 0))}
-                  </span>
-                </div>
-              )}
-
-              {/* Bottom control anchors */}
-              <div className="flex items-center gap-3 pt-3 border-t border-amber-150 dark:border-[#2d1e0d]">
-                <button 
-                  type="button" 
-                  onClick={() => setIsFormOpen(false)}
-                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer font-sans"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs font-sans cursor-pointer"
-                >
-                  Confirmar Cadastro
-                </button>
-              </div>
-
             </form>
+
+            {/* Footer */}
+            <div className="flex items-center gap-3 px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
+              <button type="button" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }}
+                className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
+                Cancelar
+              </button>
+              <button type="submit"
+                className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
+                {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* MODAL: Quick-add unidade */}

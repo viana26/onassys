@@ -267,6 +267,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   };
 
   const handleReceberPagamento = async () => {
+    if (!store.hasPermission('financeiro.lancar')) return;
     if (!selectedPedidoId || valorNumerico <= 0) return;
     const validaValor = valorNumerico > saldoRestante ? saldoRestante : valorNumerico;
     await store.registrarPagamentoPedido(selectedPedidoId, validaValor, formaPagamento, new Date().toISOString());
@@ -287,6 +288,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   };
 
   const handleNovaReceita = async () => {
+    if (!store.hasPermission('financeiro.lancar')) return;
     const val = parseFloat((livreValor || '0').replace(',', '.'));
     if (!val || val <= 0 || !livreDescricao) return;
     const catReceita = store.categoriasFinanceiro.find(c => c.tipo === 'receita');
@@ -312,6 +314,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   };
 
   const handleCriarPedidoTeste = async () => {
+    if (!store.hasPermission('financeiro.lancar')) return;
     // Seed a test client
     let clienteId = store.clientes.find(c => c.nome === 'Cliente Teste')?.id;
     if (!clienteId) {
@@ -333,6 +336,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   };
 
   const handleNovaDespesa = async () => {
+    if (!store.hasPermission('financeiro.lancar')) return;
     const val = parseFloat((despValor || '0').replace(',', '.'));
     if (!val || val <= 0 || !despDescricao) return;
     const catDespesa = store.categoriasFinanceiro.find(c => c.tipo === 'despesa');
@@ -443,7 +447,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                   </h3>
                   <p className="text-[9px] text-gray-400 font-mono">Pedido #{selectedPedido.id.slice(-6)}</p>
                 </div>
-                <button onClick={() => setSelectedPedidoId(null)} className="text-gray-400 hover:text-amber-950 p-1">
+                <button onClick={() => setSelectedPedidoId(null)} className="text-gray-400 hover:text-amber-950 p-1" aria-label="Fechar pedido selecionado">
                   <X size={14} />
                 </button>
               </div>
@@ -534,6 +538,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                   )}
 
                   {/* Receber Button */}
+                  {store.hasPermission('financeiro.lancar') && (
                   <button
                     onClick={handleReceberPagamento}
                     disabled={!paymentAmount || valorNumerico <= 0}
@@ -542,6 +547,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                     <CheckCircle2 size={16} />
                     Receber {brl(valorRegistrar > 0 ? valorRegistrar : saldoRestante)}
                   </button>
+                  )}
                 </>
               )}
             </div>
@@ -555,6 +561,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
             <h3 className="font-bold text-xs uppercase tracking-wider text-amber-950 dark:text-amber-100">Ações Rápidas</h3>
 
             {/* Receita Livre */}
+            {store.hasPermission('financeiro.lancar') && (
             <div className="bg-emerald-50/50 dark:bg-[#0d2215] border border-emerald-100 dark:border-[#1d3d25] rounded-xl p-3 space-y-2">
               <button
                 onClick={() => { setShowReceitaLivre(!showReceitaLivre); setShowDespesaRapida(false); }}
@@ -584,8 +591,10 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 </div>
               )}
             </div>
+            )}
 
             {/* Despesa Rápida */}
+            {store.hasPermission('financeiro.lancar') && (
             <div className="bg-red-50/50 dark:bg-[#2d0d0d] border border-red-100 dark:border-[#3d1d1d] rounded-xl p-3 space-y-2">
               <button
                 onClick={() => { setShowDespesaRapida(!showDespesaRapida); setShowReceitaLivre(false); }}
@@ -615,6 +624,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Extrato do Dia */}

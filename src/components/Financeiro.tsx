@@ -90,8 +90,8 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         ))}
       </div>
 
-      <div className="bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
             <tr>
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Data</th>

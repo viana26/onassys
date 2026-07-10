@@ -530,9 +530,10 @@ export class MiniFactoryStore {
     if (ok) { this.fichas[idx] = updated; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
-  async deleteFichaTecnica(id: string) {
+  async deleteFichaTecnica(id: string): Promise<boolean> {
     const ok = await this.supabaseDelete('fichas_tecnicas', id);
     if (ok) { this.fichas = this.fichas.filter(f => f.id !== id); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
+    return ok;
   }
 
   // ================================================
@@ -555,6 +556,44 @@ export class MiniFactoryStore {
 
   async updateEstoqueProdutoConfig(id: string, updates: Partial<EstoqueProduto>) { return this.updateEstoqueProduto(id, updates); }
 
+  async ajustarEstoqueProduto(estoqueId: string, novoDisponivel: number, observacao?: string): Promise<{ success: boolean; error?: string }> {
+    const idx = this.estoqueProdutos.findIndex(e => e.id === estoqueId);
+    if (idx === -1) return { success: false, error: 'Registro de estoque não encontrado.' };
+    const antigo = this.estoqueProdutos[idx].quantidade_disponivel;
+    const atualizado = {
+      ...this.estoqueProdutos[idx],
+      quantidade_disponivel: novoDisponivel,
+      data_atualizacao: new Date().toISOString()
+    };
+
+    const delta = novoDisponivel - antigo;
+    const mov: MovimentacaoProduto = {
+      id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
+      produto_id: this.estoqueProdutos[idx].produto_id,
+      tipo_id: 3,
+      quantidade: delta,
+      observacao: observacao || `Ajuste manual: ${antigo} → ${novoDisponivel}`,
+      criado_em: new Date().toISOString()
+    };
+
+    const ok = await this.supabaseUpdate('estoque_produtos', estoqueId, atualizado as unknown as Record<string, unknown>);
+    if (!ok) return { success: false, error: this.error || 'Erro ao atualizar estoque no servidor.' };
+
+    const okMov = await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>);
+    if (!okMov) {
+      // Reverte a atualização do estoque
+      const revertido = { ...atualizado, quantidade_disponivel: antigo };
+      await this.supabaseUpdate('estoque_produtos', estoqueId, revertido as unknown as Record<string, unknown>);
+      return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+    }
+
+    this.estoqueProdutos[idx] = atualizado;
+    this.movProdutos.unshift(mov);
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
+  }
+
   async deleteEstoqueProduto(id: string) {
     const ok = await this.supabaseDelete('estoque_produtos', id);
     if (ok) { this.estoqueProdutos = this.estoqueProdutos.filter(e => e.id !== id); this.saveToLocalStorage(); this.notify(); }
@@ -567,13 +606,19 @@ export class MiniFactoryStore {
     // lancarProducao already consumed insumos and added to estoque_produtos
     // Now add lote/validade if provided
     if (dataValidade || lote) {
-      const estoque = this.estoqueProdutos.find(e => e.produto_id === produtoId);
-      if (estoque) {
-        if (dataValidade) estoque.data_validade = dataValidade;
-        if (lote) estoque.lote = lote;
-        estoque.data_atualizacao = new Date().toISOString();
-        await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
-        this.saveToLocalStorage(); this.notify();
+      const idx = this.estoqueProdutos.findIndex(e => e.produto_id === produtoId);
+      if (idx !== -1) {
+        const atualizado = {
+          ...this.estoqueProdutos[idx],
+          data_validade: dataValidade || this.estoqueProdutos[idx].data_validade,
+          lote: lote || this.estoqueProdutos[idx].lote,
+          data_atualizacao: new Date().toISOString()
+        };
+        const ok = await this.supabaseUpdate('estoque_produtos', atualizado.id, atualizado as unknown as Record<string, unknown>);
+        if (ok) {
+          this.estoqueProdutos[idx] = atualizado;
+          this.saveToLocalStorage(); this.notify();
+        }
       }
     }
     return { success: true };
@@ -635,40 +680,11 @@ export class MiniFactoryStore {
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const fromStatus = pedido.status_id;
 
-    // 1 → 2: confirmar pedido (reservar estoque disponível)
-    if (fromStatus === 1 && status_id === 2) {
-      const itensConfirm = this.itensPedido.filter(i => i.pedido_id === id);
-      for (const it of itensConfirm) {
-        const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
-        if (estoque) {
-          const moverQtd = Math.min(it.quantidade_solicitada, estoque.quantidade_disponivel);
-          estoque.quantidade_disponivel -= moverQtd;
-          estoque.quantidade_reservada += moverQtd;
-          estoque.data_atualizacao = new Date().toISOString();
-          await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
-        }
-      }
-    }
-
     // 2 → 3: iniciar produção
     if (fromStatus === 2 && status_id === 3) {
       const itens = this.itensPedido.filter(i => i.pedido_id === id);
       const result = await this.lancarProducao(itens, id);
       if (!result.success) return result;
-    }
-
-    // Cancelamento (status 6): liberar reservas
-    if (status_id === 6) {
-      const itensCanc = this.itensPedido.filter(i => i.pedido_id === id);
-      for (const it of itensCanc) {
-        const estoque = this.estoqueProdutos.find(e => e.produto_id === it.produto_id);
-        if (estoque) {
-          estoque.quantidade_reservada -= it.quantidade_solicitada;
-          estoque.quantidade_disponivel += it.quantidade_solicitada;
-          estoque.data_atualizacao = new Date().toISOString();
-          await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
-        }
-      }
     }
 
     // 4 → 5: entregar — baixar estoque de produtos
@@ -746,16 +762,14 @@ export class MiniFactoryStore {
       let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
 
 if (estoque) {
-    if (!pedidoId) {
-        estoque.quantidade_reservada += item.quantidade_solicitada;
-    }
+    estoque.quantidade_disponivel += item.quantidade_solicitada;
     estoque.data_atualizacao = new Date().toISOString();
     await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
 } else {
     estoque = {
         id: 'est_' + Math.random().toString(36).substring(2, 9),
-        produto_id: item.produto_id, quantidade_disponivel: 0,
-        quantidade_reservada: item.quantidade_solicitada, quantidade_minima: 0, data_atualizacao: new Date().toISOString()
+        produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
+        quantidade_minima: 0, data_atualizacao: new Date().toISOString()
     };
     await this.supabaseInsert('estoque_produtos', estoque as unknown as Record<string, unknown>);
     this.estoqueProdutos.push(estoque);
@@ -834,28 +848,39 @@ if (estoque) {
     }
   }
 
-  async lancarSaidaPedido(pedidoId: string): Promise<{ success: boolean; error?: string }> {
+  async lancarSaidaPedido(pedidoId: string): Promise<{ success: boolean; error?: string; insufficientItems?: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> }> {
     const pedido = this.pedidos.find(p => p.id === pedidoId);
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const itens = this.itensPedido.filter(i => i.pedido_id === pedidoId);
 
+    const insufficientItems: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> = [];
     for (const item of itens) {
       const prod = this.produtos.find(p => p.id === item.produto_id);
       const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
-      const reservada = estoque?.quantidade_reservada || 0;
-      if (reservada < item.quantidade_solicitada) {
-        return {
-          success: false,
-          error: `Estoque insuficiente de "${prod?.nome || item.produto_id}". Reservado: ${reservada}${prod ? this.unidadeSigla(prod.unidade_producao_id) : ''}, necessário: ${item.quantidade_solicitada}. Produza mais antes de entregar.`
-        };
+      const disponivel = estoque?.quantidade_disponivel || 0;
+      if (disponivel < item.quantidade_solicitada) {
+        insufficientItems.push({
+          produtoId: item.produto_id,
+          produtoNome: prod?.nome || item.produto_id,
+          disponivel,
+          necessario: item.quantidade_solicitada,
+          unidade: prod ? this.unidadeSigla(prod.unidade_producao_id) : ''
+        });
       }
+    }
+    if (insufficientItems.length > 0) {
+      return {
+        success: false,
+        error: 'Estoque insuficiente para um ou mais itens.',
+        insufficientItems
+      };
     }
 
     let ok = true;
     for (const item of itens) {
       const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
       if (estoque) {
-        estoque.quantidade_reservada -= item.quantidade_solicitada;
+        estoque.quantidade_disponivel -= item.quantidade_solicitada;
         estoque.data_atualizacao = new Date().toISOString();
         if (!await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>)) ok = false;
       }
