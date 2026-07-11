@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Fornecedor } from '../types';
 import { phoneMask } from '../lib/mask';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 import { 
   Plus, 
   Trash2, 
@@ -46,8 +48,10 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
     });
   }, [store.fornecedores, searchTerm, showInativos]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginatedFornecedores = filtered.slice(
+  const { sortedItems: sortedFornecedores, requestSort, sortConfig } = useSortableData(filtered, 'nome_fantasia');
+
+  const totalPages = Math.max(1, Math.ceil(sortedFornecedores.length / pageSize));
+  const paginatedFornecedores = sortedFornecedores.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -166,7 +170,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
         </button>
       </div>
 
-      {filtered.length === 0 ? (
+      {sortedFornecedores.length === 0 ? (
         <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500 dark:text-amber-200/40">
           <Building size={36} className="mx-auto text-amber-600/30 mb-2" />
           <p className="text-sm font-medium text-amber-950 dark:text-amber-200">Nenhum fornecedor encontrado.</p>
@@ -179,11 +183,11 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
             <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                  <th className="p-3 pl-4 whitespace-nowrap">Fornecedor</th>
-                  <th className="p-3 whitespace-nowrap">Contato</th>
-                  <th className="p-3 whitespace-nowrap">Telefone</th>
-                  <th className="p-3 whitespace-nowrap">Email</th>
-                  <th className="p-3 whitespace-nowrap">Status</th>
+                  <th className="p-3 pl-4 whitespace-nowrap"><SortButton sortKey="nome_fantasia" label="Fornecedor" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton sortKey="contato" label="Contato" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton sortKey="telefone" label="Telefone" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton sortKey="email" label="Email" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton sortKey="ativo" label="Status" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap">Materiais</th>
                   <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                 </tr>
@@ -321,7 +325,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
           </div>
 
           {/* Pagination */}
-          {filtered.length > pageSize && (
+          {sortedFornecedores.length > pageSize && (
             <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

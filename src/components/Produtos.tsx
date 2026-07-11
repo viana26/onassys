@@ -25,6 +25,8 @@ import {
 import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade } from '../lib/calculos';
 import { compressImageToBlob } from '../lib/imageOptimizer';
 import { uploadProdutoImage, deleteProdutoImage, isStorageUrl, isBase64Image, base64ToBlob } from '../lib/imageUpload';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 
 interface ProdutosProps {
   store: MiniFactoryStore;
@@ -162,8 +164,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     });
   }, [store.produtos, searchTerm, categoryFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProdutos.length / pageSize));
-  const paginatedProdutos = filteredProdutos.slice(
+  const { sortedItems: sortedProdutos, requestSort, sortConfig } = useSortableData(filteredProdutos, 'nome');
+
+  const totalPages = Math.max(1, Math.ceil(sortedProdutos.length / pageSize));
+  const paginatedProdutos = sortedProdutos.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -457,7 +461,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       </div>
 
       {/* Main product display */}
-      {filteredProdutos.length === 0 ? (
+      {sortedProdutos.length === 0 ? (
         <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500">
           <Utensils size={36} className="mx-auto text-amber-600/30 mb-2" />
           <p className="text-sm font-medium text-amber-950 dark:text-amber-200">Nenhum produto cadastrado nesta categoria.</p>
@@ -470,10 +474,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider">Produto</th>
-                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20">Prep</th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20">Custo</th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20">Preço</th>
+                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider"><SortButton label="Produto" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
+                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} /></th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Cap.</th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-24">Ações</th>
                 </tr>
@@ -633,7 +637,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           </div>
 
           {/* Pagination */}
-          {filteredProdutos.length > pageSize && (
+          {sortedProdutos.length > pageSize && (
             <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

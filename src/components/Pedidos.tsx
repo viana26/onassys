@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Pedido, Cliente } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 import { 
   Plus, 
   Trash2, 
@@ -379,6 +381,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     if (showEstornoPendente && !store.getEstornoPendente().some(e => e.id === p.id)) return false;
     return true;
   });
+
+  const { sortedItems: sortedPedidos, requestSort, sortConfig } = useSortableData(filteredPedidos, 'data_pedido');
 
   // Days of delivery workloads (Workload planner scheduler weekly calculations)
   const getWorkloadByDay = () => {
@@ -782,24 +786,24 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
             </button>
           </div>
 
-          {filteredPedidos.length === 0 ? (
+          {sortedPedidos.length === 0 ? (
             <p className="text-center text-gray-400 py-12">Nenhum pedido encontrado correspondente à busca.</p>
           ) : (
             <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-x-auto w-full hidden md:block">
               <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                 <thead>
                   <tr className="bg-amber-50/30 text-amber-900 border-b border-amber-100">
-                    <th className="p-3 pl-4 whitespace-nowrap">Código</th>
-                    <th className="p-3 whitespace-nowrap">Cliente</th>
-                    <th className="p-3 font-medium whitespace-nowrap">Entrega Prevista</th>
+                    <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Código" sortKey="id" sortConfig={sortConfig} onSort={requestSort} /></th>
+                    <th className="p-3 whitespace-nowrap"><SortButton label="Cliente" sortKey="cliente_id" sortConfig={sortConfig} onSort={requestSort} /></th>
+                    <th className="p-3 font-medium whitespace-nowrap"><SortButton label="Entrega Prevista" sortKey="data_entrega_prevista" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 whitespace-nowrap">Itens Resumo</th>
-                    <th className="p-3 font-semibold whitespace-nowrap">Valor Total</th>
-                    <th className="p-3 whitespace-nowrap">Status</th>
+                    <th className="p-3 font-semibold whitespace-nowrap"><SortButton label="Valor Total" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} /></th>
+                    <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="status_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredPedidos.map(p => {
+                  {sortedPedidos.map(p => {
                     const cliName = getClienteName(p.cliente_id);
                     const estEntrega = new Date(p.data_entrega_prevista);
                     const itCount = store.itensPedido.filter(it => it.pedido_id === p.id).length;
@@ -856,7 +860,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
 
           {/* Quick mobile list version */}
           <div className="grid grid-cols-1 gap-3 md:hidden">
-            {filteredPedidos.map(p => {
+            {sortedPedidos.map(p => {
               const cliName = getClienteName(p.cliente_id);
               const estEntrega = new Date(p.data_entrega_prevista);
               return (

@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Cliente } from '../types';
 import { phoneMask } from '../lib/mask';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 import { 
   Trash2, 
   Edit3, 
@@ -55,8 +57,10 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     return filtered;
   }, [store.clientes, searchTerm, typeFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredClientes.length / pageSize));
-  const paginatedClientes = filteredClientes.slice(
+  const { sortedItems: sortedClientes, requestSort, sortConfig } = useSortableData(filteredClientes, 'nome');
+
+  const totalPages = Math.max(1, Math.ceil(sortedClientes.length / pageSize));
+  const paginatedClientes = sortedClientes.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -181,7 +185,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
       </div>
 
       {/* Empty state */}
-      {filteredClientes.length === 0 ? (
+      {sortedClientes.length === 0 ? (
         <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500 dark:text-amber-200/40">
           <Users size={36} className="mx-auto text-amber-600/30 mb-2" />
           <p className="text-sm font-medium text-amber-950 dark:text-amber-200">Nenhum cliente cadastrado.</p>
@@ -194,10 +198,10 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
             <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                  <th className="p-3 pl-4 whitespace-nowrap">Cliente</th>
-                  <th className="p-3 whitespace-nowrap">Telefone</th>
-                  <th className="p-3 whitespace-nowrap">Email</th>
-                  <th className="p-3 whitespace-nowrap">Endereço</th>
+                  <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Cliente" sortKey="nome" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton label="Telefone" sortKey="telefone" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton label="Email" sortKey="email" onSort={requestSort} sortConfig={sortConfig} /></th>
+                  <th className="p-3 whitespace-nowrap"><SortButton label="Endereço" sortKey="endereco" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap">Pedidos</th>
                   <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                 </tr>
@@ -320,7 +324,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           </div>
 
           {/* Pagination */}
-          {filteredClientes.length > pageSize && (
+          {sortedClientes.length > pageSize && (
             <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

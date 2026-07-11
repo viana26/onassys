@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { X, Search, Download, Printer, Calendar, Filter } from 'lucide-react';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -38,6 +40,8 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
       return true;
     });
   }, [store.pedidos, dataInicio, dataFim, filtroStatus, filtroCliente, searchTerm]);
+
+  const { sortedItems: sortedPedidos, requestSort, sortConfig } = useSortableData(filteredPedidos, 'data_pedido');
 
   const totalValor = filteredPedidos.reduce((s, p) => s + p.valor_total, 0);
 
@@ -260,17 +264,27 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-amber-50/30 text-amber-900 border-b border-amber-100">
-                      <th className="p-3 pl-0 whitespace-nowrap font-semibold text-[10px]">Código</th>
+                      <th className="p-3 pl-0 whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Código" sortKey="id" sortConfig={sortConfig} onSort={requestSort} />
+                      </th>
                       <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Cliente</th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Data Pedido</th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Entrega</th>
+                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Data Pedido" sortKey="data_pedido" sortConfig={sortConfig} onSort={requestSort} />
+                      </th>
+                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Entrega" sortKey="data_entrega_prevista" sortConfig={sortConfig} onSort={requestSort} />
+                      </th>
                       <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Itens</th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Valor</th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Status</th>
+                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Valor" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} />
+                      </th>
+                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Status" sortKey="status_id" sortConfig={sortConfig} onSort={requestSort} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPedidos.map(p => {
+                    {sortedPedidos.map(p => {
                       const cli = store.clientes.find(c => c.id === p.cliente_id);
                       const itens = store.itensPedido.filter(it => it.pedido_id === p.id);
                       return (

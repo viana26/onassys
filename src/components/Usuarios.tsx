@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Copy, CheckCircle, Pencil } from 'lucide-react';
 import { supabase, supabaseAdmin, signOut } from '../lib/supabaseClient';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 
 interface UsuarioRow {
   id: string;
@@ -124,6 +126,8 @@ export default function Usuarios({ store }: UsuariosProps) {
     return 0;
   });
 
+  const { sortedItems: sortedUsuarios, requestSort, sortConfig } = useSortableData(usuariosOrdenados, 'nome');
+
   const redefinirSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetError('');
@@ -185,14 +189,14 @@ export default function Usuarios({ store }: UsuariosProps) {
           <table className="w-full">
             <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Usuário</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Perfil</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="nome" label="Usuário" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="perfil_id" label="Perfil" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="ativo" label="Status" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
-              {usuariosOrdenados.map(user => (
+              {sortedUsuarios.map(user => (
                 <tr key={user.id} className={`hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition ${user.id === store.currentUserId ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

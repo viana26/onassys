@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
 import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle } from 'lucide-react';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -18,6 +20,8 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const lancamentosFiltrados = filtroTipo === 'todas'
     ? store.lancamentos
     : store.lancamentos.filter(l => l.tipo === filtroTipo);
+
+  const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento');
 
   const receitas = store.lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
   const despesas = store.lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
@@ -94,16 +98,16 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         <table className="w-full min-w-[600px]">
           <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Data</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Descrição</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Categoria</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Pagamento</th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Valor</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Data" sortKey="data_lancamento" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Descrição" sortKey="descricao" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Categoria" sortKey="categoria_id" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Pagamento" sortKey="forma_pagamento" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Valor" sortKey="valor" sortConfig={sortConfig} onSort={requestSort} /></th>
               <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider" />
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
-            {lancamentosFiltrados.map(l => (
+            {sortedLancamentos.map(l => (
               <tr key={l.id} className="hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition">
                 <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 font-mono">
                   {new Date(l.data_lancamento).toLocaleDateString('pt-BR')}
@@ -130,7 +134,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
             ))}
           </tbody>
         </table>
-        {lancamentosFiltrados.length === 0 && (
+        {sortedLancamentos.length === 0 && (
           <div className="p-8 text-center text-[#5c4a37]/60 dark:text-amber-100/50">Nenhum lançamento encontrado</div>
         )}
       </div>

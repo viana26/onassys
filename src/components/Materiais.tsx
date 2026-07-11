@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Material } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 import { 
   Plus, 
   Trash2, 
@@ -82,8 +84,10 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     });
   }, [store.materiais, searchTerm, filterCritico]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredMateriais.length / pageSize));
-  const paginatedMateriais = filteredMateriais.slice(
+  const { sortedItems: sortedMateriais, requestSort, sortConfig } = useSortableData(filteredMateriais, 'nome');
+
+  const totalPages = Math.max(1, Math.ceil(sortedMateriais.length / pageSize));
+  const paginatedMateriais = sortedMateriais.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -323,7 +327,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
           </div>
 
           {/* Table / Cards List */}
-          {filteredMateriais.length === 0 ? (
+          {sortedMateriais.length === 0 ? (
             <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500">
               <PackageOpen size={36} className="mx-auto text-amber-600/30 mb-2" />
               <p className="text-sm font-medium text-amber-900/85 dark:text-amber-100/80">Nenhum ingrediente corresponde aos filtros.</p>
@@ -336,12 +340,12 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                   <thead>
                     <tr className="bg-amber-50/40 dark:bg-amber-950/20 font-medium text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                      <th className="p-3 pl-4 whitespace-nowrap">Ingrediente</th>
-                      <th className="p-3 whitespace-nowrap">Estoque Atual</th>
-                      <th className="p-3 whitespace-nowrap">Mínimo Crítico</th>
-                      <th className="p-3 whitespace-nowrap">Preço Unitário</th>
+                      <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Ingrediente" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Estoque Atual" sortKey="quantidade_atual" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Mínimo Crítico" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Preço Unitário" sortKey="custo_unitario" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 whitespace-nowrap">Preço Total</th>
-                      <th className="p-3 whitespace-nowrap">Última Atualização</th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Última Atualização" sortKey="data_ultima_atualizacao" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
@@ -464,7 +468,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               </div>
 
               {/* Pagination */}
-              {filteredMateriais.length > pageSize && (
+              {sortedMateriais.length > pageSize && (
                 <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}

@@ -542,7 +542,7 @@ export class MiniFactoryStore {
   async addEstoqueProduto(estoque: Omit<EstoqueProduto, 'id' | 'data_atualizacao'>) {
     const novo: EstoqueProduto = { ...estoque, id: 'est_' + Math.random().toString(36).substring(2, 9), data_atualizacao: new Date().toISOString() };
     const ok = await this.supabaseInsert('estoque_produtos', novo as unknown as Record<string, unknown>);
-    if (ok) { this.estoqueProdutos.push(novo); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.estoqueProdutos = [...this.estoqueProdutos, novo]; this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
@@ -551,7 +551,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.estoqueProdutos[idx], ...updates, data_atualizacao: new Date().toISOString() };
     const ok = await this.supabaseUpdate('estoque_produtos', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.estoqueProdutos[idx] = updated; this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updated : e); this.saveToLocalStorage(); this.notify(); }
   }
 
   async updateEstoqueProdutoConfig(id: string, updates: Partial<EstoqueProduto>) { return this.updateEstoqueProduto(id, updates); }
@@ -587,8 +587,8 @@ export class MiniFactoryStore {
       return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
     }
 
-    this.estoqueProdutos[idx] = atualizado;
-    this.movProdutos.unshift(mov);
+    this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? atualizado : e);
+    this.movProdutos = [mov, ...this.movProdutos];
     this.saveToLocalStorage();
     this.notify();
     return { success: true };
@@ -741,8 +741,8 @@ export class MiniFactoryStore {
         data_ultima_atualizacao: new Date().toISOString(),
       };
       if (await this.supabaseUpdate('materiais', matId, dadosMat as unknown as Record<string, unknown>)) {
-        mat.quantidade_atual = dadosMat.quantidade_atual;
-        mat.data_ultima_atualizacao = dadosMat.data_ultima_atualizacao;
+        const matIdx = this.materiais.indexOf(mat);
+        if (matIdx !== -1) this.materiais = this.materiais.map((m, i) => i === matIdx ? dadosMat : m);
       }
 
       const mov: MovimentacaoMaterial = {
@@ -752,7 +752,7 @@ export class MiniFactoryStore {
         criado_em: new Date().toISOString()
       };
       if (await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>)) {
-        this.movMateriais.unshift(mov);
+        this.movMateriais = [mov, ...this.movMateriais];
       }
     }
 
@@ -762,17 +762,21 @@ export class MiniFactoryStore {
       let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
 
 if (estoque) {
-    estoque.quantidade_disponivel += item.quantidade_solicitada;
-    estoque.data_atualizacao = new Date().toISOString();
-    await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>);
+    const idx = this.estoqueProdutos.indexOf(estoque);
+    const updatedEstoque = { ...estoque,
+        quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
+        data_atualizacao: new Date().toISOString()
+    };
+    await this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>);
+    this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updatedEstoque : e);
 } else {
-    estoque = {
+    const novoEstoque = {
         id: 'est_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
         quantidade_minima: 0, data_atualizacao: new Date().toISOString()
     };
-    await this.supabaseInsert('estoque_produtos', estoque as unknown as Record<string, unknown>);
-    this.estoqueProdutos.push(estoque);
+    await this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>);
+    this.estoqueProdutos = [...this.estoqueProdutos, novoEstoque];
 }
 
       const movProd: MovimentacaoProduto = {
@@ -781,7 +785,7 @@ if (estoque) {
         pedido_id: pedidoId, criado_em: new Date().toISOString()
       };
       if (await this.supabaseInsert('movimentacoes_produtos', movProd as unknown as Record<string, unknown>)) {
-        this.movProdutos.unshift(movProd);
+        this.movProdutos = [movProd, ...this.movProdutos];
       }
     }
 

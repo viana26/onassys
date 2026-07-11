@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { EstoqueProduto } from '../types';
+import { EstoqueProduto, Produto } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
+import { useSortableData } from '../lib/hooks/useSortableData';
+import { SortButton } from './SortButton';
 import { 
   Plus, 
   Trash2, 
@@ -13,7 +15,6 @@ import {
   Calendar, 
   PackageCheck,
   Tag, 
-  Info, 
   X,
   Layers,
   ChevronLeft,
@@ -27,6 +28,8 @@ interface EstoqueProdutosProps {
   store: MiniFactoryStore;
   onUpdate: () => void;
 }
+
+type ProdutoComEstoque = EstoqueProduto & { produto_nome: string; produto_categoria_id: number; sem_estoque: boolean };
 
 export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,15 +47,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const [loteObs, setLoteObs] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Edit stock threshold state
-  const [isEditThresholdOpen, setIsEditThresholdOpen] = useState(false);
-  const [thresholdProdutoId, setThresholdProdutoId] = useState('');
-  const [thresholdQtd, setThresholdQtd] = useState<number>(5);
-
   // Manual stock adjustment state
   const [isAdjustStockOpen, setIsAdjustStockOpen] = useState(false);
   const [adjustStockEstoqueId, setAdjustStockEstoqueId] = useState('');
+  const [adjustStockProdutoId, setAdjustStockProdutoId] = useState('');
   const [adjustStockNovoSaldo, setAdjustStockNovoSaldo] = useState<number>(0);
+  const [adjustStockQtdMinima, setAdjustStockQtdMinima] = useState<number>(0);
+  const [adjustStockLote, setAdjustStockLote] = useState('');
+  const [adjustStockValidade, setAdjustStockValidade] = useState('');
   const [adjustStockObs, setAdjustStockObs] = useState('');
 
   const getProdutoName = (id: string) => {
@@ -60,23 +62,42 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   };
 
   const filteredEstoque = useMemo(() => {
-    return store.estoqueProdutos.filter(ep => {
-      const p = store.produtos.find(prod => prod.id === ep.produto_id);
-      if (!p) return false;
+    const estoqueMap = new Map(store.estoqueProdutos.map(ep => [ep.produto_id, ep]));
 
-      const matchesSearch = p.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    const todosProdutos: ProdutoComEstoque[] = store.produtos
+      .filter(p => p.ativo)
+      .map(p => {
+        const ep = estoqueMap.get(p.id);
+        if (ep) {
+          return { ...ep, produto_nome: p.nome, produto_categoria_id: p.categoria_id, sem_estoque: false };
+        }
+        return {
+          id: '',
+          produto_id: p.id,
+          quantidade_disponivel: 0,
+          quantidade_minima: 0,
+          data_atualizacao: '',
+          produto_nome: p.nome,
+          produto_categoria_id: p.categoria_id,
+          sem_estoque: true,
+        };
+      });
+
+    return todosProdutos.filter(ep => {
+      const matchesSearch = ep.produto_nome.toLowerCase().includes(searchTerm.toLowerCase());
       const isZero = ep.quantidade_disponivel === 0;
       const isLow = ep.quantidade_disponivel < ep.quantidade_minima;
 
       if (filterType === 'em_falta') return matchesSearch && isZero;
       if (filterType === 'baixo_estoque') return matchesSearch && isLow && !isZero;
-      if (filterType === 'lote_validade') return matchesSearch && ep.data_validade !== undefined;
+      if (filterType === 'lote_validade') return matchesSearch && !!ep.data_validade;
       return matchesSearch;
     });
   }, [store.estoqueProdutos, store.produtos, searchTerm, filterType]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredEstoque.length / pageSize));
-  const paginatedEstoque = filteredEstoque.slice(
+  const { sortedItems: sortedEstoque, requestSort, sortConfig } = useSortableData(filteredEstoque, 'produto_nome');
+  const totalPages = Math.max(1, Math.ceil(sortedEstoque.length / pageSize));
+  const paginatedEstoque = sortedEstoque.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -96,8 +117,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     setIsLoteOpen(true);
     setLoteProdutoId(produtoId || (store.produtos[0]?.id || ''));
     setLoteQtd(12);
-    const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '').substring(2);
-    setLoteNumero(`L-${dateStr}${Math.floor(Math.random() * 100)}`);
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mi = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    setLoteNumero(`L-${yy}${mm}${dd}${hh}${mi}${ss}`);
     const expDate = new Date();
     expDate.setDate(expDate.getDate() + 5);
     setLoteValidade(expDate.toISOString().split('T')[0]);
@@ -121,29 +148,18 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     }
   };
 
-  const handleOpenThreshold = (ep: EstoqueProduto) => {
-    setThresholdProdutoId(ep.id);
-    setThresholdQtd(ep.quantidade_minima);
-    setIsEditThresholdOpen(true);
-  };
-
-  const handleSaveThreshold = (e: React.FormEvent) => {
-    e.preventDefault();
-    store.updateEstoqueProdutoConfig(thresholdProdutoId, {
-      quantidade_minima: Number(thresholdQtd)
-    });
-    setIsEditThresholdOpen(false);
-    onUpdate();
-  };
-
   const handleResetLoteFilters = () => {
     setSearchTerm('');
     setFilterType('todos');
   };
 
-  const handleOpenAdjustStock = (ep: EstoqueProduto) => {
-    setAdjustStockEstoqueId(ep.id);
+  const handleOpenAdjustStock = (ep: ProdutoComEstoque) => {
+    setAdjustStockEstoqueId(ep.id || '');
+    setAdjustStockProdutoId(ep.produto_id);
     setAdjustStockNovoSaldo(ep.quantidade_disponivel);
+    setAdjustStockQtdMinima(ep.quantidade_minima);
+    setAdjustStockLote(ep.lote || '');
+    setAdjustStockValidade(ep.data_validade || '');
     setAdjustStockObs('');
     setErrorMessage(null);
     setIsAdjustStockOpen(true);
@@ -156,13 +172,33 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       return;
     }
     setErrorMessage(null);
-    const result = await store.ajustarEstoqueProduto(adjustStockEstoqueId, Number(adjustStockNovoSaldo), adjustStockObs);
-    if (!result.success) {
-      setErrorMessage(result.error || 'Erro ao ajustar estoque.');
-      return;
+
+    let estoqueId = adjustStockEstoqueId;
+
+    if (!estoqueId) {
+      const novo = await store.addEstoqueProduto({
+        produto_id: adjustStockProdutoId,
+        quantidade_disponivel: Number(adjustStockNovoSaldo),
+        quantidade_minima: Number(adjustStockQtdMinima),
+        lote: adjustStockLote || undefined,
+        data_validade: adjustStockValidade || undefined,
+      });
+      estoqueId = novo.id;
+    } else {
+      const resultadoEstoque = await store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs);
+      if (!resultadoEstoque.success) {
+        setErrorMessage(resultadoEstoque.error || 'Erro ao ajustar estoque.');
+        return;
+      }
+
+      await store.updateEstoqueProdutoConfig(estoqueId, {
+        quantidade_minima: Number(adjustStockQtdMinima),
+        lote: adjustStockLote || undefined,
+        data_validade: adjustStockValidade || undefined,
+      });
     }
+
     setIsAdjustStockOpen(false);
-    onUpdate();
   };
 
   const unidadeNome = (produtoId: string) => {
@@ -170,8 +206,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     return p ? store.unidadeNome(p.unidade_producao_id) : '';
   };
 
-  const statusInfo = (ep: EstoqueProduto) => {
-    if (ep.quantidade_disponivel === 0) return { label: 'Zerado', classes: 'bg-red-100 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/40' };
+  const statusInfo = (ep: ProdutoComEstoque) => {
+    if (ep.sem_estoque) return { label: 'Novo', classes: 'bg-gray-100 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700' };
+    if (ep.quantidade_disponivel === 0) return { label: 'Esgotado', classes: 'bg-red-100 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/40' };
     if (ep.quantidade_disponivel < ep.quantidade_minima) return { label: 'Abaixo Mín.', classes: 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-900/40' };
     return { label: 'Estável', classes: 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/45' };
   };
@@ -237,7 +274,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
               {[
                 { type: 'todos' as const, label: 'Todos' },
-                { type: 'em_falta' as const, label: 'Zerados' },
+                { type: 'em_falta' as const, label: 'Sem Estoque' },
                 { type: 'baixo_estoque' as const, label: 'Estoque Baixo' },
                 { type: 'lote_validade' as const, label: 'Validades' }
               ].map(item => (
@@ -256,7 +293,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             </div>
           </div>
 
-          {filteredEstoque.length === 0 ? (
+          {sortedEstoque.length === 0 ? (
             <div className="bg-white dark:bg-[#150f09] rounded-2xl py-12 border border-amber-100 dark:border-[#22160b] text-center text-gray-500 dark:text-amber-100/40">
               <PackageCheck size={36} className="mx-auto text-amber-600/30 mb-2" />
               <p className="text-sm font-medium">Nenhum produto pronto com esse filtro.</p>
@@ -274,27 +311,25 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                   <thead>
                     <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                      <th className="p-3 pl-4 whitespace-nowrap">Produto</th>
-                      <th className="p-3 whitespace-nowrap">Status</th>
-                      <th className="p-3 whitespace-nowrap">Disponível</th>
-                      <th className="p-3 whitespace-nowrap">Mínimo</th>
+                      <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Produto" sortKey="produto_nome" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Disponível" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 whitespace-nowrap"><SortButton label="Mínimo" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 whitespace-nowrap">Lote / Validade</th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedEstoque.map(ep => {
-                      const prod = store.produtos.find(p => p.id === ep.produto_id);
-                      if (!prod) return null;
                       const status = statusInfo(ep);
                       const expDate = ep.data_validade ? new Date(ep.data_validade) : null;
                       const isExpired = expDate ? expDate.getTime() < new Date().getTime() : false;
                       return (
-                        <tr key={ep.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
+                        <tr key={ep.produto_id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                           <td className="p-3 pl-4">
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{prod.nome}</span>
-                              <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono">{store.categoriaNome(prod.categoria_id)}</span>
+                              <span className="font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{ep.produto_nome}</span>
+                              <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono">{store.categoriaNome(ep.produto_categoria_id)}</span>
                             </div>
                           </td>
                           <td className="p-3 whitespace-nowrap">
@@ -339,15 +374,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                                   <Edit3 size={14} />
                                 </button>
                               )}
-                              {store.hasPermission('estoque.editar') && (
-                                <button 
-                                  onClick={() => handleOpenThreshold(ep)}
-                                  className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition cursor-pointer"
-                                  title="Ajustar Mínimo"
-                                >
-                                  <Info size={14} />
-                                </button>
-                              )}
                               {store.hasPermission('estoque.criar') && (
                                 <button 
                                   onClick={() => handleOpenLoteForm(ep.produto_id)}
@@ -368,20 +394,18 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               {/* Mobile Cards */}
               <div className="md:hidden grid grid-cols-1 gap-3">
                 {paginatedEstoque.map(ep => {
-                  const prod = store.produtos.find(p => p.id === ep.produto_id);
-                  if (!prod) return null;
                   const status = statusInfo(ep);
                   const expDate = ep.data_validade ? new Date(ep.data_validade) : null;
                   const isExpired = expDate ? expDate.getTime() < new Date().getTime() : false;
                   return (
                     <div 
-                      key={ep.id}
+                      key={ep.produto_id}
                       className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] p-3 shadow-sm space-y-2"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-sm font-display text-amber-950 dark:text-amber-100 truncate">{prod.nome}</h4>
-                          <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono">{store.categoriaNome(prod.categoria_id)}</span>
+                          <h4 className="font-semibold text-sm font-display text-amber-950 dark:text-amber-100 truncate">{ep.produto_nome}</h4>
+                          <span className="text-[9px] text-gray-400 dark:text-amber-100/40 font-mono">{store.categoriaNome(ep.produto_categoria_id)}</span>
                         </div>
                         <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap ${status.classes}`}>
                           {status.label}
@@ -428,14 +452,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                               Ajustar
                             </button>
                           )}
-                          {store.hasPermission('estoque.editar') && (
-                            <button 
-                              onClick={() => handleOpenThreshold(ep)}
-                              className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition text-[10px] font-semibold cursor-pointer"
-                            >
-                              Mínimo
-                            </button>
-                          )}
                         </div>
                         {store.hasPermission('estoque.criar') && (
                           <button 
@@ -452,7 +468,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               </div>
 
               {/* Pagination */}
-              {filteredEstoque.length > pageSize && (
+              {sortedEstoque.length > pageSize && (
                 <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -502,12 +518,11 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <div className="space-y-2 max-h-96 overflow-y-auto no-scrollbar">
               {store.movProdutos.map((mov, idx) => {
                 const prod = store.produtos.find(p => p.id === mov.produto_id);
-                const isBaking = mov.tipo_id === 4;
                 return (
                   <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-lg ${isBaking ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-350'}`}>
-                        {isBaking ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                      <div className={`p-1.5 rounded-lg ${mov.quantidade >= 0 ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-350'}`}>
+                        {mov.quantidade >= 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                       </div>
                       <div>
                         <p className="font-semibold text-amber-950 dark:text-amber-150">{prod?.nome || 'Produto Desconhecido'}</p>
@@ -515,8 +530,8 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className={`font-bold font-mono ${isBaking ? 'text-emerald-700 dark:text-emerald-450' : 'text-red-800 dark:text-red-400'}`}>
-                        {isBaking ? '+' : '-'}{mov.quantidade} {unidadeNome(prod?.id || '')}
+                      <p className={`font-bold font-mono ${mov.quantidade >= 0 ? 'text-emerald-700 dark:text-emerald-450' : 'text-red-800 dark:text-red-400'}`}>
+                        {mov.quantidade >= 0 ? '+' : ''}{mov.quantidade} {unidadeNome(prod?.id || '')}
                       </p>
                       <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
                         {new Date(mov.criado_em).toLocaleDateString('pt-BR')} {new Date(mov.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -662,13 +677,13 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       {/* AJUSTE MANUAL DE ESTOQUE MODAL */}
       {isAdjustStockOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans animate-none" id="modal-adjust-stock">
-          <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
+          <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">
-                  Ajustar Estoque Manual
+                  Ajustar Estoque
                 </h3>
-                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Define o saldo disponível diretamente, sem consumir insumos. Útil para produtos prontos comprados de terceiros.</p>
+                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Ajuste o saldo e a quantidade mínima de segurança do produto.</p>
               </div>
               <button 
                 onClick={() => setIsAdjustStockOpen(false)}
@@ -693,16 +708,21 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium block">Produto</label>
                 <p className="font-semibold text-amber-950 dark:text-amber-100 text-sm font-display">
-                  {getProdutoName(store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.produto_id || '')}
+                  {getProdutoName(adjustStockProdutoId)}
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <label className="text-gray-500 dark:text-amber-100/40 font-medium block">Saldo Atual</label>
-                  <p className="p-2 bg-amber-50/50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-950/35 rounded-lg text-center font-mono font-bold text-amber-950 dark:text-amber-200">
-                    {store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.quantidade_disponivel || 0}
-                  </p>
+                  <div className="flex items-center border border-amber-100 dark:border-amber-950/35 rounded-lg overflow-hidden bg-amber-50/50 dark:bg-amber-950/15">
+                    <p className="flex-1 p-2 text-center font-mono font-bold text-amber-950 dark:text-amber-200">
+                      {store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.quantidade_disponivel || 0}
+                    </p>
+                    <span className="bg-amber-100/60 dark:bg-amber-950/40 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {unidadeNome(adjustStockProdutoId)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -717,10 +737,69 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
                       required
                     />
-                    <span className="bg-amber-50 dark:bg-amber-950/35 px-3 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
-                      {unidadeNome(store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.produto_id || '')}
+                    <span className="bg-amber-50 dark:bg-amber-950/35 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {unidadeNome(adjustStockProdutoId)}
                     </span>
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-amber-950 dark:text-amber-100 font-medium block">Qtd. Mínima *</label>
+                  <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
+                    <input 
+                      type="number" 
+                      min="0"
+                      value={adjustStockQtdMinima}
+                      onChange={(e) => setAdjustStockQtdMinima(Number(e.target.value))}
+                      {...useSmartArrowKeys(adjustStockQtdMinima, setAdjustStockQtdMinima, 0)}
+                      className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
+                      required
+                    />
+                    <span className="bg-amber-50 dark:bg-amber-950/35 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {unidadeNome(adjustStockProdutoId)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-amber-950 dark:text-amber-100 font-medium block">Lote (opcional)</label>
+                  <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
+                    <input 
+                      type="text" 
+                      value={adjustStockLote}
+                      onChange={(e) => setAdjustStockLote(e.target.value)}
+                      placeholder="Ex: L-260710143522"
+                      className="flex-1 p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        const yy = String(now.getFullYear()).slice(2);
+                        const mm = String(now.getMonth() + 1).padStart(2, '0');
+                        const dd = String(now.getDate()).padStart(2, '0');
+                        const hh = String(now.getHours()).padStart(2, '0');
+                        const mi = String(now.getMinutes()).padStart(2, '0');
+                        const ss = String(now.getSeconds()).padStart(2, '0');
+                        setAdjustStockLote(`L-${yy}${mm}${dd}${hh}${mi}${ss}`);
+                      }}
+                      className="bg-amber-50 dark:bg-amber-950/35 hover:bg-amber-100 dark:hover:bg-amber-950/50 px-2 py-2 text-[10px] font-bold text-amber-700 dark:text-amber-300 cursor-pointer whitespace-nowrap transition"
+                    >
+                      Gerar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-amber-950 dark:text-amber-100 font-medium block">Validade (opcional)</label>
+                  <input 
+                    type="date" 
+                    value={adjustStockValidade}
+                    onChange={(e) => setAdjustStockValidade(e.target.value)}
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] text-xs rounded-lg focus:outline-none focus:border-amber-400 bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                  />
                 </div>
               </div>
 
@@ -755,61 +834,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
         </div>
       )}
 
-      {/* EDIT MINIMUM STOCK MODAL */}
-      {isEditThresholdOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans animate-none" id="modal-threshold">
-          <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
-            <div className="flex items-center justify-between">
-              <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">Ajustar Estoque de Segurança</h3>
-              <button onClick={() => setIsEditThresholdOpen(false)} className="text-gray-400 hover:text-amber-955 dark:hover:text-amber-200 p-1 cursor-pointer" aria-label="Fechar ajuste de mínimo">
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveThreshold} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-gray-500 dark:text-amber-100/40 font-medium block">Nome do Produto</label>
-                <p className="font-semibold text-amber-950 dark:text-amber-100 text-sm font-display">{getProdutoName(thresholdProdutoId)}</p>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Quantidade Mínima de Segurança *</label>
-                <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
-                  <input 
-                    type="number" 
-                    min="0"
-                    placeholder="Ex: 10"
-                    value={thresholdQtd}
-                    onChange={(e) => setThresholdQtd(Number(e.target.value))}
-                    {...useSmartArrowKeys(thresholdQtd, setThresholdQtd, 0)}
-                    className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
-                    required
-                  />
-                  <span className="bg-amber-50 dark:bg-amber-950/35 px-3 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
-                    {unidadeNome(thresholdProdutoId)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button 
-                  type="button" 
-                  onClick={() => setIsEditThresholdOpen(false)}
-                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold py-2.5 rounded-xl text-center"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow"
-                >
-                  Salvar Configuração
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
