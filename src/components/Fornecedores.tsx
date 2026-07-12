@@ -188,7 +188,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
                   <th className="p-3 whitespace-nowrap"><SortButton sortKey="telefone" label="Telefone" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap"><SortButton sortKey="email" label="Email" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap"><SortButton sortKey="ativo" label="Status" onSort={requestSort} sortConfig={sortConfig} /></th>
-                  <th className="p-3 whitespace-nowrap">Materiais</th>
+                  <th className="p-3 text-right whitespace-nowrap">Materiais</th>
                   <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
@@ -212,7 +212,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
                           {f.ativo === false ? 'Inativo' : 'Ativo'}
                         </span>
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="p-3 text-right whitespace-nowrap">
                         <span className={`text-xs px-2 py-0.5 rounded-lg font-bold ${
                           materiais.length > 0
                             ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'

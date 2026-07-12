@@ -368,15 +368,16 @@ export class MiniFactoryStore {
   }
 
   private recalcularValoresPedidos() {
-    for (const pedido of this.pedidos) {
+    this.pedidos = this.pedidos.map(pedido => {
       const total = this.itensPedido
         .filter(i => i.pedido_id === pedido.id)
         .reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
       if (pedido.valor_total !== total) {
-        pedido.valor_total = total;
         this.supabaseUpdate('pedidos', pedido.id, { valor_total: total } as unknown as Record<string, unknown>);
+        return { ...pedido, valor_total: total };
       }
-    }
+      return pedido;
+    });
   }
 
   async recalcularCustosProdutos() {
@@ -410,7 +411,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.materiais[idx], ...updates, data_ultima_atualizacao: new Date().toISOString() };
     const ok = await this.supabaseUpdate('materiais', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.materiais[idx] = updated; this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.materiais = this.materiais.map((m, i) => i === idx ? updated : m); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteMaterial(id: string) {
@@ -497,7 +498,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.produtos[idx], ...updates };
     const ok = await this.supabaseUpdate('produtos', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.produtos[idx] = updated; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.produtos = this.produtos.map((p, i) => i === idx ? updated : p); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteProduto(id: string) {
@@ -527,7 +528,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.fichas[idx], ...updates };
     const ok = await this.supabaseUpdate('fichas_tecnicas', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.fichas[idx] = updated; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.fichas = this.fichas.map((f, i) => i === idx ? updated : f); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteFichaTecnica(id: string): Promise<boolean> {
@@ -551,7 +552,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.estoqueProdutos[idx], ...updates, data_atualizacao: new Date().toISOString() };
     const ok = await this.supabaseUpdate('estoque_produtos', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updated : e); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? { ...e, ...updates, data_atualizacao: new Date().toISOString() } : e); this.saveToLocalStorage(); this.notify(); }
   }
 
   async updateEstoqueProdutoConfig(id: string, updates: Partial<EstoqueProduto>) { return this.updateEstoqueProduto(id, updates); }
@@ -603,22 +604,20 @@ export class MiniFactoryStore {
     const result = await this.lancarProducao([{ produto_id: produtoId, quantidade_solicitada: quantidade }], undefined);
     if (!result.success) return result;
 
-    // lancarProducao already consumed insumos and added to estoque_produtos
-    // Now add lote/validade if provided
-    if (dataValidade || lote) {
-      const idx = this.estoqueProdutos.findIndex(e => e.produto_id === produtoId);
-      if (idx !== -1) {
-        const atualizado = {
-          ...this.estoqueProdutos[idx],
-          data_validade: dataValidade || this.estoqueProdutos[idx].data_validade,
-          lote: lote || this.estoqueProdutos[idx].lote,
-          data_atualizacao: new Date().toISOString()
-        };
-        const ok = await this.supabaseUpdate('estoque_produtos', atualizado.id, atualizado as unknown as Record<string, unknown>);
-        if (ok) {
-          this.estoqueProdutos[idx] = atualizado;
-          this.saveToLocalStorage(); this.notify();
-        }
+    const idx = this.estoqueProdutos.findIndex(e => e.produto_id === produtoId);
+    if (idx !== -1) {
+      const atualizado = {
+        ...this.estoqueProdutos[idx],
+        data_validade: dataValidade || null,
+        lote: lote || null,
+        data_atualizacao: new Date().toISOString()
+      };
+      const ok = await this.supabaseUpdate('estoque_produtos', atualizado.id, atualizado as unknown as Record<string, unknown>);
+      if (ok) {
+        this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? atualizado : e);
+        this.saveToLocalStorage(); this.notify();
+      } else {
+        return { success: false, error: 'Erro ao salvar lote/validade no servidor.' };
       }
     }
     return { success: true };
@@ -642,7 +641,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.clientes[idx], ...updates };
     const ok = await this.supabaseUpdate('clientes', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.clientes[idx] = updated; this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.clientes = this.clientes.map((c, i) => i === idx ? updated : c); this.saveToLocalStorage(); this.notify(); }
   }
 
   async deleteCliente(id: string) {
@@ -672,7 +671,7 @@ export class MiniFactoryStore {
     if (idx === -1) return;
     const updated = { ...this.pedidos[idx], ...updates, atualizado_em: new Date().toISOString() };
     const ok = await this.supabaseUpdate('pedidos', id, updated as unknown as Record<string, unknown>);
-    if (ok) { this.pedidos[idx] = updated; this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.pedidos = this.pedidos.map((p, i) => i === idx ? updated : p); this.saveToLocalStorage(); this.notify(); }
   }
 
   async updatePedidoStatus(id: string, status_id: number): Promise<{ success: boolean; error?: string }> {
@@ -767,16 +766,24 @@ if (estoque) {
         quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
         data_atualizacao: new Date().toISOString()
     };
-    await this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>);
-    this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updatedEstoque : e);
+    const okUpdate = await this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>);
+    if (okUpdate) {
+      this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updatedEstoque : e);
+    } else {
+      return { success: false, error: 'Erro ao atualizar estoque no servidor.' };
+    }
 } else {
     const novoEstoque = {
         id: 'est_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
         quantidade_minima: 0, data_atualizacao: new Date().toISOString()
     };
-    await this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>);
-    this.estoqueProdutos = [...this.estoqueProdutos, novoEstoque];
+    const okInsert = await this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>);
+    if (okInsert) {
+      this.estoqueProdutos = [...this.estoqueProdutos, novoEstoque];
+    } else {
+      return { success: false, error: 'Erro ao criar estoque no servidor.' };
+    }
 }
 
       const movProd: MovimentacaoProduto = {
@@ -806,12 +813,15 @@ if (estoque) {
     const novo: ItemPedido = { ...item, id: 'item_' + Math.random().toString(36).substring(2, 9) };
     const ok = await this.supabaseInsert('itens_pedido', novo as unknown as Record<string, unknown>);
     if (ok) {
-      this.itensPedido.push(novo);
-      const pedido = this.pedidos.find(p => p.id === item.pedido_id);
-      if (pedido) {
-        pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
-        pedido.atualizado_em = new Date().toISOString();
-        await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
+      this.itensPedido = [...this.itensPedido, novo];
+      this.pedidos = this.pedidos.map(p => p.id === item.pedido_id ? {
+        ...p,
+        valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+        atualizado_em: new Date().toISOString()
+      } : p);
+      const pedidoAtualizado = this.pedidos.find(p => p.id === item.pedido_id);
+      if (pedidoAtualizado) {
+        await this.supabaseUpdate('pedidos', pedidoAtualizado.id, { valor_total: pedidoAtualizado.valor_total, atualizado_em: pedidoAtualizado.atualizado_em } as unknown as Record<string, unknown>);
       }
       this.saveToLocalStorage(); this.notify();
     }
@@ -824,12 +834,15 @@ if (estoque) {
     const updated = { ...this.itensPedido[idx], ...updates };
     const ok = await this.supabaseUpdate('itens_pedido', id, updated as unknown as Record<string, unknown>);
     if (ok) {
-      this.itensPedido[idx] = updated;
-      const pedido = this.pedidos.find(p => p.id === updated.pedido_id);
-      if (pedido) {
-        pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
-        pedido.atualizado_em = new Date().toISOString();
-        await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
+      this.itensPedido = this.itensPedido.map((it, i) => i === idx ? updated : it);
+      this.pedidos = this.pedidos.map(p => p.id === updated.pedido_id ? {
+        ...p,
+        valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+        atualizado_em: new Date().toISOString()
+      } : p);
+      const pedidoAtualizado = this.pedidos.find(p => p.id === updated.pedido_id);
+      if (pedidoAtualizado) {
+        await this.supabaseUpdate('pedidos', pedidoAtualizado.id, { valor_total: pedidoAtualizado.valor_total, atualizado_em: pedidoAtualizado.atualizado_em } as unknown as Record<string, unknown>);
       }
       this.saveToLocalStorage(); this.notify();
     }
@@ -841,11 +854,14 @@ if (estoque) {
     if (ok) {
       this.itensPedido = this.itensPedido.filter(i => i.id !== id);
       if (item) {
-        const pedido = this.pedidos.find(p => p.id === item.pedido_id);
-        if (pedido) {
-          pedido.valor_total = this.itensPedido.filter(i => i.pedido_id === pedido.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
-          pedido.atualizado_em = new Date().toISOString();
-          await this.supabaseUpdate('pedidos', pedido.id, { valor_total: pedido.valor_total, atualizado_em: pedido.atualizado_em } as unknown as Record<string, unknown>);
+        this.pedidos = this.pedidos.map(p => p.id === item.pedido_id ? {
+          ...p,
+          valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+          atualizado_em: new Date().toISOString()
+        } : p);
+        const pedidoAtualizado = this.pedidos.find(p => p.id === item.pedido_id);
+        if (pedidoAtualizado) {
+          await this.supabaseUpdate('pedidos', pedidoAtualizado.id, { valor_total: pedidoAtualizado.valor_total, atualizado_em: pedidoAtualizado.atualizado_em } as unknown as Record<string, unknown>);
         }
       }
       this.saveToLocalStorage(); this.notify();
@@ -882,11 +898,12 @@ if (estoque) {
 
     let ok = true;
     for (const item of itens) {
-      const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
-      if (estoque) {
-        estoque.quantidade_disponivel -= item.quantidade_solicitada;
-        estoque.data_atualizacao = new Date().toISOString();
-        if (!await this.supabaseUpdate('estoque_produtos', estoque.id, estoque as unknown as Record<string, unknown>)) ok = false;
+      const idx = this.estoqueProdutos.findIndex(e => e.produto_id === item.produto_id);
+      if (idx >= 0) {
+        const original = this.estoqueProdutos[idx];
+        const updated = { ...original, quantidade_disponivel: original.quantidade_disponivel - item.quantidade_solicitada, data_atualizacao: new Date().toISOString() };
+        if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) ok = false;
+        this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updated : e);
       }
       const mov: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
@@ -894,7 +911,7 @@ if (estoque) {
         pedido_id: pedidoId, criado_em: new Date().toISOString()
       };
       if (!await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>)) ok = false;
-      if (ok) this.movProdutos.unshift(mov);
+      if (ok) this.movProdutos = [mov, ...this.movProdutos];
     }
     if (ok) { this.saveToLocalStorage(); this.notify(); }
     return { success: ok, error: ok ? undefined : 'Erro ao salvar no servidor' };
@@ -912,7 +929,7 @@ if (estoque) {
     const ok = await this.supabaseUpdate('perfis_usuario', userId, updates as unknown as Record<string, unknown>);
     if (ok) {
       const idx = this.perfisUsuarios.findIndex(u => u.id === userId);
-      if (idx >= 0) this.perfisUsuarios[idx] = { ...this.perfisUsuarios[idx], ...updates };
+      if (idx >= 0) this.perfisUsuarios = this.perfisUsuarios.map((u, i) => i === idx ? { ...u, ...updates } : u);
       else this.perfisUsuarios.push({ id: userId, ...updates } as PerfilUsuario);
       this.saveToLocalStorage(); this.notify();
     }
@@ -936,7 +953,7 @@ if (estoque) {
     const { error } = await supabase.from('unidades').update(data).eq('id', id);
     if (!error) {
       const idx = this.unidades.findIndex(u => u.id === id);
-      if (idx >= 0) this.unidades[idx] = { ...this.unidades[idx], ...data };
+      if (idx >= 0) this.unidades = this.unidades.map((u, i) => i === idx ? { ...u, ...data } : u);
       this.saveToLocalStorage(); this.notify();
     }
   }
@@ -976,7 +993,7 @@ if (estoque) {
     const { error } = await supabase.from('fornecedores').update(data).eq('id', id);
     if (!error) {
       const idx = this.fornecedores.findIndex(f => f.id === id);
-      if (idx >= 0) this.fornecedores[idx] = { ...this.fornecedores[idx], ...data };
+      if (idx >= 0) this.fornecedores = this.fornecedores.map((f, i) => i === idx ? { ...f, ...data } : f);
       this.saveToLocalStorage(); this.notify();
     }
   }
@@ -987,7 +1004,7 @@ if (estoque) {
     const novoAtivo = !f.ativo;
     const { error } = await supabase.from('fornecedores').update({ ativo: novoAtivo }).eq('id', id);
     if (!error) {
-      f.ativo = novoAtivo;
+      this.fornecedores = this.fornecedores.map(f2 => f2.id === id ? { ...f2, ativo: novoAtivo } : f2);
       this.saveToLocalStorage(); this.notify();
     }
   }

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3 } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import BalancetePeriodo from './Relatorios/BalancetePeriodo';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -16,6 +17,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const [filtroTipo, setFiltroTipo] = useState<'todas' | 'receita' | 'despesa'>('todas');
   const [showModal, setShowModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<LancamentoFinanceiro | null>(null);
+  const [showBalancete, setShowBalancete] = useState(false);
 
   const lancamentosFiltrados = filtroTipo === 'todas'
     ? store.lancamentos
@@ -35,10 +37,16 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Receitas, despesas e fluxo de caixa</p>
         </div>
         {store.hasPermission('financeiro.lancar') && (
-          <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
-            <Plus size={18} /> Novo Lançamento
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowBalancete(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1a1208] border border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100 font-semibold rounded-xl hover:bg-[#f0eade] dark:hover:bg-[#22160b] transition text-xs">
+              <BarChart3 size={16} /> Relatório
+            </button>
+            <button onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition text-xs">
+              <Plus size={16} /> Novo Lançamento
+            </button>
+          </div>
         )}
       </div>
 
@@ -102,7 +110,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Descrição" sortKey="descricao" sortConfig={sortConfig} onSort={requestSort} /></th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Categoria" sortKey="categoria_id" sortConfig={sortConfig} onSort={requestSort} /></th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Pagamento" sortKey="forma_pagamento" sortConfig={sortConfig} onSort={requestSort} /></th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Valor" sortKey="valor" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Valor" sortKey="valor" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
               <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider" />
             </tr>
           </thead>
@@ -140,6 +148,8 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
       </div>
 
       {showModal && <NovoLancamentoModal store={store} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); onUpdate(); }} />}
+
+      {showBalancete && <BalancetePeriodo store={store} isOpen={true} onClose={() => setShowBalancete(false)} />}
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

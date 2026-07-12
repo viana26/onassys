@@ -341,10 +341,10 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   <thead>
                     <tr className="bg-amber-50/40 dark:bg-amber-950/20 font-medium text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
                       <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Ingrediente" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap"><SortButton label="Estoque Atual" sortKey="quantidade_atual" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap"><SortButton label="Mínimo Crítico" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap"><SortButton label="Preço Unitário" sortKey="custo_unitario" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap">Preço Total</th>
+                      <th className="p-3 text-right whitespace-nowrap"><SortButton label="Estoque Atual" sortKey="quantidade_atual" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                      <th className="p-3 text-right whitespace-nowrap"><SortButton label="Mínimo Crítico" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                      <th className="p-3 text-right whitespace-nowrap"><SortButton label="Preço Unitário" sortKey="custo_unitario" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                      <th className="p-3 text-right whitespace-nowrap">Preço Total</th>
                       <th className="p-3 whitespace-nowrap"><SortButton label="Última Atualização" sortKey="data_ultima_atualizacao" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
@@ -355,16 +355,16 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       return (
                         <tr key={m.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                           <td className="p-3 pl-4 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{m.nome}</td>
-                          <td className="p-3 font-mono whitespace-nowrap">
+                          <td className="p-3 text-right font-mono whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-lg text-xs font-bold
                               ${isAbatido ? 'bg-red-100 dark:bg-red-950/25 text-red-700 dark:text-red-350 animate-pulse' : 'bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200'}
                             `}>
                               {m.quantidade_atual} {store.unidadeSigla(m.unidade_id)}
                             </span>
                           </td>
-                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{m.quantidade_minima} {store.unidadeSigla(m.unidade_id)}</td>
-                          <td className="p-3 font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{store.unidadeSigla(m.unidade_id)}</span></td>
-                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/50 whitespace-nowrap">{(m.custo_unitario * m.quantidade_atual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                          <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{m.quantidade_minima} {store.unidadeSigla(m.unidade_id)}</td>
+                          <td className="p-3 text-right font-mono text-emerald-700 dark:text-emerald-400 font-semibold whitespace-nowrap">{m.custo_unitario.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })} <span className="text-[10px] text-gray-400 dark:text-amber-100/30">/{store.unidadeSigla(m.unidade_id)}</span></td>
+                          <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/50 whitespace-nowrap">{(m.custo_unitario * m.quantidade_atual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                           <td className="p-3 text-gray-400 dark:text-amber-100/30 whitespace-nowrap">{new Date(m.data_ultima_atualizacao).toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-2">

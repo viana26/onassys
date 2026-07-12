@@ -796,8 +796,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                     <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Código" sortKey="id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 whitespace-nowrap"><SortButton label="Cliente" sortKey="cliente_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 font-medium whitespace-nowrap"><SortButton label="Entrega Prevista" sortKey="data_entrega_prevista" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 whitespace-nowrap">Itens Resumo</th>
-                    <th className="p-3 font-semibold whitespace-nowrap"><SortButton label="Valor Total" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} /></th>
+                    <th className="p-3 text-right whitespace-nowrap">Itens Resumo</th>
+                    <th className="p-3 text-right font-semibold whitespace-nowrap"><SortButton label="Valor Total" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                     <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="status_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                   </tr>
@@ -813,8 +813,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         <td className="p-3 pl-4 font-mono font-bold text-amber-700 whitespace-nowrap">#{p.id.substring(4).toUpperCase()}</td>
                         <td className="p-3 font-semibold text-amber-950 whitespace-nowrap">{cliName}</td>
                         <td className="p-3 font-mono whitespace-nowrap">{estEntrega.toLocaleDateString('pt-BR')} às {estEntrega.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td className="p-3 whitespace-nowrap">{itCount} itens cadastrados</td>
-                        <td className="p-3 font-bold text-amber-900 font-mono whitespace-nowrap">{formatCurrency(p.valor_total)}</td>
+                        <td className="p-3 text-right whitespace-nowrap">{itCount} itens cadastrados</td>
+                        <td className="p-3 text-right font-bold text-amber-900 font-mono whitespace-nowrap">{formatCurrency(p.valor_total)}</td>
                         <td className="p-3 whitespace-nowrap">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase
                             ${p.status_id === 1 ? 'bg-gray-100 text-gray-600' : ''}

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Wallet, Search, DollarSign, TrendingUp, TrendingDown, Printer, X, CheckCircle2, AlertTriangle, Clock, User, CreditCard, Banknote, Smartphone, Landmark, ArrowLeftRight } from 'lucide-react';
 
@@ -222,6 +222,13 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   // Comprovante
   const [comprovanteData, setComprovanteData] = useState<ComprovanteData | null>(null);
 
+  // Relógio
+  const [agora, setAgora] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setAgora(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const pedidos = store.pedidos.filter(p => {
     if (p.status_id === 1 || p.status_id === 6) return false;
     const recebido = store.lancamentos.filter(l => l.pedido_id === p.id && l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
@@ -392,7 +399,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
             </div>
 
             {!selectedPedidoId && (
-              <div className="max-h-48 overflow-y-auto space-y-1">
+              <div className="max-h-[300px] overflow-y-auto space-y-1">
                 {pedidosFiltrados.length === 0 ? (
                   <p className="text-[10px] text-gray-400 italic text-center py-4">Nenhum pedido pendente</p>
                 ) : (
@@ -695,6 +702,17 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
           onClose={() => setComprovanteData(null)}
         />
       )}
+
+      {/* Footer Bar */}
+      <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-[#120c06] rounded-xl border border-amber-100 dark:border-[#2d1e0d] text-xs text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
+        <span>{appName || 'Mini Fábrica'}</span>
+        <span className="flex items-center gap-1.5">
+          <Clock size={12} />
+          {agora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+          {' • '}
+          {agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </span>
+      </div>
     </div>
   );
 }

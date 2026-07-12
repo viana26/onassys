@@ -202,7 +202,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                   <th className="p-3 whitespace-nowrap"><SortButton label="Telefone" sortKey="telefone" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap"><SortButton label="Email" sortKey="email" onSort={requestSort} sortConfig={sortConfig} /></th>
                   <th className="p-3 whitespace-nowrap"><SortButton label="Endereço" sortKey="endereco" onSort={requestSort} sortConfig={sortConfig} /></th>
-                  <th className="p-3 whitespace-nowrap">Pedidos</th>
+                  <th className="p-3 text-right whitespace-nowrap">Pedidos</th>
                   <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                 </tr>
               </thead>
@@ -217,7 +217,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                       <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap font-mono">{c.telefone || '—'}</td>
                       <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap max-w-[180px] truncate">{c.email || '—'}</td>
                       <td className="p-3 text-gray-600 dark:text-amber-100/60 whitespace-nowrap max-w-[200px] truncate">{c.endereco || '—'}</td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="p-3 text-right whitespace-nowrap">
                         <span className={`text-xs px-2 py-0.5 rounded-lg font-bold ${
                           totalPedidos > 0
                             ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300'

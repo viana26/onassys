@@ -475,9 +475,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
               <thead>
                 <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
                   <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider"><SortButton label="Produto" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
-                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Cap.</th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-24">Ações</th>
                 </tr>
@@ -501,7 +501,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 font-mono text-amber-950 dark:text-amber-100">{p.tempo_producao_minutos}m</td>
+                      <td className="px-3 py-2 text-right font-mono text-amber-950 dark:text-amber-100">{p.tempo_producao_minutos}m</td>
                       <td className="px-3 py-2 text-right font-mono text-gray-600 dark:text-amber-200/65">{formatCurrency(p.custo_producao_calculado)}</td>
                       <td className="px-3 py-2 text-right font-mono">
                         <span className={`${!p.preco_venda || p.preco_venda <= 0 ? 'text-gray-400 dark:text-amber-100/30' : p.preco_venda < p.custo_producao_calculado ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-emerald-700 dark:text-emerald-450 font-bold'}`}>

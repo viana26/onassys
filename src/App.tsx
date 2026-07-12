@@ -14,6 +14,7 @@ import AddAdmin from './components/AddAdmin';
 import Usuarios from './components/Usuarios';
 import Financeiro from './components/Financeiro';
 import Configuracao from './components/Configuracao';
+import Relatorios from './components/Relatorios';
 import SyncStatus from './components/SyncStatus';
 import { 
     isSupabaseConfigured, 
@@ -47,7 +48,8 @@ import {
   Copy,
   Wifi,
   WifiOff,
-  AlertCircle
+  AlertCircle,
+  BarChart3
 } from 'lucide-react';
 
 type AuthScreen = 'loading' | 'setup' | 'add-admin' | 'login' | 'app';
@@ -342,6 +344,7 @@ export default function App() {
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
                 { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
+                { id: 'relatorios', label: 'Relatórios', icon: <BarChart3 size={15} />, perm: 'financeiro.ver' },
                 { id: 'materiais', label: 'Despensa Insumos', icon: <Coins size={15} />, perm: 'materiais.ver' },
                 { id: 'produtos', label: 'Produtos / F. Técnicas', icon: <Layers size={16} />, perm: 'produtos.ver' },
                 { id: 'pedidos', label: 'Produção e Pedidos', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
@@ -604,6 +607,10 @@ export default function App() {
           <Financeiro store={store} onUpdate={() => setUpdateTick(t => t + 1)} />
         )}
 
+        {currentTab === 'relatorios' && store.hasPermission('financeiro.ver') && (
+          <Relatorios store={store} />
+        )}
+
         {currentTab === 'config' && store.hasPermission('config.editar') && (
           <Configuracao store={store} />
         )}
@@ -706,6 +713,7 @@ export default function App() {
                 { id: 'pedidos', perm: 'pedidos.ver' },
                 { id: 'caixa', perm: 'financeiro.ver' },
                 { id: 'financeiro', perm: 'financeiro.ver' },
+                { id: 'relatorios', perm: 'financeiro.ver' },
                 { id: 'usuarios', perm: '' },
                 { id: 'config', perm: 'config.editar' },
               ].find(t => {

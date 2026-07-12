@@ -264,7 +264,7 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-amber-50/30 text-amber-900 border-b border-amber-100">
-                      <th className="p-3 pl-0 whitespace-nowrap font-semibold text-[10px]">
+                      <th className="p-3 pl-4 whitespace-nowrap font-semibold text-[10px]">
                         <SortButton label="Código" sortKey="id" sortConfig={sortConfig} onSort={requestSort} />
                       </th>
                       <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Cliente</th>
@@ -274,9 +274,9 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
                       <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
                         <SortButton label="Entrega" sortKey="data_entrega_prevista" sortConfig={sortConfig} onSort={requestSort} />
                       </th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">Itens</th>
-                      <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
-                        <SortButton label="Valor" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} />
+                      <th className="p-3 text-right whitespace-nowrap font-semibold text-[10px]">Itens</th>
+                      <th className="p-3 text-right whitespace-nowrap font-semibold text-[10px]">
+                        <SortButton label="Valor" sortKey="valor_total" sortConfig={sortConfig} onSort={requestSort} align="right" />
                       </th>
                       <th className="p-3 whitespace-nowrap font-semibold text-[10px]">
                         <SortButton label="Status" sortKey="status_id" sortConfig={sortConfig} onSort={requestSort} />
@@ -289,12 +289,12 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
                       const itens = store.itensPedido.filter(it => it.pedido_id === p.id);
                       return (
                         <tr key={p.id} className="border-b border-amber-50/50">
-                          <td className="p-3 pl-0 font-mono font-bold text-amber-700 whitespace-nowrap">#{p.id.substring(4).toUpperCase()}</td>
+                          <td className="p-3 pl-4 font-mono font-bold text-amber-700 whitespace-nowrap">#{p.id.substring(4).toUpperCase()}</td>
                           <td className="p-3 font-semibold text-amber-950 whitespace-nowrap">{cli?.nome || 'N/A'}</td>
                           <td className="p-3 font-mono text-gray-600 whitespace-nowrap">{new Date(p.data_pedido).toLocaleDateString('pt-BR')}</td>
                           <td className="p-3 font-mono text-gray-600 whitespace-nowrap">{new Date(p.data_entrega_prevista).toLocaleDateString('pt-BR')}</td>
-                          <td className="p-3 whitespace-nowrap">{itens.length} itens</td>
-                          <td className="p-3 font-bold font-mono text-amber-900 whitespace-nowrap">{formatCurrency(p.valor_total)}</td>
+                          <td className="p-3 text-right font-mono whitespace-nowrap">{itens.length} itens</td>
+                          <td className="p-3 text-right font-bold font-mono text-amber-900 whitespace-nowrap">{formatCurrency(p.valor_total)}</td>
                           <td className="p-3 whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase
                               ${p.status_id === 1 ? 'bg-gray-100 text-gray-600' : ''}

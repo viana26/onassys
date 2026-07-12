@@ -139,12 +139,16 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       return;
     }
 
-    const result = await store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteValidade, loteNumero, loteObs);
-    if (result.success) {
-      setIsLoteOpen(false);
-      onUpdate();
-    } else {
-      setErrorMessage(result.error || 'Erro ao lançar produção de lote.');
+    try {
+      const result = await store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteValidade, loteNumero, loteObs);
+      if (result.success) {
+        setIsLoteOpen(false);
+        onUpdate();
+      } else {
+        setErrorMessage(result.error || 'Erro ao lançar produção de lote.');
+      }
+    } catch (err) {
+      setErrorMessage('Erro inesperado ao lançar produção.');
     }
   };
 
@@ -180,23 +184,21 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
         produto_id: adjustStockProdutoId,
         quantidade_disponivel: Number(adjustStockNovoSaldo),
         quantidade_minima: Number(adjustStockQtdMinima),
-        lote: adjustStockLote || undefined,
-        data_validade: adjustStockValidade || undefined,
+        lote: adjustStockLote || null,
+        data_validade: adjustStockValidade || null,
       });
       estoqueId = novo.id;
     } else {
-      const [resultadoEstoque] = await Promise.all([
-        store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs),
-        store.updateEstoqueProdutoConfig(estoqueId, {
-          quantidade_minima: Number(adjustStockQtdMinima),
-          lote: adjustStockLote || undefined,
-          data_validade: adjustStockValidade || undefined,
-        }),
-      ]);
+      const resultadoEstoque = await store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs);
       if (!resultadoEstoque.success) {
         setErrorMessage(resultadoEstoque.error || 'Erro ao ajustar estoque.');
         return;
       }
+      await store.updateEstoqueProdutoConfig(estoqueId, {
+        quantidade_minima: Number(adjustStockQtdMinima),
+        lote: adjustStockLote || null,
+        data_validade: adjustStockValidade || null,
+      });
     }
 
     setIsAdjustStockOpen(false);
@@ -314,8 +316,8 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
                       <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Produto" sortKey="produto_nome" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap"><SortButton label="Disponível" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} /></th>
-                      <th className="p-3 whitespace-nowrap"><SortButton label="Mínimo" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} /></th>
+                      <th className="p-3 text-right whitespace-nowrap"><SortButton label="Disponível" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                      <th className="p-3 text-right whitespace-nowrap"><SortButton label="Mínimo" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                       <th className="p-3 whitespace-nowrap">Lote / Validade</th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
@@ -338,10 +340,10 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                               {status.label}
                             </span>
                           </td>
-                          <td className="p-3 font-mono font-bold text-amber-950 dark:text-amber-100 whitespace-nowrap">
+                          <td className="p-3 text-right font-mono font-bold text-amber-950 dark:text-amber-100 whitespace-nowrap">
                             {ep.quantidade_disponivel} <span className="text-[10px] font-normal text-gray-400 dark:text-amber-100/30">{unidadeNome(ep.produto_id)}</span>
                           </td>
-                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                          <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                             {ep.quantidade_minima} <span className="text-[10px]">{unidadeNome(ep.produto_id)}</span>
                           </td>
                           <td className="p-3 whitespace-nowrap">
