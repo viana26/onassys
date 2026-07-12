@@ -18,7 +18,6 @@ function getInitialItems(store: MiniFactoryStore): ChecklistItem[] {
     { id: 'cliente', label: 'Cadastrar primeiro cliente', completed: store.clientes.length > 0 },
     { id: 'fornecedor', label: 'Cadastrar fornecedor', completed: store.fornecedores.length > 0 },
     { id: 'pedido', label: 'Registrar primeiro pedido', completed: store.pedidos.length > 0 },
-    { id: 'relatorio', label: 'Ver relatórios', completed: !!localStorage.getItem(CHECKLIST_KEY)?.includes('"relatorio"') },
   ];
 }
 

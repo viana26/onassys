@@ -47,18 +47,10 @@ export const welcomeTourSteps: TourStep[] = [
     },
   },
   {
-    element: '[data-help="relatorios"]',
-    popover: {
-      title: 'Relatórios',
-      description: 'Visualize indicadores: balancete, fluxo de caixa, ranking de clientes, desempenho de produtos e mais.',
-      side: 'right',
-    },
-  },
-  {
     element: '[data-help="ajuda"]',
     popover: {
       title: 'Precisa de Ajuda?',
-      description: 'Clique no botão de ajuda em qualquer módulo para ver uma explicação dos elementos da tela.',
+      description: 'Clique no botão ? em qualquer tela para ver explicações rápidas dos elementos da página.',
       side: 'bottom',
     },
   },
