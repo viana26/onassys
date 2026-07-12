@@ -342,7 +342,7 @@ export default function App() {
             <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
 
             <div className="flex items-center gap-2 px-1">
-              <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
+              <OnboardingChecklist moduleId={currentTab} />
             </div>
           </div>
 
@@ -479,7 +479,7 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2 mb-4 px-1">
-              <OnboardingChecklist store={store} onNavigate={(tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); }} />
+              <OnboardingChecklist moduleId={currentTab} />
             </div>
 
             <nav className="space-y-1">
