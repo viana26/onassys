@@ -340,10 +340,6 @@ export default function App() {
             </div>
 
             <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
-
-            <div className="flex items-center gap-2 px-1">
-              <OnboardingChecklist moduleId={currentTab} />
-            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto min-h-0 no-scrollbar py-2">
@@ -416,7 +412,12 @@ export default function App() {
               </button>
             </div>
 
-            <SyncStatus store={store} />
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1">
+                <SyncStatus store={store} />
+              </div>
+              <OnboardingChecklist moduleId={currentTab} />
+            </div>
 
             <button
               onClick={handleLogout}
@@ -476,10 +477,6 @@ export default function App() {
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
                 <X size={18} />
               </button>
-            </div>
-
-            <div className="flex items-center gap-2 mb-4 px-1">
-              <OnboardingChecklist moduleId={currentTab} />
             </div>
 
             <nav className="space-y-1">

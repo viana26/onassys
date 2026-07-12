@@ -446,7 +446,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           {store.hasPermission('pedidos.criar') && (
             <button 
               onClick={handleOpenNewOrder}
-              className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 justify-center font-medium"
+              className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 justify-center"
               data-help="pedidos-novo"
             >
               <PlusCircle size={16} /> Novo Pedido

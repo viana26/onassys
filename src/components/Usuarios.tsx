@@ -177,8 +177,8 @@ export default function Usuarios({ store }: UsuariosProps) {
         </div>
         {store.hasPermission('usuarios.criar') && (
           <button onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition">
-            <Plus size={18} /> Novo Usuário
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition text-xs font-sans">
+            <Plus size={15} /> Novo Usuário
           </button>
         )}
       </div>

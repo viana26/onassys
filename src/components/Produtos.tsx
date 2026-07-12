@@ -412,10 +412,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         {store.hasPermission('produtos.criar') && (
           <button 
             onClick={handleOpenNew}
-            className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
+            className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center cursor-pointer"
             data-help="produtos-novo"
           >
-            <PlusCircle size={16} /> Novo Produto & Receita
+            <PlusCircle size={15} /> Novo Produto
           </button>
         )}
       </div>

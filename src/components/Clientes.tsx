@@ -148,10 +148,10 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           <button
             onClick={() => setIsOpenForm(true)}
             disabled={!store.hasPermission('clientes.criar')}
-            className={`${store.hasPermission('clientes.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium`}
+            className={`${store.hasPermission('clientes.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center`}
             data-help="clientes-novo"
           >
-          <PlusCircle size={16} /> Novo Cliente
+          <PlusCircle size={15} /> Novo Cliente
         </button>
       </div>
 

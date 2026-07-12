@@ -141,9 +141,9 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
         <button
           onClick={handleOpenNew}
           disabled={!store.hasPermission('fornecedores.criar')}
-          className={`${store.hasPermission('fornecedores.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center`}
+          className={`${store.hasPermission('fornecedores.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center`}
         >
-          <PlusCircle size={16} /> Novo Fornecedor
+          <PlusCircle size={15} /> Novo Fornecedor
         </button>
       </div>
 

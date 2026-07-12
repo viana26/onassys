@@ -233,9 +233,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
         {store.hasPermission('estoque.criar') && (
           <button 
             onClick={() => handleOpenLoteForm()}
-            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center cursor-pointer"
           >
-            <Layers size={16} /> Lançar Lote de Produção
+            <Layers size={15} /> Lançar Lote
           </button>
         )}
       </div>
