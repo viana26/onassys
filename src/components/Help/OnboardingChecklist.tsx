@@ -18,7 +18,7 @@ function getInitialItems(store: MiniFactoryStore): ChecklistItem[] {
     { id: 'cliente', label: 'Cadastrar primeiro cliente', completed: store.clientes.length > 0 },
     { id: 'fornecedor', label: 'Cadastrar fornecedor', completed: store.fornecedores.length > 0 },
     { id: 'pedido', label: 'Registrar primeiro pedido', completed: store.pedidos.length > 0 },
-    { id: 'relatorio', label: 'Ver relatórios', completed: false },
+    { id: 'relatorio', label: 'Ver relatórios', completed: !!localStorage.getItem(CHECKLIST_KEY)?.includes('"relatorio"') },
   ];
 }
 
@@ -30,6 +30,7 @@ interface OnboardingChecklistProps {
 export default function OnboardingChecklist({ store, onNavigate }: OnboardingChecklistProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
+  const [tick, setTick] = useState(0);
   const btnRef = useRef<HTMLButtonElement>(null);
 
   const items = useMemo(() => {
@@ -43,7 +44,7 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
     } catch {
       return initial;
     }
-  }, [store.produtos.length, store.materiais.length, store.fichas.length, store.clientes.length, store.fornecedores.length, store.pedidos.length]);
+  }, [store.produtos.length, store.materiais.length, store.fichas.length, store.clientes.length, store.fornecedores.length, store.pedidos.length, tick]);
 
   const completedCount = items.filter(i => i.completed).length;
   const allDone = completedCount === items.length;
@@ -116,6 +117,7 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
                     const saved = JSON.parse(localStorage.getItem(CHECKLIST_KEY) || '[]');
                     saved.push({ id: item.id, completed: true });
                     localStorage.setItem(CHECKLIST_KEY, JSON.stringify(saved));
+                    setTick(t => t + 1);
                     setIsOpen(false);
                   }
                 }}
