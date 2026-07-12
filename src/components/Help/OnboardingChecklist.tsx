@@ -159,6 +159,9 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
                       relatorio: 'relatorios',
                     };
                     onNavigate(tabMap[item.id] || 'dashboard');
+                    const saved = JSON.parse(localStorage.getItem(CHECKLIST_KEY) || '[]');
+                    saved.push({ id: item.id, completed: true });
+                    localStorage.setItem(CHECKLIST_KEY, JSON.stringify(saved));
                     setIsOpen(false);
                   }
                 }}
