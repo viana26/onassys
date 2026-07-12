@@ -16,6 +16,8 @@ import Financeiro from './components/Financeiro';
 import Configuracao from './components/Configuracao';
 import Relatorios from './components/Relatorios';
 import SyncStatus from './components/SyncStatus';
+import { ContextualHelp, OnboardingTour, OnboardingChecklist } from './components/Help';
+import './components/Help/driver-overrides.css';
 import { 
     isSupabaseConfigured, 
     verificarAdminExiste,
@@ -312,6 +314,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex flex-col md:flex-row relative text-[#2e2315] dark:text-[#f7f4f0] transition-colors duration-200">
       
+      <OnboardingTour />
+
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
           <div className="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0 no-scrollbar">
@@ -339,7 +343,12 @@ export default function App() {
 
             <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
 
-            <nav className="space-y-1" id="desktop-nav">
+            <div className="flex items-center gap-2 px-1">
+              <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
+              <ContextualHelp moduleId={currentTab} />
+            </div>
+
+            <nav className="space-y-1" id="desktop-nav" data-help="sidebar">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
@@ -363,6 +372,7 @@ export default function App() {
                 return (
                   <button
                     key={item.id}
+                    data-help={item.id}
                     onClick={() => {
                       setCurrentTab(item.id);
                       setIsSidebarOpen(false);
@@ -469,6 +479,11 @@ export default function App() {
               </button>
             </div>
 
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <OnboardingChecklist store={store} onNavigate={(tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); }} />
+              <ContextualHelp moduleId={currentTab} />
+            </div>
+
             <nav className="space-y-1">
               {[
                 { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} />, perm: 'financeiro.ver' },
@@ -488,6 +503,7 @@ export default function App() {
                 return (
                   <button
                     key={item.id}
+                    data-help={item.id}
                     onClick={() => {
                       setCurrentTab(item.id);
                       setIsMobileMenuOpen(false);
