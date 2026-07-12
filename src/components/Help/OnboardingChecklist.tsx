@@ -1,6 +1,9 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle2, Circle } from 'lucide-react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { ChevronDown, ChevronUp, CheckCircle2, Circle, RotateCcw } from 'lucide-react';
+import { driver, DriveStep } from 'driver.js';
+import 'driver.js/dist/driver.css';
 import { MiniFactoryStore } from '../../lib/store';
+import { welcomeTourSteps } from './helpSteps';
 
 const CHECKLIST_KEY = 'onassys_onboarding_checklist';
 
@@ -15,6 +18,8 @@ function getInitialItems(store: MiniFactoryStore): ChecklistItem[] {
     { id: 'produto', label: 'Cadastrar primeiro produto', completed: store.produtos.length > 0 },
     { id: 'material', label: 'Adicionar material ao estoque', completed: store.materiais.length > 0 },
     { id: 'ficha', label: 'Criar ficha técnica', completed: store.fichas.length > 0 },
+    { id: 'cliente', label: 'Cadastrar primeiro cliente', completed: store.clientes.length > 0 },
+    { id: 'fornecedor', label: 'Cadastrar fornecedor', completed: store.fornecedores.length > 0 },
     { id: 'pedido', label: 'Registrar primeiro pedido', completed: store.pedidos.length > 0 },
     { id: 'relatorio', label: 'Ver relatórios', completed: false },
   ];
@@ -41,7 +46,7 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
     } catch {
       return initial;
     }
-  }, [store.produtos.length, store.materiais.length, store.fichas.length, store.pedidos.length]);
+  }, [store.produtos.length, store.materiais.length, store.fichas.length, store.clientes.length, store.fornecedores.length, store.pedidos.length]);
 
   const completedCount = items.filter(i => i.completed).length;
   const allDone = completedCount === items.length;
@@ -72,6 +77,44 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen]);
 
+  const handleRestartTour = useCallback(() => {
+    localStorage.removeItem('onassys_welcome_tour_completed');
+    setIsOpen(false);
+
+    const availableSteps: DriveStep[] = welcomeTourSteps
+      .filter(s => document.querySelector(s.element))
+      .map(s => ({
+        element: s.element,
+        popover: {
+          title: s.popover.title,
+          description: s.popover.description,
+          side: s.popover.side || 'bottom' as const,
+        },
+      }));
+
+    if (availableSteps.length === 0) return;
+
+    const isDark = document.documentElement.classList.contains('dark');
+
+    const d = driver({
+      showProgress: true,
+      animate: true,
+      overlayColor: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.5)',
+      progressText: '{{current}} de {{total}}',
+      popoverOffset: 8,
+      stagePadding: 6,
+      stageRadius: 8,
+      allowClose: true,
+      onDestroyStarted: () => {
+        d.destroy();
+        localStorage.setItem('onassys_welcome_tour_completed', 'true');
+      },
+      steps: availableSteps,
+    });
+
+    d.drive();
+  }, []);
+
   if (allDone) return null;
 
   return (
@@ -99,6 +142,8 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
                       produto: 'produtos',
                       material: 'materiais',
                       ficha: 'produtos',
+                      cliente: 'clientes',
+                      fornecedor: 'fornecedores',
                       pedido: 'pedidos',
                       relatorio: 'relatorios',
                     };
@@ -117,6 +162,15 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
                 <span className={`${item.completed ? 'line-through opacity-60' : ''} truncate`}>{item.label}</span>
               </button>
             ))}
+          </div>
+          <div className="mt-2 pt-2 border-t border-amber-100 dark:border-[#2d1e0d]">
+            <button
+              onClick={handleRestartTour}
+              className="w-full flex items-center gap-2 text-[11px] text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 py-1 px-1.5 rounded-lg transition"
+            >
+              <RotateCcw size={12} />
+              Refazer tour
+            </button>
           </div>
         </div>
       )}
