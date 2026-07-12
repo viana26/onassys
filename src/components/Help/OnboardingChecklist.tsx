@@ -79,10 +79,13 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
 
   const handleRestartTour = useCallback(() => {
     localStorage.removeItem('onassys_welcome_tour_completed');
-    setIsOpen(false);
 
     const availableSteps: DriveStep[] = welcomeTourSteps
-      .filter(s => document.querySelector(s.element))
+      .filter(s => {
+        const found = !!document.querySelector(s.element);
+        if (!found) console.log('[Tour] Elemento não encontrado:', s.element);
+        return found;
+      })
       .map(s => ({
         element: s.element,
         popover: {
@@ -92,7 +95,13 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
         },
       }));
 
-    if (availableSteps.length === 0) return;
+    console.log('[Tour] Passos disponíveis:', availableSteps.length, 'de', welcomeTourSteps.length);
+
+    if (availableSteps.length === 0) {
+      console.log('[Tour] Nenhum elemento encontrado. Elementos no DOM:', document.querySelectorAll('[data-help]').length);
+      setIsOpen(false);
+      return;
+    }
 
     const isDark = document.documentElement.classList.contains('dark');
 
@@ -112,7 +121,9 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
       steps: availableSteps,
     });
 
-    d.drive();
+    setIsOpen(false);
+
+    setTimeout(() => d.drive(), 100);
   }, []);
 
   if (allDone) return null;
