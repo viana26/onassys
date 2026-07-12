@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Save, Upload, Trash2 } from 'lucide-react';
+import { Save, Upload, Trash2, Settings } from 'lucide-react';
 import { DadosEmpresa } from '../types';
 import { MiniFactoryStore } from '../lib/store';
 import { uploadLogo, deleteLogo } from '../lib/logoUpload';
@@ -66,8 +66,11 @@ export default function Configuracao({ store }: ConfiguracaoProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-[#2e2315] dark:text-amber-50">Configurações</h2>
-        <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Dados da Empresa para relatórios e notas fiscais</p>
+        <div className="flex items-center gap-2">
+          <Settings size={20} className="text-amber-700 dark:text-amber-400" />
+          <h2 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Configurações</h2>
+        </div>
+        <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Dados da Empresa para relatórios e notas fiscais</p>
       </div>
 
       <div className="bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] p-6 max-w-xl space-y-6">

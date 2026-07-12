@@ -402,9 +402,11 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       {/* Title block */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className="text-amber-800 dark:text-amber-300 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Receitas</span>
-          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-[#f8f1ea]">Produtos e Fichas Técnicas</h1>
-          <p className="text-sm text-amber-900/60 dark:text-amber-100/60 mt-1">Defina quais ingredientes compõem seus salgados, bolos e doces. Calcule custos reais de fabricação e sugira capacidades.</p>
+          <div className="flex items-center gap-2">
+            <Layers size={20} className="text-amber-700 dark:text-amber-400" />
+            <h1 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Produtos</h1>
+          </div>
+          <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Defina quais ingredientes compõem seus salgados, bolos e doces. Calcule custos reais de fabricação e sugira capacidades.</p>
         </div>
 
         {store.hasPermission('produtos.criar') && (

@@ -131,9 +131,11 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className="text-amber-800 dark:text-amber-400 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Cadastros</span>
-          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-amber-100">Fornecedores</h1>
-          <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Gerencie seus fornecedores de insumos e matérias-primas.</p>
+          <div className="flex items-center gap-2">
+            <Building size={20} className="text-amber-700 dark:text-amber-400" />
+            <h1 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Fornecedores</h1>
+          </div>
+          <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Gerencie seus fornecedores de insumos e matérias-primas.</p>
         </div>
 
         <button

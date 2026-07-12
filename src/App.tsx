@@ -350,13 +350,13 @@ export default function App() {
             <nav className="space-y-1" id="desktop-nav" data-help="sidebar">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
-                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
+                { id: 'caixa', label: 'Caixa', icon: <Wallet size={15} />, perm: 'financeiro.ver' },
                 { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={15} />, perm: 'financeiro.ver' },
                 { id: 'relatorios', label: 'Relatórios', icon: <BarChart3 size={15} />, perm: 'financeiro.ver' },
-                { id: 'materiais', label: 'Despensa Insumos', icon: <Coins size={15} />, perm: 'materiais.ver' },
-                { id: 'produtos', label: 'Produtos / F. Técnicas', icon: <Layers size={16} />, perm: 'produtos.ver' },
-                { id: 'pedidos', label: 'Produção e Pedidos', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
-                { id: 'estoque', label: 'Estoque de Assados', icon: <Warehouse size={15} />, perm: 'estoque.ver' },
+                { id: 'materiais', label: 'Insumos', icon: <Coins size={15} />, perm: 'materiais.ver' },
+                { id: 'produtos', label: 'Produtos', icon: <Layers size={16} />, perm: 'produtos.ver' },
+                { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag size={15} />, perm: 'pedidos.ver' },
+                { id: 'estoque', label: 'Estoque', icon: <Warehouse size={15} />, perm: 'estoque.ver' },
                 { id: 'clientes', label: 'Clientes', icon: <Users size={15} />, perm: 'clientes.ver' },
                 { id: 'fornecedores', label: 'Fornecedores', icon: <Building size={15} />, perm: 'fornecedores.ver' },
                 { id: 'usuarios', label: 'Usuários', icon: <Shield size={15} />, perm: 'usuarios.ver' },
@@ -484,11 +484,11 @@ export default function App() {
 
             <nav className="space-y-1">
               {[
-                { id: 'caixa', label: 'Caixa Rápido', icon: <Wallet size={16} />, perm: 'financeiro.ver' },
+                { id: 'caixa', label: 'Caixa', icon: <Wallet size={16} />, perm: 'financeiro.ver' },
                 { id: 'clientes', label: 'Clientes', icon: <Users size={16} />, perm: 'clientes.ver' },
                 { id: 'fornecedores', label: 'Fornecedores', icon: <Building size={16} />, perm: 'fornecedores.ver' },
                 { id: 'financeiro', label: 'Financeiro', icon: <DollarSign size={16} />, perm: 'financeiro.ver' },
-                { id: 'produtos', label: 'Produtos / F. Técnicas', icon: <Layers size={16} />, perm: 'produtos.ver' },
+                { id: 'produtos', label: 'Produtos', icon: <Layers size={16} />, perm: 'produtos.ver' },
                 { id: 'usuarios', label: 'Usuários', icon: <Shield size={16} />, perm: 'usuarios.ver' },
                 { id: 'config', label: 'Configurações', icon: <Settings size={16} />, perm: 'config.editar' },
               ].filter(item => {

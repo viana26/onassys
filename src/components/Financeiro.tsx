@@ -33,7 +33,10 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#2e2315] dark:text-amber-50">Financeiro</h2>
+          <div className="flex items-center gap-2">
+            <DollarSign size={20} className="text-amber-700 dark:text-amber-400" />
+            <h2 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Financeiro</h2>
+          </div>
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Receitas, despesas e fluxo de caixa</p>
         </div>
         {store.hasPermission('financeiro.lancar') && (

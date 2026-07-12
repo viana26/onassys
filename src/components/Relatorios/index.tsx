@@ -114,9 +114,11 @@ export default function Relatorios({ store }: RelatoriosProps) {
   return (
     <div className="space-y-6">
       <div>
-        <span className="text-amber-800 dark:text-amber-400 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Análise</span>
-        <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-amber-100">Relatórios</h1>
-        <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Análises e indicadores do seu negócio.</p>
+        <div className="flex items-center gap-2">
+          <BarChart3 size={20} className="text-amber-700 dark:text-amber-400" />
+          <h1 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Relatórios</h1>
+        </div>
+        <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Análises e indicadores do seu negócio.</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-help="relatorios-card">

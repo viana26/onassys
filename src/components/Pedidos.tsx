@@ -20,7 +20,8 @@ import {
   DollarSign,
   FileText,
   Printer,
-  CheckCircle
+  CheckCircle,
+  ShoppingBag
 } from 'lucide-react';
 import { analisarEstoqueParaPedido } from '../lib/calculos';
 import RelatorioPedidos from './RelatorioPedidos';
@@ -434,9 +435,11 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       {/* Module Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className="text-amber-800 dark:text-amber-400 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Pedidos</span>
-          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-amber-100">Controle de Produção e Pedidos</h1>
-          <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore rascunhos, confirme pedidos, verifique insumos deficientes e trace o Kanban semanal.</p>
+          <div className="flex items-center gap-2">
+            <ShoppingBag size={20} className="text-amber-700 dark:text-amber-400" />
+            <h1 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Pedidos</h1>
+          </div>
+          <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Monitore rascunhos, confirme pedidos, verifique insumos deficientes e trace o Kanban semanal.</p>
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center">

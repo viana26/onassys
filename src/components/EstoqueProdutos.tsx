@@ -17,6 +17,7 @@ import {
   Tag, 
   X,
   Layers,
+  Warehouse,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   ArrowDownLeft,
@@ -222,9 +223,11 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       {/* Title Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className="text-amber-800 dark:text-amber-400 text-xs font-semibold font-mono tracking-wider uppercase">Módulo de Prateleira</span>
-          <h1 className="text-2xl font-semibold font-display tracking-tight text-amber-950 dark:text-amber-100">Estoque de Produtos Acabados</h1>
-          <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore coxinhas, brigadeiros e bolos assados livres para venda.</p>
+          <div className="flex items-center gap-2">
+            <Warehouse size={20} className="text-amber-700 dark:text-amber-400" />
+            <h1 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Estoque</h1>
+          </div>
+          <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Monitore coxinhas, brigadeiros e bolos assados livres para venda.</p>
         </div>
 
         {store.hasPermission('estoque.criar') && (
