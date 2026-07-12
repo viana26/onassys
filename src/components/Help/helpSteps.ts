@@ -66,6 +66,13 @@ export const welcomeTourSteps: TourStep[] = [
 
 export const moduleHelp: ModuleHelp[] = [
   {
+    moduleId: 'dashboard',
+    title: 'Ajuda — Dashboard',
+    steps: [
+      { element: '[data-help="dashboard"]', popover: { title: 'Painel Geral', description: 'Visão geral do seu negócio: receitas, despesas, saldo e pedidos do dia.', side: 'right' } },
+    ],
+  },
+  {
     moduleId: 'estoque',
     title: 'Ajuda — Estoque de Assados',
     steps: [
@@ -120,6 +127,27 @@ export const moduleHelp: ModuleHelp[] = [
     title: 'Ajuda — Relatórios',
     steps: [
       { element: '[data-help="relatorios-card"]', popover: { title: 'Relatórios Disponíveis', description: 'Clique em um relatório para abrir. Cada um oferece filtros, tabela ordenável, exportação CSV e impressão.', side: 'bottom' } },
+    ],
+  },
+  {
+    moduleId: 'fornecedores',
+    title: 'Ajuda — Fornecedores',
+    steps: [
+      { element: '[data-help="fornecedores"]', popover: { title: 'Fornecedores', description: 'Gerencie seus fornecedores de insumos e matérias-primas.', side: 'right' } },
+    ],
+  },
+  {
+    moduleId: 'config',
+    title: 'Ajuda — Configurações',
+    steps: [
+      { element: '[data-help="config"]', popover: { title: 'Configurações', description: 'Configure os dados da empresa, logo, slogan e preferências do sistema.', side: 'right' } },
+    ],
+  },
+  {
+    moduleId: 'usuarios',
+    title: 'Ajuda — Usuários',
+    steps: [
+      { element: '[data-help="usuarios"]', popover: { title: 'Usuários', description: 'Gerencie os acessos e permissões dos usuários do sistema.', side: 'right' } },
     ],
   },
 ];

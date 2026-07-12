@@ -126,7 +126,7 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
   });
 
   return (
-    <div className="space-y-6" id="dashboard-tab">
+    <div className="space-y-6" id="dashboard-tab" data-help="dashboard">
       <div className="bg-gradient-to-r from-amber-800 to-amber-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden" id="dash-banner">
         <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
           <Sparkles size={250} />
