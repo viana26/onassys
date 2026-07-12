@@ -343,11 +343,6 @@ export default function App() {
 
             <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
 
-            <div className="flex items-center gap-2 px-1">
-              <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
-              <ContextualHelp moduleId={currentTab} />
-            </div>
-
             <nav className="space-y-1" id="desktop-nav" data-help="sidebar">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
@@ -477,11 +472,6 @@ export default function App() {
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
                 <X size={18} />
               </button>
-            </div>
-
-            <div className="flex items-center gap-2 mb-4 px-1">
-              <OnboardingChecklist store={store} onNavigate={(tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); }} />
-              <ContextualHelp moduleId={currentTab} />
             </div>
 
             <nav className="space-y-1">
@@ -744,6 +734,12 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* FLOATING HELP BAR */}
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 md:bottom-6 md:right-6">
+        <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
+        <ContextualHelp moduleId={currentTab} />
+      </div>
     </div>
   );
 }

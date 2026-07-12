@@ -73,6 +73,13 @@ export const moduleHelp: ModuleHelp[] = [
     ],
   },
   {
+    moduleId: 'caixa',
+    title: 'Ajuda — Caixa Rápido',
+    steps: [
+      { element: '[data-help="caixa"]', popover: { title: 'Caixa Rápido', description: 'Registre recebimentos de pedidos, receitas avulsas e despesas rápidas. Veja o resumo do dia à direita.', side: 'right' } },
+    ],
+  },
+  {
     moduleId: 'estoque',
     title: 'Ajuda — Estoque de Assados',
     steps: [
