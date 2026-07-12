@@ -375,7 +375,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
         <div className="flex items-center gap-2">
           <Wallet size={22} className="text-amber-700" />
           <div>
-            <h2 className="text-xl font-bold text-[#2e2315] dark:text-amber-50">Caixa Rápido</h2>
+            <h2 className="text-lg font-semibold text-[#2e2315] dark:text-amber-100">Caixa</h2>
             <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Recebimentos, receitas e despesas</p>
           </div>
         </div>
