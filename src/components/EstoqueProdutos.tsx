@@ -185,17 +185,18 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       });
       estoqueId = novo.id;
     } else {
-      const resultadoEstoque = await store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs);
+      const [resultadoEstoque] = await Promise.all([
+        store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs),
+        store.updateEstoqueProdutoConfig(estoqueId, {
+          quantidade_minima: Number(adjustStockQtdMinima),
+          lote: adjustStockLote || undefined,
+          data_validade: adjustStockValidade || undefined,
+        }),
+      ]);
       if (!resultadoEstoque.success) {
         setErrorMessage(resultadoEstoque.error || 'Erro ao ajustar estoque.');
         return;
       }
-
-      await store.updateEstoqueProdutoConfig(estoqueId, {
-        quantidade_minima: Number(adjustStockQtdMinima),
-        lote: adjustStockLote || undefined,
-        data_validade: adjustStockValidade || undefined,
-      });
     }
 
     setIsAdjustStockOpen(false);
