@@ -143,11 +143,12 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           <p className="text-sm text-amber-900/60 dark:text-amber-100/40 mt-1">Monitore quem compra seus salgadinhos de festa, bolos e doces. Registre contatos e locais de entrega rápida.</p>
         </div>
 
-        <button 
-          onClick={handleOpenNew}
-          disabled={!store.hasPermission('clientes.criar')}
-          className={`${store.hasPermission('clientes.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium`}
-        >
+          <button
+            onClick={() => setIsOpenForm(true)}
+            disabled={!store.hasPermission('clientes.criar')}
+            className={`${store.hasPermission('clientes.criar') ? 'bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700' : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'} shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium`}
+            data-help="clientes-novo"
+          >
           <PlusCircle size={16} /> Novo Cliente
         </button>
       </div>
@@ -163,6 +164,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
             placeholder="Buscar por nome, telefone, endereço..." 
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
+            data-help="clientes-busca"
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2b1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
           />
         </div>

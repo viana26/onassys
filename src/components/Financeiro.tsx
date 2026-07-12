@@ -37,13 +37,14 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50">Receitas, despesas e fluxo de caixa</p>
         </div>
         {store.hasPermission('financeiro.lancar') && (
-          <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2" data-help="financeiro-filtro">
             <button onClick={() => setShowBalancete(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1a1208] border border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100 font-semibold rounded-xl hover:bg-[#f0eade] dark:hover:bg-[#22160b] transition text-xs">
               <BarChart3 size={16} /> Relatório
             </button>
             <button onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition text-xs">
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition text-xs"
+              data-help="financeiro-novo">
               <Plus size={16} /> Novo Lançamento
             </button>
           </div>

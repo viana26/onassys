@@ -270,11 +270,12 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 placeholder="Buscar por nome do produto..." 
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                data-help="estoque-busca"
                 className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2a1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
               />
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
+            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1" data-help="estoque-filtro">
               {[
                 { type: 'todos' as const, label: 'Todos' },
                 { type: 'em_falta' as const, label: 'Sem Estoque' },
@@ -373,6 +374,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                                   onClick={() => handleOpenAdjustStock(ep)}
                                   className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition cursor-pointer"
                                   title="Ajustar Estoque"
+                                  data-help="estoque-novo"
                                 >
                                   <Edit3 size={14} />
                                 </button>

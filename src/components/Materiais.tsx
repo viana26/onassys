@@ -291,6 +291,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <button 
                   onClick={handleOpenNew}
                   className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2 px-3 rounded-xl transition flex items-center gap-1 w-full sm:w-auto justify-center cursor-pointer"
+                  data-help="materiais-novo"
                 >
                   <Plus size={14} /> Novo Ingrediente
                 </button>
@@ -372,6 +373,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                                 <button 
                                   onClick={() => handleOpenInbound(m)}
                                   className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
+                                  data-help="materiais-mov"
                                 >
                                   + Compra/Entrada
                                 </button>

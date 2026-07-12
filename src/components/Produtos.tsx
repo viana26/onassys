@@ -411,6 +411,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           <button 
             onClick={handleOpenNew}
             className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center font-medium cursor-pointer"
+            data-help="produtos-novo"
           >
             <PlusCircle size={16} /> Novo Produto & Receita
           </button>
@@ -700,6 +701,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   key={tab.key}
                   type="button"
                   onClick={() => setFormTab(tab.key)}
+                  data-help={tab.key === 'receita' ? 'produtos-ficha' : undefined}
                   className={`flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
                     formTab === tab.key
                       ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100'

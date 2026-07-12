@@ -444,6 +444,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
             <button 
               onClick={handleOpenNewOrder}
               className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-700 shadow-sm text-white text-xs font-semibold font-sans py-2.5 px-4 rounded-xl transition flex items-center gap-1.5 justify-center font-medium"
+              data-help="pedidos-novo"
             >
               <PlusCircle size={16} /> Novo Pedido
             </button>
@@ -461,6 +462,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       <div className="flex border-b border-amber-100 dark:border-[#22160b] gap-4" id="orders-tabs">
         <button 
           onClick={() => setActiveTab('kanban')}
+          data-help="pedidos-kanban"
           className={`pb-2.5 text-xs font-semibold uppercase tracking-wider font-sans transition flex items-center gap-1
             ${activeTab === 'kanban' ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-200 font-bold' : 'text-gray-500 dark:text-[#a08f80]'}
           `}
@@ -477,6 +479,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
         </button>
         <button 
           onClick={() => setActiveTab('lista')}
+          data-help="pedidos-lista"
           className={`pb-2.5 text-xs font-semibold uppercase tracking-wider font-sans transition flex items-center gap-1
             ${activeTab === 'lista' ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-200 font-bold' : 'text-gray-500 dark:text-[#a08f80]'}
           `}
