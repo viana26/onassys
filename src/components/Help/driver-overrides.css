@@ -1,0 +1,95 @@
+.driver-popover {
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25) !important;
+  border: 1px solid #e7e5e4 !important;
+  padding: 16px !important;
+  max-width: 320px !important;
+}
+
+.dark .driver-popover {
+  background: #1c140c !important;
+  border-color: #2d1e0d !important;
+}
+
+.driver-popover-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #1c1917 !important;
+  margin-bottom: 6px !important;
+}
+
+.dark .driver-popover-title {
+  color: #f5f0e8 !important;
+}
+
+.driver-popover-description {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 12px !important;
+  color: #57534e !important;
+  line-height: 1.5 !important;
+  margin-bottom: 12px !important;
+}
+
+.dark .driver-popover-description {
+  color: #a8a29e !important;
+}
+
+.driver-popover-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.driver-popover-progress-text {
+  font-size: 10px !important;
+  color: #a8a29e !important;
+  font-family: monospace !important;
+}
+
+.driver-btn {
+  background: #d97706 !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 6px 16px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: background 0.15s !important;
+}
+
+.driver-btn:hover {
+  background: #b45309 !important;
+}
+
+.driver-btn.driver-btn-secondary {
+  background: transparent !important;
+  color: #78716c !important;
+  border: 1px solid #d6d3d1 !important;
+}
+
+.driver-btn.driver-btn-secondary:hover {
+  background: #f5f5f4 !important;
+}
+
+.dark .driver-btn.driver-btn-secondary {
+  color: #a8a29e !important;
+  border-color: #44403c !important;
+}
+
+.dark .driver-btn.driver-btn-secondary:hover {
+  background: #292524 !important;
+}
+
+.driver-overlay {
+  opacity: 0.7 !important;
+}
+
+.driver-spotlight {
+  border: 2px solid #d97706 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15) !important;
+}
