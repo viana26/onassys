@@ -318,7 +318,7 @@ export default function App() {
 
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
-          <div className="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0 no-scrollbar">
+          <div className="flex flex-col gap-2 flex-shrink-0">
             <div className="flex items-start gap-2.5 lg:gap-3">
               {store?.dadosEmpresa?.logo_url ? (
                 <img src={store.dadosEmpresa.logo_url} alt="Logo" className="w-20 h-20 object-cover rounded-xl shadow-lg border border-amber-200 dark:border-amber-800/40 shrink-0" />
@@ -343,6 +343,13 @@ export default function App() {
 
             <div className="border-b border-[#ebdcc9] dark:border-[#1e1005]"></div>
 
+            <div className="flex items-center gap-2 px-1">
+              <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
+              <ContextualHelp moduleId={currentTab} />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto min-h-0 no-scrollbar py-2">
             <nav className="space-y-1" id="desktop-nav" data-help="sidebar">
               {[
                 { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={15} />, perm: null },
@@ -472,6 +479,11 @@ export default function App() {
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
                 <X size={18} />
               </button>
+            </div>
+
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <OnboardingChecklist store={store} onNavigate={(tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); }} />
+              <ContextualHelp moduleId={currentTab} />
             </div>
 
             <nav className="space-y-1">
@@ -734,12 +746,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* FLOATING HELP BAR */}
-      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 md:bottom-6 md:right-6">
-        <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
-        <ContextualHelp moduleId={currentTab} />
-      </div>
     </div>
   );
 }
