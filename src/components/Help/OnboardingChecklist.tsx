@@ -46,7 +46,6 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
   }, [store.produtos.length, store.materiais.length, store.fichas.length, store.clientes.length, store.fornecedores.length, store.pedidos.length, tick]);
 
   const completedCount = items.filter(i => i.completed).length;
-  const allDone = completedCount === items.length;
 
   useEffect(() => {
     if (isOpen && btnRef.current) {
@@ -79,8 +78,6 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
     localStorage.removeItem(CHECKLIST_KEY);
     window.location.reload();
   }, []);
-
-  if (allDone) return null;
 
   return (
     <div className="relative">
