@@ -11,17 +11,10 @@ interface ContextualHelpProps {
 export default function ContextualHelp({ moduleId }: ContextualHelpProps) {
   const handleHelp = useCallback(() => {
     const help = getModuleHelp(moduleId);
-    if (!help || help.steps.length === 0) {
-      console.log('[Ajuda] Nenhum passo definido para:', moduleId);
-      return;
-    }
+    if (!help || help.steps.length === 0) return;
 
     const steps: DriveStep[] = help.steps
-      .filter(s => {
-        const found = !!document.querySelector(s.element);
-        if (!found) console.log('[Ajuda] Elemento não encontrado:', s.element);
-        return found;
-      })
+      .filter(s => !!document.querySelector(s.element))
       .map(s => ({
         element: s.element,
         popover: {
@@ -31,12 +24,7 @@ export default function ContextualHelp({ moduleId }: ContextualHelpProps) {
         },
       }));
 
-    if (steps.length === 0) {
-      console.log('[Ajuda] Nenhum elemento encontrado na tela para:', moduleId);
-      return;
-    }
-
-    console.log('[Ajuda] Iniciando tour com', steps.length, 'passos');
+    if (steps.length === 0) return;
 
     const isDark = document.documentElement.classList.contains('dark');
 

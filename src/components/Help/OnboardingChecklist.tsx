@@ -1,9 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle2, Circle, RotateCcw } from 'lucide-react';
-import { driver, DriveStep } from 'driver.js';
-import 'driver.js/dist/driver.css';
 import { MiniFactoryStore } from '../../lib/store';
-import { welcomeTourSteps } from './helpSteps';
 
 const CHECKLIST_KEY = 'onassys_onboarding_checklist';
 
@@ -79,51 +76,8 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
 
   const handleRestartTour = useCallback(() => {
     localStorage.removeItem('onassys_welcome_tour_completed');
-
-    const availableSteps: DriveStep[] = welcomeTourSteps
-      .filter(s => {
-        const found = !!document.querySelector(s.element);
-        if (!found) console.log('[Tour] Elemento não encontrado:', s.element);
-        return found;
-      })
-      .map(s => ({
-        element: s.element,
-        popover: {
-          title: s.popover.title,
-          description: s.popover.description,
-          side: s.popover.side || 'bottom' as const,
-        },
-      }));
-
-    console.log('[Tour] Passos disponíveis:', availableSteps.length, 'de', welcomeTourSteps.length);
-
-    if (availableSteps.length === 0) {
-      console.log('[Tour] Nenhum elemento encontrado. Elementos no DOM:', document.querySelectorAll('[data-help]').length);
-      setIsOpen(false);
-      return;
-    }
-
-    const isDark = document.documentElement.classList.contains('dark');
-
-    const d = driver({
-      showProgress: true,
-      animate: true,
-      overlayColor: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(0, 0, 0, 0.5)',
-      progressText: '{{current}} de {{total}}',
-      popoverOffset: 8,
-      stagePadding: 6,
-      stageRadius: 8,
-      allowClose: true,
-      onDestroyStarted: () => {
-        d.destroy();
-        localStorage.setItem('onassys_welcome_tour_completed', 'true');
-      },
-      steps: availableSteps,
-    });
-
-    setIsOpen(false);
-
-    setTimeout(() => d.drive(), 100);
+    localStorage.removeItem(CHECKLIST_KEY);
+    window.location.reload();
   }, []);
 
   if (allDone) return null;
