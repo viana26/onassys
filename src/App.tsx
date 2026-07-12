@@ -16,7 +16,7 @@ import Financeiro from './components/Financeiro';
 import Configuracao from './components/Configuracao';
 import Relatorios from './components/Relatorios';
 import SyncStatus from './components/SyncStatus';
-import { ContextualHelp, OnboardingTour, OnboardingChecklist } from './components/Help';
+import { OnboardingChecklist } from './components/Help';
 import './components/Help/driver-overrides.css';
 import { 
     isSupabaseConfigured, 
@@ -314,8 +314,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#fdfbf7] dark:bg-[#0c0703] flex flex-col md:flex-row relative text-[#2e2315] dark:text-[#f7f4f0] transition-colors duration-200">
       
-      <OnboardingTour />
-
       {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col md:w-56 lg:w-64 bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-50 h-screen sticky top-0 flex-shrink-0 md:p-4 lg:p-5 border-r border-[#ebdcc9] dark:border-[#1e1005] transition-colors duration-200">
           <div className="flex flex-col gap-2 flex-shrink-0">
@@ -345,7 +343,6 @@ export default function App() {
 
             <div className="flex items-center gap-2 px-1">
               <OnboardingChecklist store={store} onNavigate={(tab) => setCurrentTab(tab)} />
-              <ContextualHelp moduleId={currentTab} />
             </div>
           </div>
 
@@ -483,7 +480,6 @@ export default function App() {
 
             <div className="flex items-center gap-2 mb-4 px-1">
               <OnboardingChecklist store={store} onNavigate={(tab) => { setCurrentTab(tab); setIsMobileMenuOpen(false); }} />
-              <ContextualHelp moduleId={currentTab} />
             </div>
 
             <nav className="space-y-1">

@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle2, Circle, RotateCcw } from 'lucide-react';
+import { CheckCircle2, Circle, HelpCircle, RotateCcw } from 'lucide-react';
 import { MiniFactoryStore } from '../../lib/store';
 
 const CHECKLIST_KEY = 'onassys_onboarding_checklist';
@@ -84,11 +84,11 @@ export default function OnboardingChecklist({ store, onNavigate }: OnboardingChe
       <button
         ref={btnRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/30 transition whitespace-nowrap"
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/40 transition text-[11px] font-semibold"
+        title="Primeiros passos"
       >
-        <CheckCircle2 size={14} />
-        Início ({completedCount}/{items.length})
-        {isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        <HelpCircle size={14} />
+        Ajuda!
       </button>
 
       {isOpen && (

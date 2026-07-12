@@ -13,49 +13,6 @@ export interface ModuleHelp {
   steps: TourStep[];
 }
 
-export const welcomeTourSteps: TourStep[] = [
-  {
-    element: '[data-help="sidebar"]',
-    popover: {
-      title: 'Menu Principal',
-      description: 'Acesse todos os módulos do sistema pelo menu lateral. Aqui você encontra Estoque, Pedidos, Financeiro e muito mais.',
-      side: 'right',
-    },
-  },
-  {
-    element: '[data-help="estoque"]',
-    popover: {
-      title: 'Estoque de Assados',
-      description: 'Gerencie seus produtos acabados. Aqui você controla entradas, saídas, lotes e validades.',
-      side: 'right',
-    },
-  },
-  {
-    element: '[data-help="pedidos"]',
-    popover: {
-      title: 'Produção e Pedidos',
-      description: 'Crie e acompanhe pedidos. O sistema reserva estoque automaticamente e controla o fluxo de produção.',
-      side: 'right',
-    },
-  },
-  {
-    element: '[data-help="financeiro"]',
-    popover: {
-      title: 'Financeiro',
-      description: 'Registre entradas, saídas e acompanhe o fluxo de caixa do seu negócio.',
-      side: 'right',
-    },
-  },
-  {
-    element: '[data-help="ajuda"]',
-    popover: {
-      title: 'Precisa de Ajuda?',
-      description: 'Clique no botão ? em qualquer tela para ver explicações rápidas dos elementos da página.',
-      side: 'bottom',
-    },
-  },
-];
-
 export const moduleHelp: ModuleHelp[] = [
   {
     moduleId: 'dashboard',
