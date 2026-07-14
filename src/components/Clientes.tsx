@@ -4,6 +4,10 @@ import { Cliente } from '../types';
 import { phoneMask } from '../lib/mask';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+
+function onlyDigits(v: string): string {
+  return v.replace(/\D/g, '');
+}
 import { 
   Trash2, 
   Edit3, 
@@ -44,17 +48,26 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
   const filteredClientes = useMemo(() => {
-    const filtered = store.clientes.filter(c => {
-      const matchesSearch = c.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            c.telefone.includes(searchTerm) || 
-                            c.endereco.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase().trim();
+    const searchDigits = searchTerm.replace(/\D/g, '');
+    
+    return store.clientes.filter(c => {
+      const nomeLower = (c.nome || '').toLowerCase();
+      const telDigits = (c.telefone || '').replace(/\D/g, '');
+      const enderecoLower = (c.endereco || '').toLowerCase();
+      const emailLower = (c.email || '').toLowerCase();
+
+      const matchesSearch = 
+        nomeLower.includes(searchLower) ||
+        (searchDigits !== '' && telDigits.includes(searchDigits)) ||
+        enderecoLower.includes(searchLower) ||
+        emailLower.includes(searchLower);
       
       if (typeFilter !== 'todos') {
         return matchesSearch && c.tipo_id === Number(typeFilter);
       }
       return matchesSearch;
     });
-    return filtered;
   }, [store.clientes, searchTerm, typeFilter]);
 
   const { sortedItems: sortedClientes, requestSort, sortConfig } = useSortableData(filteredClientes, 'nome');

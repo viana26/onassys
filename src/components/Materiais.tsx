@@ -524,6 +524,24 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               {store.movMateriais.map((mov, idx) => {
                 const mat = store.materiais.find(m => m.id === mov.material_id);
                 const isEntrada = mov.tipo_id === 1;
+
+                const hasCostInfo = isEntrada && (
+                  (mov.valor_pago !== null && mov.valor_pago !== undefined) ||
+                  (mov.custo_unitario !== null && mov.custo_unitario !== undefined) ||
+                  (mat?.custo_unitario !== null && mat?.custo_unitario !== undefined)
+                );
+
+                const valPago = (mov.valor_pago !== null && mov.valor_pago !== undefined)
+                  ? Number(mov.valor_pago)
+                  : ((mov.custo_unitario !== null && mov.custo_unitario !== undefined) ? Number(mov.custo_unitario) : (mat?.custo_unitario || 0)) * mov.quantidade;
+
+                const custUnit = (mov.custo_unitario !== null && mov.custo_unitario !== undefined)
+                  ? Number(mov.custo_unitario)
+                  : (mat?.custo_unitario || 0);
+
+                const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
+                const isDateValid = dateObj && !isNaN(dateObj.getTime());
+
                 return (
                   <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
                     <div className="flex items-center gap-3">
@@ -539,17 +557,19 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
                         {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
                       </p>
-                      {isEntrada && (mov.valor_pago !== undefined || mov.custo_unitario !== undefined || mat?.custo_unitario) && (
+                      {hasCostInfo && (
                         <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-mono">
-                          PAGO: {(mov.valor_pago !== undefined ? mov.valor_pago : (mov.custo_unitario || mat?.custo_unitario || 0) * mov.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          PAGO: {valPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           <span className="text-gray-400 dark:text-amber-100/30 font-sans font-normal ml-1">
-                            ({(mov.custo_unitario !== undefined ? mov.custo_unitario : mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0) || ''})
+                            ({custUnit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0) || ''})
                           </span>
                         </p>
                       )}
-                      <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
-                        {new Date(mov.criado_em).toLocaleDateString('pt-BR')} {new Date(mov.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      {isDateValid && (
+                        <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
+                          {dateObj.toLocaleDateString('pt-BR')} {dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
                     </div>
                   </div>
                 );

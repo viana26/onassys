@@ -57,9 +57,12 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   // Selected Order detail popup state
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(null);
   
-  // Cancel confirmation modal
-  const [cancelConfirmPedidoId, setCancelConfirmPedidoId] = useState<string | null>(null);
-  
+  // Reverse confirmation modal (voltar/cancelar pedido)
+  const [reverseConfirm, setReverseConfirm] = useState<{ pedidoId: string; targetStatus: number; fromStatus: number } | null>(null);
+
+  // Custom alert modal (replaces native alert())
+  const [customAlert, setCustomAlert] = useState<{ title?: string; message: string } | null>(null);
+
   // Estorno pendente filter
   const [showEstornoPendente, setShowEstornoPendente] = useState(false);
   
@@ -93,6 +96,13 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   const [analiseResultado, setAnaliseResultado] = useState<ReturnType<typeof analisarEstoqueParaPedido> | null>(null);
 
 
+
+  // Reverse modal checkbox states
+  const [revReverterProducao, setRevReverterProducao] = useState(true);
+  const [revRestaurarInsumos, setRevRestaurarInsumos] = useState(true);
+  const [revRemoverProdutos, setRevRemoverProdutos] = useState(true);
+  const [revReporEstoque, setRevReporEstoque] = useState(true);
+  const [revEstornar, setRevEstornar] = useState(false);
 
   // Drag and drop states for Kanban columns
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
@@ -196,11 +206,11 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   const handleSaveOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clienteId) {
-      alert('Por favor cadastre ou selecione um cliente.');
+      setCustomAlert({ title: 'Cliente necessário', message: 'Por favor cadastre ou selecione um cliente.' });
       return;
     }
     if (itensPedido.length === 0) {
-      alert('Adicione pelo menos 1 produto no pedido.');
+      setCustomAlert({ title: 'Produto necessário', message: 'Adicione pelo menos 1 produto no pedido.' });
       return;
     }
 
@@ -300,7 +310,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
         });
         setInsufficientItemsEdit({ pedidoId: pedId, items });
       } else {
-        alert(result.error);
+        setCustomAlert({ title: 'Erro', message: result.error || 'Erro desconhecido' });
       }
     } else {
       onUpdate();
@@ -354,7 +364,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           });
           setInsufficientItemsEdit({ pedidoId: edit.pedidoId, items });
         } else {
-          alert(retry.error);
+          setCustomAlert({ title: 'Erro', message: retry.error || 'Erro ao processar' });
         }
       } else {
         onUpdate();
@@ -522,8 +532,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="kanban-columns-container">
             {/* Compile Columns list */}
             {[
-              { id: 2, title: 'Aguardando Produção', color: 'bg-amber-50/45 dark:bg-[#1a1107]/40 border-amber-100 dark:border-[#382613]/55', text: 'text-amber-950 dark:text-amber-200', badge: 'bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200' },
-              { id: 3, title: 'Em Produção (Cozinha)', color: 'bg-indigo-50/20 dark:bg-[#111124]/30 border-indigo-100 dark:border-[#22224c]/40', text: 'text-indigo-900 dark:text-indigo-300', badge: 'bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-200' },
+              { id: 2, title: 'Confirmado', color: 'bg-amber-50/45 dark:bg-[#1a1107]/40 border-amber-100 dark:border-[#382613]/55', text: 'text-amber-950 dark:text-amber-200', badge: 'bg-amber-200 dark:bg-amber-950/80 dark:text-amber-200' },
+              { id: 3, title: 'Produzindo', color: 'bg-indigo-50/20 dark:bg-[#111124]/30 border-indigo-100 dark:border-[#22224c]/40', text: 'text-indigo-900 dark:text-indigo-300', badge: 'bg-indigo-200 dark:bg-indigo-950 dark:text-indigo-200' },
               { id: 4, title: 'Pronto p/ Entrega', color: 'bg-emerald-50/20 dark:bg-[#071a10]/30 border-emerald-100 dark:border-[#133c24]/40', text: 'text-emerald-900 dark:text-emerald-305', badge: 'bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' },
               { id: 5, title: 'Entregues Recentes', color: 'bg-gray-50/20 dark:bg-[#111111]/30 border-gray-100 dark:border-[#222222]/40', text: 'text-gray-650 dark:text-gray-300', badge: 'bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }
             ].map(col => {
@@ -554,7 +564,19 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                     e.preventDefault();
                     const orderId = e.dataTransfer.getData("text/plain") || draggedOrderId;
                     if (orderId) {
-                      handleTransitionStatus(orderId, col.id);
+                      const pedido = store.pedidos.find(p => p.id === orderId);
+                      if (pedido) {
+                        const diff = col.id - pedido.status_id;
+                        if (diff > 1) {
+                          setCustomAlert({ title: 'Fluxo inválido', message: 'Avance uma etapa por vez. Use "Atender do Estoque" no painel de detalhes se o produto já estiver em estoque.' });
+                        } else if (diff < -1) {
+                          setCustomAlert({ title: 'Fluxo inválido', message: 'Volte uma etapa por vez para evitar inconsistências.' });
+                        } else if (diff < 0) {
+                          setReverseConfirm({ pedidoId: orderId, targetStatus: col.id, fromStatus: pedido.status_id });
+                        } else {
+                          handleTransitionStatus(orderId, col.id);
+                        }
+                      }
                     }
                     setDraggedOrderId(null);
                     setDragOverColumn(null);
@@ -1393,9 +1415,22 @@ ${pagHtml}
                         <button
                           onClick={() => handleTransitionStatus(p.id, 3)}
                           disabled={!analise.tudoDisponivelEmEstoquePronto && !analise.podeProduzirRestante}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                          className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
-                          🥘 Iniciar Produção (Cozinha)
+                          🥘 Iniciar Produção
+                        </button>
+                      )}
+
+                      {store.hasPermission('pedidos.editar') && p.status_id === 2 && analise.tudoDisponivelEmEstoquePronto && (
+                        <button
+                          onClick={async () => {
+                            const result = await store.atenderPedidoDoEstoque(p.id);
+                            if (!result.success) { setCustomAlert({ title: 'Erro', message: result.error || 'Erro ao atender do estoque' }); return; }
+                            onUpdate();
+                          }}
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                        >
+                          📦 Atender do Estoque
                         </button>
                       )}
 
@@ -1404,7 +1439,7 @@ ${pagHtml}
                           onClick={() => handleTransitionStatus(p.id, 4)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
-                          📦 Prontificar Assado (Pronto)
+                          🍳 Finalizar e Gerar Estoque
                         </button>
                       )}
 
@@ -1413,13 +1448,13 @@ ${pagHtml}
                           onClick={() => handleTransitionStatus(p.id, 5)}
                           className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
                         >
-                          🚚 Confirmar Entrega de Pedido
+                          🚚 Entregar
                         </button>
                       )}
 
                       {store.hasPermission('pedidos.cancelar') && p.status_id !== 5 && p.status_id !== 6 && (
                         <button
-                          onClick={() => setCancelConfirmPedidoId(p.id)}
+                          onClick={() => setReverseConfirm({ pedidoId: p.id, targetStatus: 6, fromStatus: p.status_id })}
                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-lg"
                         >
                           Cancelar Pedido ❌
@@ -1507,50 +1542,96 @@ ${pagHtml}
         </div>
       )}
 
-      {/* Cancel confirmation modal */}
-      {cancelConfirmPedidoId && (() => {
-        const ped = store.pedidos.find(p => p.id === cancelConfirmPedidoId);
+      {/* Reverse confirmation modal (voltar/cancelar pedido) */}
+      {reverseConfirm && (() => {
+        const { pedidoId, targetStatus, fromStatus } = reverseConfirm;
+        const ped = store.pedidos.find(p => p.id === pedidoId);
         if (!ped) return null;
-        const recebidos = store.lancamentos.filter(l => l.pedido_id === cancelConfirmPedidoId && l.tipo === 'receita');
+        const recebidos = store.lancamentos.filter(l => l.pedido_id === pedidoId && l.tipo === 'receita');
         const totalRecebido = recebidos.reduce((s, l) => s + l.valor, 0);
+        const isCancel = targetStatus === 6;
         return (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 space-y-4 border border-amber-100 dark:border-[#2e1a0a]">
-              <h3 className="font-bold text-amber-950 dark:text-amber-50">Cancelar Pedido</h3>
+              <h3 className="font-bold text-amber-950 dark:text-amber-50">
+                {isCancel ? 'Cancelar Pedido' : 'Voltar Pedido'}
+              </h3>
               <p className="text-sm text-gray-600 dark:text-amber-100/70">
-                Tem certeza que deseja cancelar o pedido #{ped.id.slice(-6)}?
+                {isCancel
+                  ? `Tem certeza que deseja cancelar o pedido #${ped.id.slice(-6)}?`
+                  : `Deseja voltar o pedido #${ped.id.slice(-6)} para "${store.statusNome(targetStatus)}"?`}
               </p>
-              {totalRecebido > 0 && (
-                <div className="p-3 bg-amber-50 dark:bg-[#2d1e0d] border border-amber-200 dark:border-[#3d2e1d] rounded-xl space-y-2">
-                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1">
-                    <AlertTriangle size={14} /> Este pedido já recebeu <strong>{formatCurrency(totalRecebido)}</strong>
-                  </p>
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400">Deseja estornar os valores agora?</p>
-                </div>
-              )}
+
+              {/* Checkboxes conforme fromStatus */}
+              <div className="space-y-2">
+                {fromStatus === 4 && (
+                  <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
+                    <input type="checkbox" checked={revReverterProducao}
+                      onChange={e => {
+                        setRevReverterProducao(e.target.checked);
+                        setRevRestaurarInsumos(e.target.checked);
+                        setRevRemoverProdutos(e.target.checked);
+                      }}
+                      className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
+                    Reverter produção (restaura insumos + remove estoque gerado)
+                  </label>
+                )}
+                {fromStatus === 5 && (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
+                      <input type="checkbox" checked={revReverterProducao}
+                        onChange={e => {
+                          setRevReverterProducao(e.target.checked);
+                          setRevRestaurarInsumos(e.target.checked);
+                          setRevRemoverProdutos(e.target.checked);
+                        }}
+                        className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
+                      Reverter produção (restaura insumos + remove estoque gerado)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
+                      <input type="checkbox" checked={revReporEstoque} onChange={e => setRevReporEstoque(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
+                      Repor produtos entregues (devolve ao estoque)
+                    </label>
+                    {totalRecebido > 0 && (
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
+                        <input type="checkbox" checked={revEstornar} onChange={e => setRevEstornar(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
+                        Estornar pagamentos ({formatCurrency(totalRecebido)})
+                      </label>
+                    )}
+                  </>
+                )}
+              </div>
+
               <div className="flex gap-2">
-                <button onClick={() => setCancelConfirmPedidoId(null)}
+                <button onClick={() => { setReverseConfirm(null); setRevReverterProducao(true); setRevRestaurarInsumos(true); setRevRemoverProdutos(true); setRevReporEstoque(true); setRevEstornar(false); }}
                   className="flex-1 py-2 px-3 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-xs font-medium text-gray-600 dark:text-amber-100 hover:bg-gray-50 dark:hover:bg-[#130b04]">
                   Voltar
                 </button>
-                {totalRecebido > 0 && (
-                  <button onClick={async () => {
-                    await store.updatePedidoStatus(cancelConfirmPedidoId, 6);
-                    await store.estornarPagamentosPedido(cancelConfirmPedidoId);
-                    setCancelConfirmPedidoId(null);
-                    onUpdate();
-                  }}
-                    className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold">
-                    Cancelar e Estornar
-                  </button>
-                )}
                 <button onClick={async () => {
-                  await store.updatePedidoStatus(cancelConfirmPedidoId, 6);
-                  setCancelConfirmPedidoId(null);
-                  onUpdate();
+                  let errMsg: string | null = null;
+                  try {
+                    if (revRestaurarInsumos || revRemoverProdutos || revReporEstoque) {
+                      const revResult = await store.reverterMovimentacoesPedido(pedidoId, { restaurarInsumos: revRestaurarInsumos, removerProdutos: revRemoverProdutos, reporEstoque: revReporEstoque });
+                      if (!revResult.success) { errMsg = revResult.error || 'Erro ao reverter movimentações'; return; }
+                    }
+                    const statusResult = await store.updatePedidoStatus(pedidoId, targetStatus);
+                    if (!statusResult.success) { errMsg = statusResult.error || 'Erro desconhecido'; return; }
+                    if (revEstornar) {
+                      await store.estornarPagamentosPedido(pedidoId);
+                    }
+                  } catch (e) {
+                    errMsg = e instanceof Error ? e.message : 'Erro inesperado';
+                  } finally {
+                    setReverseConfirm(null);
+                    setRevReverterProducao(true); setRevRestaurarInsumos(true); setRevRemoverProdutos(true); setRevReporEstoque(true); setRevEstornar(false);
+                    if (errMsg) setCustomAlert({ title: 'Erro na operação', message: errMsg });
+                    onUpdate();
+                  }
                 }}
-                  className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold">
-                  Só Cancelar
+                  className="flex-1 py-2 px-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold">
+                  {isCancel ? 'Confirmar Cancelamento' : 'Confirmar'}
                 </button>
               </div>
             </div>
@@ -1577,7 +1658,11 @@ ${pagHtml}
                 className="flex-1 py-2 px-4 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-gray-600 dark:text-amber-100 font-medium hover:bg-gray-50 dark:hover:bg-[#130b04] transition">
                 Cancelar
               </button>
-              <button onClick={async () => { store.deletePedido(deleteConfirm); setDeleteConfirm(null); onUpdate(); }}
+              <button onClick={async () => {
+                const result = await store.deletePedido(deleteConfirm);
+                if (!result.success) { setCustomAlert({ title: 'Erro ao excluir', message: result.error || 'Erro desconhecido' }); return; }
+                setDeleteConfirm(null); onUpdate();
+              }}
                 className="flex-1 py-2 px-4 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition">
                 Confirmar Exclusão
               </button>
@@ -1699,6 +1784,29 @@ ${pagHtml}
       })()}
 
       <RelatorioPedidos store={store} isOpen={relatorioOpen} onClose={() => setRelatorioOpen(false)} />
+
+      {/* Custom alert modal (replaces native browser alert) */}
+      {customAlert && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">{customAlert.title || 'Atenção'}</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              {customAlert.message}
+            </p>
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setCustomAlert(null)}
+                className="py-2 px-6 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

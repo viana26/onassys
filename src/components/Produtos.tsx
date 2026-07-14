@@ -798,35 +798,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       </div>
                     </div>
 
-                    {/* Pricing */}
-                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
-                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
-                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
-                          <div className="relative">
-                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
-                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
-                          </div>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
-                          <div className="relative">
-                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
-                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
-                          </div>
-                        </div>
-                      </div>
                     </div>
-                  </div>
                 )}
 
                 {/* TAB: FICHA TÉCNICA */}
@@ -959,23 +931,52 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                         </span>
                       </div>
                     )}
+
+                    {/* Precificação */}
+                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
+                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
+                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
+                          <div className="relative">
+                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
+                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
+                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
               </div>
-            </form>
 
-            {/* Footer */}
-            <div className="flex items-center gap-3 px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
-              <button type="button" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }}
-                className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
-                Cancelar
-              </button>
-              <button type="submit"
-                className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
-                {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
-              </button>
-            </div>
+              {/* Footer */}
+              <div className="flex items-center gap-3 px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
+                <button type="button" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }}
+                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
+                  Cancelar
+                </button>
+                <button type="submit"
+                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
+                  {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
+                </button>
+              </div>
+            </form>
             </div>
           </div>
         </>

@@ -350,7 +350,7 @@ export class MiniFactoryStore {
     this.recalcularValoresPedidos();
     this.loading = false;
     this.recalcularCustosProdutos();
-    this.saveToLocalStorage();
+    this.saveToLocalStorage(); // CACHE_ONLY
     if (this.currentUserId) this.setCurrentUser(this.currentUserId);
     this.notify();
   }
@@ -362,7 +362,7 @@ export class MiniFactoryStore {
     this.recalcularValoresPedidos();
     this.loading = false;
     this.recalcularCustosProdutos();
-    this.saveToLocalStorage();
+    this.saveToLocalStorage(); // CACHE_ONLY
     if (this.currentUserId) this.setCurrentUser(this.currentUserId);
     this.notify();
   }
@@ -457,7 +457,7 @@ export class MiniFactoryStore {
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
         const despesa: LancamentoFinanceiro = {
-          id: crypto.randomUUID(), criado_em: new Date().toISOString(),
+          id: 'lanc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12), criado_em: new Date().toISOString(),
           data_lancamento: new Date().toISOString().split('T')[0],
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
@@ -666,21 +666,24 @@ export class MiniFactoryStore {
     return novo;
   }
 
-  async updatePedido(id: string, updates: Partial<Pedido>) {
+  async updatePedido(id: string, updates: Partial<Pedido>): Promise<boolean> {
     const idx = this.pedidos.findIndex(p => p.id === id);
-    if (idx === -1) return;
+    if (idx === -1) return false;
     const updated = { ...this.pedidos[idx], ...updates, atualizado_em: new Date().toISOString() };
     const ok = await this.supabaseUpdate('pedidos', id, updated as unknown as Record<string, unknown>);
     if (ok) { this.pedidos = this.pedidos.map((p, i) => i === idx ? updated : p); this.saveToLocalStorage(); this.notify(); }
+    return ok;
   }
 
   async updatePedidoStatus(id: string, status_id: number): Promise<{ success: boolean; error?: string }> {
+    this.error = null;
+    this.errorType = null;
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const fromStatus = pedido.status_id;
 
-    // 2 → 3: iniciar produção
-    if (fromStatus === 2 && status_id === 3) {
+    // 3 → 4: finalizar produção — consumir insumos + gerar estoque
+    if (fromStatus === 3 && status_id === 4) {
       const itens = this.itensPedido.filter(i => i.pedido_id === id);
       const result = await this.lancarProducao(itens, id);
       if (!result.success) return result;
@@ -692,12 +695,20 @@ export class MiniFactoryStore {
       if (!result.success) return result;
     }
 
-    try {
-      await this.updatePedido(id, { status_id });
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'Erro' };
-    }
+    const ok = await this.updatePedido(id, { status_id });
+    if (!ok) return { success: false, error: 'Erro ao atualizar status no servidor' };
+    return { success: true };
+  }
+
+  async atenderPedidoDoEstoque(pedidoId: string): Promise<{ success: boolean; error?: string }> {
+    this.error = null;
+    this.errorType = null;
+    const pedido = this.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) return { success: false, error: 'Pedido não encontrado' };
+    if (pedido.status_id !== 2) return { success: false, error: 'Pedido precisa estar Confirmado' };
+    const ok = await this.updatePedido(pedidoId, { status_id: 4 });
+    if (!ok) return { success: false, error: 'Erro ao atualizar status no servidor' };
+    return { success: true };
   }
 
   async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string): Promise<{ success: boolean; error?: string }> {
@@ -801,9 +812,19 @@ if (estoque) {
     return { success: true };
   }
 
-  async deletePedido(id: string) {
-    const ok = await this.supabaseDelete('pedidos', id);
-    if (ok) { this.pedidos = this.pedidos.filter(p => p.id !== id); this.itensPedido = this.itensPedido.filter(i => i.pedido_id !== id); this.saveToLocalStorage(); this.notify(); }
+  async deletePedido(id: string): Promise<{ success: boolean; error?: string }> {
+    const revResult = await this.reverterMovimentacoesPedido(id, { restaurarInsumos: true, removerProdutos: true, reporEstoque: true });
+    if (!revResult.success) return revResult;
+
+    let ok = false;
+    try { ok = await this.supabaseDelete('pedidos', id); } catch { ok = false; }
+    if (!ok) return { success: false, error: 'Erro ao excluir pedido no servidor' };
+
+    this.pedidos = this.pedidos.filter(p => p.id !== id);
+    this.itensPedido = this.itensPedido.filter(i => i.pedido_id !== id);
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
   }
 
   // ================================================
@@ -917,6 +938,87 @@ if (estoque) {
     return { success: ok, error: ok ? undefined : 'Erro ao salvar no servidor' };
   }
 
+  async reverterMovimentacoesPedido(pedidoId: string, opts: { restaurarInsumos?: boolean; removerProdutos?: boolean; reporEstoque?: boolean } = {}): Promise<{ success: boolean; error?: string }> {
+    try {
+    let ok = true;
+
+    if (opts.restaurarInsumos) {
+      const movsMateriais = this.movMateriais.filter(m =>
+        m.observacao?.includes(pedidoId) && m.tipo_id === 2
+      );
+      for (const mov of movsMateriais) {
+        const mat = this.materiais.find(m => m.id === mov.material_id);
+        if (!mat) continue;
+        const dadosMat = {
+          ...mat,
+          quantidade_atual: Number((mat.quantidade_atual + mov.quantidade).toFixed(3)),
+          data_ultima_atualizacao: new Date().toISOString(),
+        };
+        if (!await this.supabaseUpdate('materiais', mat.id, dadosMat as unknown as Record<string, unknown>)) { ok = false; break; }
+        const matIdx = this.materiais.indexOf(mat);
+        if (matIdx !== -1) this.materiais = this.materiais.map((m, i) => i === matIdx ? dadosMat : m);
+
+        const reversao: MovimentacaoMaterial = {
+          id: 'mov_m_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
+          material_id: mov.material_id, tipo_id: 1, quantidade: mov.quantidade,
+          observacao: `Estorno produção pedido ${pedidoId}`,
+          criado_em: new Date().toISOString()
+        };
+        if (!await this.supabaseInsert('movimentacoes_materiais', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
+        this.movMateriais = [reversao, ...this.movMateriais];
+      }
+      if (!ok) return { success: false, error: this.error || 'Não foi possível devolver os ingredientes ao estoque.' };
+    }
+
+    if (opts.removerProdutos) {
+      const movsEntrada = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 4);
+      for (const mov of movsEntrada) {
+        const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
+        if (estoque) {
+          const novoQtd = Math.max(0, estoque.quantidade_disponivel - mov.quantidade);
+          const updated = { ...estoque, quantidade_disponivel: novoQtd, data_atualizacao: new Date().toISOString() };
+          if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) { ok = false; break; }
+          this.estoqueProdutos = this.estoqueProdutos.map((e, i) => e.id === updated.id ? updated : e);
+        }
+        const reversao: MovimentacaoProduto = {
+          id: 'mov_p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
+          produto_id: mov.produto_id, tipo_id: 5, quantidade: mov.quantidade,
+          pedido_id: pedidoId, criado_em: new Date().toISOString()
+        };
+        if (!await this.supabaseInsert('movimentacoes_produtos', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
+        this.movProdutos = [reversao, ...this.movProdutos];
+      }
+      if (!ok) return { success: false, error: this.error || 'Não foi possível remover os produtos do estoque.' };
+    }
+
+    if (opts.reporEstoque) {
+      const movsSaida = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 5);
+      for (const mov of movsSaida) {
+        const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
+        if (estoque) {
+          const updated = { ...estoque, quantidade_disponivel: estoque.quantidade_disponivel + mov.quantidade, data_atualizacao: new Date().toISOString() };
+          if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) { ok = false; break; }
+          this.estoqueProdutos = this.estoqueProdutos.map((e, i) => e.id === updated.id ? updated : e);
+        }
+        const reversao: MovimentacaoProduto = {
+          id: 'mov_p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
+          produto_id: mov.produto_id, tipo_id: 4, quantidade: mov.quantidade,
+          pedido_id: pedidoId, criado_em: new Date().toISOString()
+        };
+        if (!await this.supabaseInsert('movimentacoes_produtos', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
+        this.movProdutos = [reversao, ...this.movProdutos];
+      }
+      if (!ok) return { success: false, error: this.error || 'Não foi possível repor o estoque.' };
+    }
+
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Ocorreu um erro inesperado ao desfazer as movimentações de estoque. Tente novamente ou contate o supervisor.' };
+    }
+  }
+
   // ================================================
   // CRUD — PERFIS USUÁRIO
   // ================================================
@@ -1022,7 +1124,7 @@ if (estoque) {
   // FINANCEIRO
   // ================================================
   async addLancamentoFinanceiro(data: Omit<LancamentoFinanceiro, 'id' | 'criado_em'>) {
-    const novo = { ...data, id: crypto.randomUUID(), criado_em: new Date().toISOString() };
+    const novo = { ...data, id: 'lanc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12), criado_em: new Date().toISOString() };
     const ok = await this.supabaseInsert('lancamentos_financeiros', novo as unknown as Record<string, unknown>);
     if (ok) { this.lancamentos.unshift(novo); this.saveToLocalStorage(); this.notify(); }
     return novo;
@@ -1122,7 +1224,7 @@ if (estoque) {
       if (jaEstornado) continue;
 
       const estorno = {
-        id: crypto.randomUUID(),
+        id: 'estorno_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
         data_lancamento: new Date().toISOString().split('T')[0],
         valor: rec.valor,
         tipo: 'despesa' as const,
@@ -1132,14 +1234,17 @@ if (estoque) {
         forma_pagamento: rec.forma_pagamento,
         criado_em: new Date().toISOString(),
       };
-      const ok = await this.supabaseInsert('lancamentos_financeiros', estorno as unknown as Record<string, unknown>);
+      let ok = false;
+      try { ok = await this.supabaseInsert('lancamentos_financeiros', estorno as unknown as Record<string, unknown>); } catch { ok = false; }
       if (ok) this.lancamentos.unshift(estorno);
     }
+
+    this.error = null;
+    this.errorType = null;
     this.saveToLocalStorage();
     this.notify();
     return { success: true };
   }
-
   // ================================================
   // PLANEJAMENTO DE COMPRAS
   // ================================================

@@ -541,9 +541,15 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       <p className={`font-bold font-mono ${mov.quantidade >= 0 ? 'text-emerald-700 dark:text-emerald-450' : 'text-red-800 dark:text-red-400'}`}>
                         {mov.quantidade >= 0 ? '+' : ''}{mov.quantidade} {unidadeNome(prod?.id || '')}
                       </p>
-                      <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
-                        {new Date(mov.criado_em).toLocaleDateString('pt-BR')} {new Date(mov.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                      {(() => {
+                        const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
+                        const isDateValid = dateObj && !isNaN(dateObj.getTime());
+                        return isDateValid ? (
+                          <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
+                            {dateObj.toLocaleDateString('pt-BR')} {dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                 );
