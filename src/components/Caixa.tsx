@@ -93,6 +93,7 @@ function ComprovanteModal({ data, appName, onClose }: {
     `);
     printWindow.document.close();
     setTimeout(() => { printWindow.focus(); printWindow.print(); }, 300);
+    onClose();
   };
 
   const formaNome = FORMAS_PAGAMENTO.find(f => f.value === data.formaPagamento)?.label || data.formaPagamento;
@@ -699,7 +700,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
         <ComprovanteModal
           data={comprovanteData}
           appName={appName || 'Mini Fábrica'}
-          onClose={() => setComprovanteData(null)}
+          onClose={() => { setComprovanteData(null); onUpdate(); }}
         />
       )}
 

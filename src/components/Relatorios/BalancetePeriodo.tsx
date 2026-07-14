@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import SelectSearch from '../SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -160,6 +161,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -206,13 +208,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Categoria</label>
-              <select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                <option value="todos">Todas</option>
-                {store.categoriasFinanceiro.map(c => (
-                  <option key={c.id} value={c.id}>{c.nome}</option>
-                ))}
-              </select>
+              <SelectSearch value={filtroCategoria} onChange={v => setFiltroCategoria(v === 'todos' ? 'todos' : Number(v))} options={[{ value: 'todos', label: 'Todas as categorias' }, ...store.categoriasFinanceiro.map(c => ({ value: String(c.id), label: c.nome }))]} placeholder="Filtrar por categoria" />
             </div>
           </div>
         </div>

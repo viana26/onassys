@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 import BalancetePeriodo from './Relatorios/BalancetePeriodo';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -15,13 +16,13 @@ interface FinanceiroProps {
 
 export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const [filtroTipo, setFiltroTipo] = useState<'todas' | 'receita' | 'despesa'>('todas');
-  const [showModal, setShowModal] = useState(false);
+  const [showModalTipo, setShowModalTipo] = useState<'receita' | 'despesa' | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<LancamentoFinanceiro | null>(null);
   const [showBalancete, setShowBalancete] = useState(false);
 
-  const lancamentosFiltrados = filtroTipo === 'todas'
-    ? store.lancamentos
-    : store.lancamentos.filter(l => l.tipo === filtroTipo);
+  const lancamentosFiltrados = (filtroTipo === 'todas'
+    ? [...store.lancamentos]
+    : store.lancamentos.filter(l => l.tipo === filtroTipo));
 
   const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento');
 
@@ -45,10 +46,15 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
               className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#1a1208] border border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100 font-semibold rounded-xl hover:bg-[#f0eade] dark:hover:bg-[#22160b] transition text-xs font-sans">
               <BarChart3 size={15} /> Relatório
             </button>
-            <button onClick={() => setShowModal(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl transition text-xs font-sans"
-              data-help="financeiro-novo">
-              <Plus size={15} /> Novo Lançamento
+            <button onClick={() => setShowModalTipo('receita')}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl transition text-xs font-sans"
+              data-help="financeiro-novo-receita">
+              <TrendingUp size={15} /> Receita
+            </button>
+            <button onClick={() => setShowModalTipo('despesa')}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition text-xs font-sans"
+              data-help="financeiro-novo-despesa">
+              <TrendingDown size={15} /> Despesa
             </button>
           </div>
         )}
@@ -151,7 +157,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         )}
       </div>
 
-      {showModal && <NovoLancamentoModal store={store} onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); onUpdate(); }} />}
+      {showModalTipo && <NovoLancamentoModal store={store} initialTipo={showModalTipo} onClose={() => setShowModalTipo(null)} onSaved={() => { setShowModalTipo(null); onUpdate(); }} />}
 
       {showBalancete && <BalancetePeriodo store={store} isOpen={true} onClose={() => setShowBalancete(false)} />}
 
@@ -189,8 +195,8 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   );
 }
 
-function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactoryStore; onClose: () => void; onSaved: () => void }) {
-  const [tipo, setTipo] = useState<'receita' | 'despesa'>('receita');
+function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: MiniFactoryStore; initialTipo: 'receita' | 'despesa'; onClose: () => void; onSaved: () => void }) {
+  const [tipo, setTipo] = useState<'receita' | 'despesa'>(initialTipo);
   const [categoriaId, setCategoriaId] = useState(1);
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -198,6 +204,13 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
   const [dataLancamento, setDataLancamento] = useState(new Date().toISOString().split('T')[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showCategorias, setShowCategorias] = useState(false);
+  const [novaCatNome, setNovaCatNome] = useState('');
+  const [novaCatCor, setNovaCatCor] = useState('#16a34a');
+  const [editCatId, setEditCatId] = useState<number | null>(null);
+  const [editCatNome, setEditCatNome] = useState('');
+  const [editCatCor, setEditCatCor] = useState('');
+  const [delCatId, setDelCatId] = useState<number | null>(null);
 
   const categorias = store.categoriasFinanceiro.filter(c => c.tipo === tipo);
 
@@ -223,7 +236,9 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">Novo Lançamento</h3>
+          <h3 className={`text-lg font-bold ${tipo === 'receita' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400'}`}>
+            {tipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
+          </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-[#f0eade] dark:hover:bg-[#130b04] text-[#5c4a37] dark:text-amber-100/70">
             <X size={18} />
           </button>
@@ -235,37 +250,23 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-2">Tipo</label>
-            <div className="flex gap-2">
-              {(['receita', 'despesa'] as const).map(t => (
-                <button key={t} type="button" onClick={() => { setTipo(t); setCategoriaId(store.categoriasFinanceiro.filter(c => c.tipo === t)[0]?.id || 1); }}
-                  className={`flex-1 py-2 px-4 rounded-xl text-sm font-semibold transition border ${
-                    tipo === t
-                      ? t === 'receita'
-                        ? 'bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300'
-                        : 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300'
-                      : 'bg-[#f8f5ee] dark:bg-[#130b04] border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100/70'
-                  }`}>
-                  {t === 'receita' ? 'Receita' : 'Despesa'}
-                </button>
-              ))}
+            <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Categoria</label>
+            <div className="flex gap-1">
+              <div className="flex-1">
+                <SelectSearch value={String(categoriaId)} onChange={v => setCategoriaId(Number(v))} options={categorias.map(c => ({ value: String(c.id), label: c.nome }))} placeholder="Selecione a categoria" />
+              </div>
+              <button type="button" onClick={() => setShowCategorias(!showCategorias)}
+                className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-xl border transition text-xs font-bold ${showCategorias ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300' : 'bg-[#f8f5ee] dark:bg-[#130b04] border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100/70 hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b]'}`}>
+                <Tag size={12} />
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Categoria</label>
-              <select value={categoriaId} onChange={e => setCategoriaId(Number(e.target.value))} required
-                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                {categorias.map(c => (
-                  <option key={c.id} value={c.id}>{c.nome}</option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Pagamento</label>
               <select value={formaPagamento} onChange={e => setFormaPagamento(e.target.value)}
-                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                className="w-full h-9 px-3 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-sm text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
                 <option value="">Selecione</option>
                 <option value="dinheiro">Dinheiro</option>
                 <option value="pix">Pix</option>
@@ -275,26 +276,83 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
                 <option value="transferencia">Transferência</option>
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>
               <input type="text" inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} required placeholder="0,00"
-                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                className="w-full h-9 px-3 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-sm text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Data</label>
               <input type="date" value={dataLancamento} onChange={e => setDataLancamento(e.target.value)} required
-                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                className="w-full h-9 px-3 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-sm text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Descrição</label>
             <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Descrição do lançamento"
-              className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              className="w-full h-9 px-3 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-sm text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
           </div>
+
+          {showCategorias && (
+            <div className={`p-3 rounded-xl border space-y-2 ${tipo === 'receita' ? 'bg-emerald-50/50 dark:bg-[#0d2215] border-emerald-200 dark:border-[#1d3d25]' : 'bg-red-50/50 dark:bg-[#2d0d0d] border-red-200 dark:border-[#3d1d1d]'}`}>
+              <p className="text-[10px] font-bold uppercase text-[#5c4a37] dark:text-amber-100/60">Gerenciar categorias</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <input type="color" value={novaCatCor} onChange={e => setNovaCatCor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0" />
+                <input type="text" value={novaCatNome} onChange={e => setNovaCatNome(e.target.value)} placeholder="Nova categoria..."
+                  className="flex-1 min-w-0 h-7 px-2 bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg text-xs text-[#2e2315] dark:text-amber-50" />
+                <button type="button" onClick={async () => {
+                  if (!novaCatNome.trim()) return;
+                  const cat = await store.addCategoriaFinanceiro({ nome: novaCatNome.trim(), tipo, cor: novaCatCor });
+                  if (cat) setCategoriaId(cat.id);
+                  setNovaCatNome(''); setNovaCatCor('#16a34a');
+                }} disabled={!novaCatNome.trim()}
+                  className="shrink-0 h-7 px-2.5 flex items-center justify-center bg-amber-600 hover:bg-amber-500 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white rounded-lg text-xs font-bold transition">
+                  <Plus size={11} />
+                </button>
+              </div>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {categorias.map(cat => (
+                  <div key={cat.id} className="flex items-center gap-1.5 py-1 px-1.5 rounded-lg hover:bg-white/60 dark:hover:bg-[#130b04]/60">
+                    {editCatId === cat.id ? (
+                      <>
+                        <input type="color" value={editCatCor} onChange={e => setEditCatCor(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-0 p-0" />
+                        <input type="text" value={editCatNome} onChange={e => setEditCatNome(e.target.value)}
+                          className="flex-1 px-1.5 py-0.5 bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded text-xs text-[#2e2315] dark:text-amber-50" />
+                        <button type="button" onClick={async () => {
+                          if (!editCatNome.trim()) return;
+                          await store.updateCategoriaFinanceiro(cat.id, { nome: editCatNome.trim(), cor: editCatCor });
+                          setEditCatId(null);
+                        }} className="p-0.5 text-emerald-600 dark:text-emerald-400"><Check size={10} /></button>
+                        <button type="button" onClick={() => setEditCatId(null)} className="p-0.5 text-gray-400"><X size={10} /></button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.cor }} />
+                        <span className="flex-1 text-[11px] text-[#2e2315] dark:text-amber-50">{cat.nome}</span>
+                        {String(cat.id) === String(categoriaId) && <Check size={10} className="text-amber-600 dark:text-amber-400" />}
+                        <button type="button" onClick={() => { setEditCatId(cat.id); setEditCatNome(cat.nome); setEditCatCor(cat.cor); }}
+                          className="p-0.5 text-[#5c4a37]/30 dark:text-amber-100/30 hover:text-amber-600"><Edit2 size={9} /></button>
+                        {delCatId === cat.id ? (
+                          <>
+                            <button type="button" onClick={async () => {
+                              await store.deleteCategoriaFinanceiro(cat.id);
+                              if (String(cat.id) === String(categoriaId)) setCategoriaId(categorias[0]?.id || 1);
+                              setDelCatId(null);
+                            }} className="text-[9px] font-bold text-red-600">Sim</button>
+                            <button type="button" onClick={() => setDelCatId(null)} className="text-[9px] text-gray-400">Não</button>
+                          </>
+                        ) : (
+                          <button type="button" onClick={() => setDelCatId(cat.id)}
+                            className="p-0.5 text-[#5c4a37]/30 dark:text-amber-100/30 hover:text-red-600"><Trash2 size={9} /></button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -302,8 +360,8 @@ function NovoLancamentoModal({ store, onClose, onSaved }: { store: MiniFactorySt
               Cancelar
             </button>
             <button type="submit" disabled={saving}
-              className="flex-1 py-2 px-4 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl transition disabled:cursor-not-allowed">
-              {saving ? 'Salvando...' : 'Salvar'}
+              className={`flex-1 py-2 px-4 font-semibold rounded-xl transition disabled:cursor-not-allowed text-white ${tipo === 'receita' ? 'bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400' : 'bg-red-600 hover:bg-red-500 disabled:bg-red-400'}`}>
+              {saving ? 'Salvando...' : tipo === 'receita' ? 'Salvar Receita' : 'Salvar Despesa'}
             </button>
           </div>
         </form>

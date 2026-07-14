@@ -147,25 +147,7 @@ export class MiniFactoryStore {
   // PERSISTÊNCIA LOCAL (cache)
   // ================================================
   private saveToLocalStorage() {
-    try {
-      const data: Record<string, unknown> = {
-        materiais: this.materiais, produtos: this.produtos,
-        fichas: this.fichas, estoqueProdutos: this.estoqueProdutos,
-        clientes: this.clientes, pedidos: this.pedidos,
-        itensPedido: this.itensPedido, movMateriais: this.movMateriais,
-        movProdutos: this.movProdutos, lancamentos: this.lancamentos,
-        planejamentoCompras: this.planejamentoCompras,
-        perfisUsuarios: this.perfisUsuarios,
-        unidades: this.unidades, categorias: this.categorias,
-        statusPedido: this.statusPedido, tiposCliente: this.tiposCliente,
-        fornecedores: this.fornecedores, permissoes: this.permissoes,
-        perfis: this.perfis, perfisPermissoes: this.perfisPermissoes,
-        tiposMovimentacao: this.tiposMovimentacao,
-        categoriasFinanceiro: this.categoriasFinanceiro,
-        dadosEmpresa: this.dadosEmpresa,
-      };
-      Object.entries(data).forEach(([key, val]) => localStorage.setItem(`oc_${key}`, JSON.stringify(val)));
-    } catch { /* quota exceeded */ }
+    // no-op: Supabase é a fonte de verdade
   }
 
   private loadFromLocalStorage() {
@@ -457,7 +439,7 @@ export class MiniFactoryStore {
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
         const despesa: LancamentoFinanceiro = {
-          id: 'lanc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12), criado_em: new Date().toISOString(),
+          id: crypto.randomUUID(), criado_em: new Date().toISOString(),
           data_lancamento: new Date().toISOString().split('T')[0],
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
@@ -681,6 +663,7 @@ export class MiniFactoryStore {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const fromStatus = pedido.status_id;
+    if (fromStatus === status_id) return { success: true };
 
     // 3 → 4: finalizar produção — consumir insumos + gerar estoque
     if (fromStatus === 3 && status_id === 4) {
@@ -706,8 +689,12 @@ export class MiniFactoryStore {
     const pedido = this.pedidos.find(p => p.id === pedidoId);
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     if (pedido.status_id !== 2) return { success: false, error: 'Pedido precisa estar Confirmado' };
-    const ok = await this.updatePedido(pedidoId, { status_id: 4 });
-    if (!ok) return { success: false, error: 'Erro ao atualizar status no servidor' };
+    const result = await this.lancarSaidaPedido(pedidoId);
+    if (!result.success) return result;
+    const statusOk = await this.updatePedido(pedidoId, { status_id: 5 });
+    if (!statusOk) return { success: false, error: 'Erro ao atualizar status no servidor' };
+    this.saveToLocalStorage();
+    this.notify();
     return { success: true };
   }
 
@@ -718,6 +705,10 @@ export class MiniFactoryStore {
       const fichas = this.fichas.filter(f => f.produto_id === item.produto_id);
       const produto = this.produtos.find(p => p.id === item.produto_id);
       if (!produto) return { success: false, error: `Produto não encontrado: ${item.produto_id}` };
+      if (fichas.length === 0) {
+        const idsFichas = this.fichas.map(f => f.produto_id);
+        return { success: false, error: `Ficha técnica não encontrada para "${produto.nome}".\n\nFichas carregadas: ${this.fichas.length}\nID do produto: ${item.produto_id}\nIDs das fichas existentes: [${idsFichas.join(', ')}]` };
+      }
 
       for (const ficha of fichas) {
         const mat = this.materiais.find(m => m.id === ficha.material_id);
@@ -741,7 +732,11 @@ export class MiniFactoryStore {
       }
     }
 
-    // Consumir insumos
+    // Consumir insumos (paralelo)
+    const matPromises: Promise<boolean>[] = [];
+    const movsMatCriadas: MovimentacaoMaterial[] = [];
+    const updatesMatLocal: { idx: number; dados: Material }[] = [];
+
     for (const matId of Object.keys(materiaisUsados)) {
        const totalQtd = Number(materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0).toFixed(3));
       const mat = this.materiais.find(m => m.id === matId)!;
@@ -750,61 +745,71 @@ export class MiniFactoryStore {
         quantidade_atual: Number((mat.quantidade_atual - totalQtd).toFixed(3)),
         data_ultima_atualizacao: new Date().toISOString(),
       };
-      if (await this.supabaseUpdate('materiais', matId, dadosMat as unknown as Record<string, unknown>)) {
-        const matIdx = this.materiais.indexOf(mat);
-        if (matIdx !== -1) this.materiais = this.materiais.map((m, i) => i === matIdx ? dadosMat : m);
-      }
+      updatesMatLocal.push({ idx: this.materiais.indexOf(mat), dados: dadosMat });
+      matPromises.push(this.supabaseUpdate('materiais', matId, dadosMat as unknown as Record<string, unknown>));
 
       const mov: MovimentacaoMaterial = {
         id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
         material_id: matId, tipo_id: 2, quantidade: totalQtd,
-        observacao: pedidoId ? `Produção pedido ${pedidoId}` : 'Produção avulsa',
+        observacao: pedidoId ? `Consumo por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Produção avulsa',
         criado_em: new Date().toISOString()
       };
-      if (await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>)) {
-        this.movMateriais = [mov, ...this.movMateriais];
+      movsMatCriadas.push(mov);
+      matPromises.push(this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>));
+    }
+    if (matPromises.length > 0) {
+      const matResults = await Promise.all(matPromises);
+      if (matResults.some(r => !r)) return { success: false, error: 'Erro ao consumir insumos no servidor.' };
+      for (const { idx, dados } of updatesMatLocal) {
+        if (idx !== -1) this.materiais = this.materiais.map((m, i) => i === idx ? dados : m);
       }
+      this.movMateriais = [...movsMatCriadas, ...this.movMateriais];
     }
 
-    // Gerar produtos + movimentações
+    // Gerar produtos + movimentações (paralelo)
+    const prodPromises: Promise<boolean>[] = [];
+    const movsProdCriadas: MovimentacaoProduto[] = [];
+    const updatesEstoqueLocal: { idx: number; dados: EstoqueProduto }[] = [];
+    const novosEstoqueLocal: EstoqueProduto[] = [];
+
     for (const item of itens) {
       const produto = this.produtos.find(p => p.id === item.produto_id)!;
       let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
 
-if (estoque) {
-    const idx = this.estoqueProdutos.indexOf(estoque);
-    const updatedEstoque = { ...estoque,
-        quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
-        data_atualizacao: new Date().toISOString()
-    };
-    const okUpdate = await this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>);
-    if (okUpdate) {
-      this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updatedEstoque : e);
-    } else {
-      return { success: false, error: 'Erro ao atualizar estoque no servidor.' };
-    }
-} else {
-    const novoEstoque = {
-        id: 'est_' + Math.random().toString(36).substring(2, 9),
-        produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
-        quantidade_minima: 0, data_atualizacao: new Date().toISOString()
-    };
-    const okInsert = await this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>);
-    if (okInsert) {
-      this.estoqueProdutos = [...this.estoqueProdutos, novoEstoque];
-    } else {
-      return { success: false, error: 'Erro ao criar estoque no servidor.' };
-    }
-}
+      if (estoque) {
+        const updatedEstoque = { ...estoque,
+            quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
+            data_atualizacao: new Date().toISOString()
+        };
+        updatesEstoqueLocal.push({ idx: this.estoqueProdutos.indexOf(estoque), dados: updatedEstoque });
+        prodPromises.push(this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>));
+      } else {
+        const novoEstoque = {
+            id: 'est_' + Math.random().toString(36).substring(2, 9),
+            produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
+            quantidade_minima: 0, data_atualizacao: new Date().toISOString()
+        };
+        novosEstoqueLocal.push(novoEstoque);
+        prodPromises.push(this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>));
+      }
 
       const movProd: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: 4, quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId, criado_em: new Date().toISOString()
+        pedido_id: pedidoId, observacao: `Entrada por produção — Pedido #${pedidoId?.slice(-6).toUpperCase()}`,
+        criado_em: new Date().toISOString()
       };
-      if (await this.supabaseInsert('movimentacoes_produtos', movProd as unknown as Record<string, unknown>)) {
-        this.movProdutos = [movProd, ...this.movProdutos];
+      movsProdCriadas.push(movProd);
+      prodPromises.push(this.supabaseInsert('movimentacoes_produtos', movProd as unknown as Record<string, unknown>));
+    }
+    if (prodPromises.length > 0) {
+      const prodResults = await Promise.all(prodPromises);
+      if (prodResults.some(r => !r)) return { success: false, error: 'Erro ao gerar estoque no servidor.' };
+      for (const { idx, dados } of updatesEstoqueLocal) {
+        if (idx !== -1) this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? dados : e);
       }
+      this.estoqueProdutos = [...novosEstoqueLocal, ...this.estoqueProdutos];
+      this.movProdutos = [...movsProdCriadas, ...this.movProdutos];
     }
 
     this.saveToLocalStorage();
@@ -917,103 +922,122 @@ if (estoque) {
       };
     }
 
-    let ok = true;
+    const saidaPromises: Promise<boolean>[] = [];
+    const movsSaidaCriadas: MovimentacaoProduto[] = [];
+    const updatesEstoqueSaida: { idx: number; dados: EstoqueProduto }[] = [];
+
     for (const item of itens) {
       const idx = this.estoqueProdutos.findIndex(e => e.produto_id === item.produto_id);
       if (idx >= 0) {
         const original = this.estoqueProdutos[idx];
         const updated = { ...original, quantidade_disponivel: original.quantidade_disponivel - item.quantidade_solicitada, data_atualizacao: new Date().toISOString() };
-        if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) ok = false;
-        this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updated : e);
+        updatesEstoqueSaida.push({ idx, dados: updated });
+        saidaPromises.push(this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>));
       }
       const mov: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: 5, quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId, criado_em: new Date().toISOString()
+        pedido_id: pedidoId, observacao: `Saída por entrega — Pedido #${pedidoId.slice(-6).toUpperCase()}`,
+        criado_em: new Date().toISOString()
       };
-      if (!await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>)) ok = false;
-      if (ok) this.movProdutos = [mov, ...this.movProdutos];
+      movsSaidaCriadas.push(mov);
+      saidaPromises.push(this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>));
     }
-    if (ok) { this.saveToLocalStorage(); this.notify(); }
-    return { success: ok, error: ok ? undefined : 'Erro ao salvar no servidor' };
+    const saidaResults = await Promise.all(saidaPromises);
+    if (saidaResults.some(r => !r)) return { success: false, error: 'Erro ao salvar no servidor' };
+    for (const { idx, dados } of updatesEstoqueSaida) {
+      this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? dados : e);
+    }
+    this.movProdutos = [...movsSaidaCriadas, ...this.movProdutos];
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
   }
 
   async reverterMovimentacoesPedido(pedidoId: string, opts: { restaurarInsumos?: boolean; removerProdutos?: boolean; reporEstoque?: boolean } = {}): Promise<{ success: boolean; error?: string }> {
     try {
-    let ok = true;
+      const promises: Promise<boolean>[] = [];
+      const updatesMateriais: { idx: number; dados: Material }[] = [];
+      const updatesEstoque: { idx: number; dados: EstoqueProduto }[] = [];
+      const delMovMateriais: string[] = [];
+      const delMovProdutos: string[] = [];
 
-    if (opts.restaurarInsumos) {
-      const movsMateriais = this.movMateriais.filter(m =>
-        m.observacao?.includes(pedidoId) && m.tipo_id === 2
-      );
-      for (const mov of movsMateriais) {
-        const mat = this.materiais.find(m => m.id === mov.material_id);
-        if (!mat) continue;
-        const dadosMat = {
-          ...mat,
-          quantidade_atual: Number((mat.quantidade_atual + mov.quantidade).toFixed(3)),
-          data_ultima_atualizacao: new Date().toISOString(),
-        };
-        if (!await this.supabaseUpdate('materiais', mat.id, dadosMat as unknown as Record<string, unknown>)) { ok = false; break; }
-        const matIdx = this.materiais.indexOf(mat);
-        if (matIdx !== -1) this.materiais = this.materiais.map((m, i) => i === matIdx ? dadosMat : m);
-
-        const reversao: MovimentacaoMaterial = {
-          id: 'mov_m_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
-          material_id: mov.material_id, tipo_id: 1, quantidade: mov.quantidade,
-          observacao: `Estorno produção pedido ${pedidoId}`,
-          criado_em: new Date().toISOString()
-        };
-        if (!await this.supabaseInsert('movimentacoes_materiais', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
-        this.movMateriais = [reversao, ...this.movMateriais];
-      }
-      if (!ok) return { success: false, error: this.error || 'Não foi possível devolver os ingredientes ao estoque.' };
-    }
-
-    if (opts.removerProdutos) {
-      const movsEntrada = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 4);
-      for (const mov of movsEntrada) {
-        const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
-        if (estoque) {
-          const novoQtd = Math.max(0, estoque.quantidade_disponivel - mov.quantidade);
-          const updated = { ...estoque, quantidade_disponivel: novoQtd, data_atualizacao: new Date().toISOString() };
-          if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) { ok = false; break; }
-          this.estoqueProdutos = this.estoqueProdutos.map((e, i) => e.id === updated.id ? updated : e);
+      if (opts.restaurarInsumos) {
+        const shortId = pedidoId.slice(-6).toUpperCase();
+        const movsMateriais = this.movMateriais.filter(m =>
+          m.observacao?.includes(shortId) && m.tipo_id === 2
+        );
+        for (const mov of movsMateriais) {
+          const mat = this.materiais.find(m => m.id === mov.material_id);
+          if (!mat) continue;
+          const dadosMat = {
+            ...mat,
+            quantidade_atual: Number((mat.quantidade_atual + mov.quantidade).toFixed(3)),
+            data_ultima_atualizacao: new Date().toISOString(),
+          };
+          updatesMateriais.push({ idx: this.materiais.indexOf(mat), dados: dadosMat });
+          promises.push(this.supabaseUpdate('materiais', mat.id, dadosMat as unknown as Record<string, unknown>));
+          delMovMateriais.push(mov.id);
+          promises.push(supabase.from('movimentacoes_materiais').delete().eq('id', mov.id).then(r => !r.error) as Promise<boolean>);
         }
-        const reversao: MovimentacaoProduto = {
-          id: 'mov_p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
-          produto_id: mov.produto_id, tipo_id: 5, quantidade: mov.quantidade,
-          pedido_id: pedidoId, criado_em: new Date().toISOString()
-        };
-        if (!await this.supabaseInsert('movimentacoes_produtos', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
-        this.movProdutos = [reversao, ...this.movProdutos];
       }
-      if (!ok) return { success: false, error: this.error || 'Não foi possível remover os produtos do estoque.' };
-    }
 
-    if (opts.reporEstoque) {
-      const movsSaida = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 5);
-      for (const mov of movsSaida) {
-        const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
-        if (estoque) {
-          const updated = { ...estoque, quantidade_disponivel: estoque.quantidade_disponivel + mov.quantidade, data_atualizacao: new Date().toISOString() };
-          if (!await this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>)) { ok = false; break; }
-          this.estoqueProdutos = this.estoqueProdutos.map((e, i) => e.id === updated.id ? updated : e);
+      if (opts.removerProdutos) {
+        const movsEntrada = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 4);
+        for (const mov of movsEntrada) {
+          const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
+          if (estoque) {
+            const novoQtd = Math.max(0, estoque.quantidade_disponivel - mov.quantidade);
+            const updated = { ...estoque, quantidade_disponivel: novoQtd, data_atualizacao: new Date().toISOString() };
+            updatesEstoque.push({ idx: this.estoqueProdutos.findIndex(e => e.id === updated.id), dados: updated });
+            promises.push(this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>));
+          }
+          delMovProdutos.push(mov.id);
+          promises.push(supabase.from('movimentacoes_produtos').delete().eq('id', mov.id).then(r => !r.error) as Promise<boolean>);
         }
-        const reversao: MovimentacaoProduto = {
-          id: 'mov_p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
-          produto_id: mov.produto_id, tipo_id: 4, quantidade: mov.quantidade,
-          pedido_id: pedidoId, criado_em: new Date().toISOString()
-        };
-        if (!await this.supabaseInsert('movimentacoes_produtos', reversao as unknown as Record<string, unknown>)) { ok = false; break; }
-        this.movProdutos = [reversao, ...this.movProdutos];
       }
-      if (!ok) return { success: false, error: this.error || 'Não foi possível repor o estoque.' };
-    }
 
-    this.saveToLocalStorage();
-    this.notify();
-    return { success: true };
+      if (opts.reporEstoque) {
+        const movsSaida = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 5);
+        for (const mov of movsSaida) {
+          const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
+          if (estoque) {
+            const updated = { ...estoque, quantidade_disponivel: estoque.quantidade_disponivel + mov.quantidade, data_atualizacao: new Date().toISOString() };
+            updatesEstoque.push({ idx: this.estoqueProdutos.findIndex(e => e.id === updated.id), dados: updated });
+            promises.push(this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>));
+          }
+          delMovProdutos.push(mov.id);
+          promises.push(supabase.from('movimentacoes_produtos').delete().eq('id', mov.id).then(r => !r.error) as Promise<boolean>);
+        }
+      }
+
+      if (promises.length === 0) {
+        this.saveToLocalStorage();
+        this.notify();
+        return { success: true };
+      }
+
+      const results = await Promise.all(promises);
+      if (results.some(r => !r)) {
+        return { success: false, error: this.error || 'Não foi possível reverter as movimentações.' };
+      }
+
+      for (const { idx, dados } of updatesMateriais) {
+        if (idx !== -1) this.materiais = this.materiais.map((m, i) => i === idx ? dados : m);
+      }
+      for (const { idx, dados } of updatesEstoque) {
+        if (idx !== -1) this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? dados : e);
+      }
+      if (delMovMateriais.length > 0) {
+        this.movMateriais = this.movMateriais.filter(m => !delMovMateriais.includes(m.id));
+      }
+      if (delMovProdutos.length > 0) {
+        this.movProdutos = this.movProdutos.filter(m => !delMovProdutos.includes(m.id));
+      }
+
+      this.saveToLocalStorage();
+      this.notify();
+      return { success: true };
     } catch (e) {
       return { success: false, error: e instanceof Error ? e.message : 'Ocorreu um erro inesperado ao desfazer as movimentações de estoque. Tente novamente ou contate o supervisor.' };
     }
@@ -1124,15 +1148,53 @@ if (estoque) {
   // FINANCEIRO
   // ================================================
   async addLancamentoFinanceiro(data: Omit<LancamentoFinanceiro, 'id' | 'criado_em'>) {
-    const novo = { ...data, id: 'lanc_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12), criado_em: new Date().toISOString() };
+    const novo = { ...data, id: crypto.randomUUID(), criado_em: new Date().toISOString() };
     const ok = await this.supabaseInsert('lancamentos_financeiros', novo as unknown as Record<string, unknown>);
-    if (ok) { this.lancamentos.unshift(novo); this.saveToLocalStorage(); this.notify(); }
+    if (ok) {
+      this.lancamentos.unshift(novo);
+      this.saveToLocalStorage();
+      this.notify();
+    }
     return novo;
   }
 
   async deleteLancamentoFinanceiro(id: string) {
     const ok = await this.supabaseDelete('lancamentos_financeiros', id);
-    if (ok) { this.lancamentos = this.lancamentos.filter(l => l.id !== id); this.saveToLocalStorage(); this.notify(); }
+    if (ok) {
+      this.lancamentos = this.lancamentos.filter(l => l.id !== id);
+      this.saveToLocalStorage();
+      this.notify();
+    }
+  }
+
+  async addCategoriaFinanceiro(data: { nome: string; tipo: 'receita' | 'despesa'; cor?: string }): Promise<CategoriaFinanceiro | null> {
+    const novo: CategoriaFinanceiro = { id: Date.now(), nome: data.nome, tipo: data.tipo, cor: data.cor || '#6b7280' };
+    if (isSupabaseConfigured()) {
+      const { data: inserted, error } = await supabase.from('categorias_financeiro').insert({ nome: data.nome, tipo: data.tipo, cor: data.cor || '#6b7280' }).select().single();
+      if (error) { this.setError(error.message, 'server'); return null; }
+      this.categoriasFinanceiro.push(inserted);
+    } else {
+      this.categoriasFinanceiro.push(novo);
+    }
+    this.saveToLocalStorage();
+    this.notify();
+    return novo;
+  }
+
+  async updateCategoriaFinanceiro(id: number, updates: Partial<{ nome: string; cor: string }>) {
+    const idx = this.categoriasFinanceiro.findIndex(c => c.id === id);
+    if (idx === -1) return;
+    const ok = await this.supabaseUpdate('categorias_financeiro', String(id), updates as unknown as Record<string, unknown>);
+    if (ok) {
+      this.categoriasFinanceiro = this.categoriasFinanceiro.map(c => c.id === id ? { ...c, ...updates } : c);
+      this.saveToLocalStorage();
+      this.notify();
+    }
+  }
+
+  async deleteCategoriaFinanceiro(id: number) {
+    const ok = await this.supabaseDelete('categorias_financeiro', String(id));
+    if (ok) { this.categoriasFinanceiro = this.categoriasFinanceiro.filter(c => c.id !== id); this.saveToLocalStorage(); this.notify(); }
   }
 
   async carregarDadosEmpresa(): Promise<void> {
@@ -1224,7 +1286,7 @@ if (estoque) {
       if (jaEstornado) continue;
 
       const estorno = {
-        id: 'estorno_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 12),
+        id: crypto.randomUUID(),
         data_lancamento: new Date().toISOString().split('T')[0],
         valor: rec.valor,
         tipo: 'despesa' as const,
@@ -1236,7 +1298,7 @@ if (estoque) {
       };
       let ok = false;
       try { ok = await this.supabaseInsert('lancamentos_financeiros', estorno as unknown as Record<string, unknown>); } catch { ok = false; }
-      if (ok) this.lancamentos.unshift(estorno);
+      this.lancamentos.unshift(estorno);
     }
 
     this.error = null;

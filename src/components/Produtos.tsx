@@ -27,6 +27,7 @@ import { compressImageToBlob } from '../lib/imageOptimizer';
 import { uploadProdutoImage, deleteProdutoImage, isStorageUrl, isBase64Image, base64ToBlob } from '../lib/imageUpload';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 
 interface ProdutosProps {
   store: MiniFactoryStore;
@@ -679,7 +680,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         <>
           <div className="fixed inset-0 bg-black/50 z-50" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }} />
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans">
-            <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl border border-amber-100 dark:border-[#2d1e0d] flex flex-col max-h-[90vh]" id="modal-product-form">
+            <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl shadow-2xl border border-amber-100 dark:border-[#2d1e0d] flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 border-b border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
               <div>
@@ -716,7 +717,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             </div>
 
             {/* Content */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar text-xs font-sans">
+            <form id="modal-product-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar text-xs font-sans">
               <div className="p-4 sm:p-5 space-y-4">
                 
                 {/* TAB: INFORMAÇÕES BÁSICAS */}
@@ -731,10 +732,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       </div>
                       <div className="space-y-1">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Categoria *</label>
-                        <select value={categoriaId} onChange={(e) => setCategoriaId(Number(e.target.value))}
-                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100">
-                          {store.categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                        </select>
+                        <SelectSearch value={String(categoriaId)} onChange={v => setCategoriaId(Number(v))}
+                          options={store.categorias.map(cat => ({value: String(cat.id), label: cat.nome}))}
+                          placeholder="Selecione uma categoria"
+                          className="w-full" />
                       </div>
                     </div>
 
@@ -742,10 +743,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       <div className="flex-1 space-y-1 min-w-0">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Unidade *</label>
                         <div className="flex gap-2">
-                          <select value={unidadeProducaoId} onChange={(e) => setUnidadeProducaoId(Number(e.target.value))}
-                            className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" required>
-                            {store.unidades.map(u => <option key={u.id} value={u.id}>{u.nome} ({u.sigla})</option>)}
-                          </select>
+                          <SelectSearch value={String(unidadeProducaoId)} onChange={v => setUnidadeProducaoId(Number(v))}
+                            options={store.unidades.map(u => ({value: String(u.id), label: `${u.nome} (${u.sigla})`}))}
+                            placeholder="Selecione uma unidade"
+                            className="flex-1" />
                           <button type="button" onClick={() => setShowNovaUnidade(true)}
                             className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold rounded-lg transition shrink-0">+ Nova</button>
                         </div>
@@ -812,6 +813,34 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       </button>
                     </div>
 
+                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
+                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
+                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
+                          <div className="relative">
+                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
+                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
+                          <div className="relative">
+                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
+                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
+                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
+                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {recipeItems.length === 0 ? (
                       <div className="bg-amber-50/10 dark:bg-amber-950/5 rounded-xl p-4 border border-amber-50 dark:border-[#2d1e0d] text-center text-gray-400 dark:text-amber-100/30">
                         <p className="text-xs">Nenhum ingrediente adicionado.</p>
@@ -823,7 +852,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                     ) : (
                       <>
                         {/* Desktop table */}
-                        <div className="hidden md:block max-h-[320px] overflow-y-auto no-scrollbar">
+                        <div className="hidden md:block max-h-[40vh] overflow-y-auto no-scrollbar">
                           <table className="w-full text-xs">
                             <thead className="sticky top-0 z-10">
                               <tr className="bg-amber-50 dark:bg-[#1c140c] border-b border-amber-200 dark:border-[#2d1e0d]">
@@ -840,12 +869,12 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                 return (
                                   <tr key={idx} className="border-b border-amber-100/30 dark:border-[#2d1e0d]/30 hover:bg-amber-50/20 dark:hover:bg-[#1c140c]/20">
                                     <td className="px-2 py-1.5">
-                                      <select value={item.material_id}
-                                        onChange={(e) => handleUpdateRecipeRow(idx, { material_id: e.target.value })}
-                                        className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100">
-                                        {store.materiais.filter(m => !usedIds.includes(m.id))
-                                          .map(m => <option key={m.id} value={m.id}>{m.nome} ({m.quantidade_atual}{store.unidadeSigla(m.unidade_id)} em estoque)</option>)}
-                                      </select>
+                                      <SelectSearch value={item.material_id}
+                                        onChange={v => handleUpdateRecipeRow(idx, { material_id: v })}
+                                        options={store.materiais.filter(m => !usedIds.includes(m.id))
+                                          .map(m => ({value: m.id, label: `${m.nome} (${store.unidadeSigla(m.unidade_id)})`}))}
+                                        placeholder="Selecione um ingrediente"
+                                        className="w-full" />
                                     </td>
                                     <td className="px-2 py-1.5">
                                       <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
@@ -878,20 +907,19 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                         </div>
 
                         {/* Mobile cards */}
-                        <div className="md:hidden space-y-2 max-h-[320px] overflow-y-auto no-scrollbar pr-1">
+                        <div className="md:hidden space-y-2 max-h-[40vh] overflow-y-auto no-scrollbar pr-1">
                           {recipeItems.map((item, idx) => {
                             const materialRef = store.materiais.find(m => m.id === item.material_id);
                             return (
                               <div key={idx} className="bg-orange-50/15 dark:bg-[#1c140c]/30 p-2.5 rounded-lg border border-amber-100/50 dark:border-[#2d1e0d]/50 space-y-2">
-                                <select value={item.material_id}
-                                  onChange={(e) => handleUpdateRecipeRow(idx, { material_id: e.target.value })}
-                                  className="w-full p-1.5 border border-amber-200 dark:border-[#2d1e0d] rounded text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100">
-                                  {(() => {
+                                <SelectSearch value={item.material_id}
+                                  onChange={v => handleUpdateRecipeRow(idx, { material_id: v })}
+                                  options={store.materiais.filter(m => {
                                     const usedIds = recipeItems.filter((_, i) => i !== idx).map(r => r.material_id);
-                                    return store.materiais.filter(m => !usedIds.includes(m.id))
-                                      .map(m => <option key={m.id} value={m.id}>{m.nome} ({m.quantidade_atual}{store.unidadeSigla(m.unidade_id)})</option>);
-                                  })()}
-                                </select>
+                                    return !usedIds.includes(m.id);
+                                  }).map(m => ({value: m.id, label: `${m.nome} (${store.unidadeSigla(m.unidade_id)})`}))}
+                                  placeholder="Selecione um ingrediente"
+                                  className="w-full" />
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
                                     <input type="number" step="any" min="0.0001" placeholder="0.5"
@@ -917,53 +945,11 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                         </div>
                       </>
                     )}
-
-                    {recipeItems.length > 0 && (
-                      <div className="p-2.5 bg-emerald-50 dark:bg-[#1a3a22]/30 rounded-xl border border-emerald-100 dark:border-[#244c2f]/40 flex items-center justify-between text-[10px]">
-                        <span className="font-semibold text-emerald-950 dark:text-emerald-200 flex items-center gap-1">
-                          <Info size={12} /> Custo Unitário Projetado:
-                        </span>
-                        <span className="font-bold font-mono text-emerald-800 dark:text-emerald-400 text-sm">
-                          {formatCurrency(recipeItems.reduce((acc, item) => {
-                            const mat = store.materiais.find(m => m.id === item.material_id);
-                            return acc + (item.quantidade_necessaria * (mat?.custo_unitario || 0));
-                          }, 0))}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Precificação */}
-                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
-                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
-                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
-                          <div className="relative">
-                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
-                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
-                          </div>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
-                          <div className="relative">
-                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
-                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
               </div>
+            </form>
 
               {/* Footer */}
               <div className="flex items-center gap-3 px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
@@ -971,12 +957,11 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
                   Cancelar
                 </button>
-                <button type="submit"
+                <button type="submit" form="modal-product-form"
                   className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
                   {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
                 </button>
               </div>
-            </form>
             </div>
           </div>
         </>

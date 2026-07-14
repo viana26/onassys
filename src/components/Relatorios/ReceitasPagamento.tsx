@@ -162,6 +162,7 @@ export default function ReceitasPagamento({ store, isOpen, onClose }: ReceitasPa
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;

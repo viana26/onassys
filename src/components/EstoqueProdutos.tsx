@@ -4,6 +4,7 @@ import { EstoqueProduto, Produto } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 import { 
   Plus, 
   Trash2, 
@@ -21,7 +22,9 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   ArrowDownLeft,
-  ArrowUpRight
+  ArrowUpRight,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { sugerirMaximoProduzivel } from '../lib/calculos';
 
@@ -38,6 +41,15 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const [activeTab, setActiveTab] = useState<'painel' | 'historico'>('painel');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
+
+  // Historico tab state
+  const [histSearch, setHistSearch] = useState('');
+  const [histTipoFilter, setHistTipoFilter] = useState(0);
+  const [histProdutoFilter, setHistProdutoFilter] = useState('todos');
+  const [histDataInicio, setHistDataInicio] = useState('');
+  const [histDataFim, setHistDataFim] = useState('');
+  const [histPage, setHistPage] = useState(1);
+  const [histPageSize, setHistPageSize] = useState(10);
 
   // Lote form state
   const [isLoteOpen, setIsLoteOpen] = useState(false);
@@ -101,6 +113,31 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const paginatedEstoque = sortedEstoque.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
+  );
+
+  const histFiltered = useMemo(() => {
+    return store.movProdutos.filter(m => {
+      if (histSearch) {
+        const prod = store.produtos.find(p => p.id === m.produto_id);
+        const nome = prod?.nome || '';
+        if (!nome.toLowerCase().includes(histSearch.toLowerCase()) && !(m.observacao || '').toLowerCase().includes(histSearch.toLowerCase())) return false;
+      }
+      if (histTipoFilter && m.tipo_id !== histTipoFilter) return false;
+      if (histProdutoFilter !== 'todos' && m.produto_id !== histProdutoFilter) return false;
+      if (histDataInicio && new Date(m.criado_em) < new Date(histDataInicio)) return false;
+      if (histDataFim) {
+        const fim = new Date(histDataFim);
+        fim.setDate(fim.getDate() + 1);
+        if (new Date(m.criado_em) > fim) return false;
+      }
+      return true;
+    }).sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+  }, [store.movProdutos, histSearch, histTipoFilter, histProdutoFilter, histDataInicio, histDataFim]);
+
+  const histTotalPages = Math.max(1, Math.ceil(histFiltered.length / histPageSize));
+  const histPaginated = histFiltered.slice(
+    (histPage - 1) * histPageSize,
+    histPage * histPageSize
   );
 
   const handleSearchChange = (v: string) => {
@@ -511,49 +548,105 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
           )}
         </>
       ) : (
-        /* Finished Movements and baking auditing tab */
         <div className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold font-display text-amber-950 dark:text-amber-100 text-base">Controle de Saídas e Assamento de Forno</h3>
+            <h3 className="font-semibold font-display text-amber-950 dark:text-amber-100 text-base">Histórico de Movimentações</h3>
             <span className="text-[11px] bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-250 border border-amber-100 dark:border-[#382613] font-bold px-2 py-1 rounded">
-              {store.movProdutos.length} registros
+              {histFiltered.length} registros
             </span>
           </div>
 
-          {store.movProdutos.length === 0 ? (
-            <p className="text-center text-gray-400 dark:text-amber-150/30 py-8 text-xs">Nenhuma movimentação de produto pronto relatada.</p>
+          {/* Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input type="text" value={histSearch} onChange={e => { setHistSearch(e.target.value); setHistPage(1); }} placeholder="Buscar produto ou observação..." className="w-full pl-7 pr-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
+            </div>
+            <select value={histTipoFilter} onChange={e => { setHistTipoFilter(Number(e.target.value)); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none">
+              <option value={0}>Todos os tipos</option>
+              {store.tiposMovimentacao.filter(t => t.entidade === 'produto' || t.entidade === 'ambos').map(t => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+            <SelectSearch value={histProdutoFilter} onChange={v => { setHistProdutoFilter(v); setHistPage(1); }} options={[{ value: 'todos', label: 'Todos os produtos' }, ...store.produtos.filter(p => p.ativo).map(p => ({ value: p.id, label: p.nome }))]} placeholder="Filtrar por produto" />
+            <input type="date" value={histDataInicio} onChange={e => { setHistDataInicio(e.target.value); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data início" />
+            <input type="date" value={histDataFim} onChange={e => { setHistDataFim(e.target.value); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data fim" />
+          </div>
+
+          {histFiltered.length === 0 ? (
+            <p className="text-center text-gray-400 dark:text-amber-100/30 py-8 text-xs">Nenhuma movimentação encontrada para os filtros atuais.</p>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto no-scrollbar">
-              {store.movProdutos.map((mov, idx) => {
-                const prod = store.produtos.find(p => p.id === mov.produto_id);
-                return (
-                  <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-lg ${mov.quantidade >= 0 ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-350'}`}>
-                        {mov.quantidade >= 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-amber-950 dark:text-amber-150">{prod?.nome || 'Produto Desconhecido'}</p>
-                        <p className="text-gray-500 dark:text-amber-100/40 text-[10px] mt-0.5">{mov.observacao}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold font-mono ${mov.quantidade >= 0 ? 'text-emerald-700 dark:text-emerald-450' : 'text-red-800 dark:text-red-400'}`}>
-                        {mov.quantidade >= 0 ? '+' : ''}{mov.quantidade} {unidadeNome(prod?.id || '')}
-                      </p>
-                      {(() => {
-                        const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
-                        const isDateValid = dateObj && !isNaN(dateObj.getTime());
-                        return isDateValid ? (
-                          <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
-                            {dateObj.toLocaleDateString('pt-BR')} {dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        ) : null;
-                      })()}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
+                    <th className="p-3 pl-4 whitespace-nowrap font-semibold">Data</th>
+                    <th className="p-3 whitespace-nowrap font-semibold">Produto</th>
+                    <th className="p-3 whitespace-nowrap font-semibold">Tipo</th>
+                    <th className="p-3 text-right whitespace-nowrap font-semibold">Quantidade</th>
+                    <th className="p-3 pr-4 whitespace-nowrap font-semibold">Observação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {histPaginated.map((mov) => {
+                    const prod = store.produtos.find(p => p.id === mov.produto_id);
+                    const natureza = store.tiposMovimentacao.find(t => t.id === mov.tipo_id)?.natureza;
+                    const isEntrada = natureza === 'entrada';
+                    return (
+                      <tr key={mov.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
+                        <td className="p-3 pl-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                          {new Date(mov.criado_em).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="p-3 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">
+                          {prod?.nome || 'Produto Desconhecido'}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                            isEntrada
+                              ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                          }`}>
+                            {isEntrada ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
+                            {store.tipoMovNome(mov.tipo_id)}
+                          </span>
+                        </td>
+                        <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${isEntrada ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {isEntrada ? '+' : '-'}{mov.quantidade}
+                        </td>
+                        <td className="p-3 pr-4 text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                          {mov.observacao || '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {histFiltered.length > histPageSize && (
+            <div className="flex items-center justify-between pt-2 border-t border-amber-100 dark:border-[#22160b]">
+              <div className="text-[10px] text-gray-500 dark:text-amber-100/40">
+                {histFiltered.length} registros — Pág. {histPage} de {histTotalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={histPage === 1}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+                  Anterior
+                </button>
+                <button onClick={() => setHistPage(p => Math.min(histTotalPages, p + 1))} disabled={histPage === histTotalPages}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+                  Próximo
+                </button>
+                <select value={histPageSize} onChange={e => { setHistPageSize(Number(e.target.value)); setHistPage(1); }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none">
+                  <option value={10}>10 / pág</option>
+                  <option value={20}>20 / pág</option>
+                  <option value={50}>50 / pág</option>
+                  <option value={100}>100 / pág</option>
+                </select>
+              </div>
             </div>
           )}
         </div>
@@ -592,18 +685,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <form onSubmit={handleSaveLote} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium">Selecione o Produto *</label>
-                <select 
-                  value={loteProdutoId}
-                  onChange={(e) => {
-                    setLoteProdutoId(e.target.value);
-                    setErrorMessage(null);
-                  }}
-                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400"
-                >
-                  {store.produtos.map(p => (
-                    <option key={p.id} value={p.id} className="dark:bg-[#1c140c]">{p.nome} (Sugerido máx: {sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})</option>
-                  ))}
-                </select>
+                <SelectSearch value={loteProdutoId} onChange={v => { setLoteProdutoId(v); setErrorMessage(null); }} options={store.produtos.map(p => ({ value: p.id, label: `${p.nome} (Sugerido máx: ${sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})` }))} placeholder="Selecione um produto" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

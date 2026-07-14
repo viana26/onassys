@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { analisarEstoqueParaPedido } from '../lib/calculos';
 import RelatorioPedidos from './RelatorioPedidos';
+import SelectSearch from './SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -537,7 +538,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
               { id: 4, title: 'Pronto p/ Entrega', color: 'bg-emerald-50/20 dark:bg-[#071a10]/30 border-emerald-100 dark:border-[#133c24]/40', text: 'text-emerald-900 dark:text-emerald-305', badge: 'bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300' },
               { id: 5, title: 'Entregues Recentes', color: 'bg-gray-50/20 dark:bg-[#111111]/30 border-gray-100 dark:border-[#222222]/40', text: 'text-gray-650 dark:text-gray-300', badge: 'bg-gray-200 dark:bg-gray-800 dark:text-gray-300' }
             ].map(col => {
-              const ordersInCol = filteredPedidos.filter(p => p.status_id === col.id);
+              const ordersInCol = filteredPedidos.filter(p => p.status_id === col.id).sort((a, b) => new Date(a.data_entrega_prevista).getTime() - new Date(b.data_entrega_prevista).getTime());
               
               // Hide other columns on mobile if not active
               const isActiveOnMobile = mobileKanbanColumn === col.id;
@@ -942,17 +943,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-amber-950 font-medium">Comprador / Cliente *</label>
-                  <select 
-                    value={clienteId}
-                    onChange={(e) => setClienteId(e.target.value)}
-                    className="w-full p-2 border border-amber-200 rounded-lg text-xs bg-white"
-                    required
-                  >
-                    <option value="" disabled>--- Selecione o Cliente ---</option>
-                    {store.clientes.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome} ({store.tipoClienteNome(c.tipo_id)})</option>
-                    ))}
-                  </select>
+                  <SelectSearch value={clienteId} onChange={setClienteId} options={store.clientes.map(c => ({ value: c.id, label: `${c.nome} (${store.tipoClienteNome(c.tipo_id)})` }))} placeholder="Selecione um cliente" />
                 </div>
 
                 <div className="space-y-1">
@@ -988,15 +979,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                         {/* Selected product dropdown */}
                         <div className="w-full sm:flex-1 space-y-1">
                           <label className="text-[9px] font-semibold text-amber-900/60 uppercase">Produto</label>
-                          <select 
-                            value={item.produto_id}
-                            onChange={(e) => handleUpdateItemRow(idx, { produto_id: e.target.value })}
-                            className="w-full p-1.5 border border-amber-200 bg-white rounded text-xs"
-                          >
-                            {store.produtos.map(p => (
-                              <option key={p.id} value={p.id}>{p.nome}</option>
-                            ))}
-                          </select>
+                          <SelectSearch value={item.produto_id} onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })} options={store.produtos.map(p => ({ value: p.id, label: p.nome }))} placeholder="Selecione um produto" />
                         </div>
 
                         {/* Quantity input requested */}
@@ -1425,12 +1408,12 @@ ${pagHtml}
                         <button
                           onClick={async () => {
                             const result = await store.atenderPedidoDoEstoque(p.id);
-                            if (!result.success) { setCustomAlert({ title: 'Erro', message: result.error || 'Erro ao atender do estoque' }); return; }
+                            if (!result.success) { setCustomAlert({ title: 'Erro', message: result.error || 'Erro ao entregar do estoque' }); return; }
                             onUpdate();
                           }}
-                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 text-[10px]"
                         >
-                          📦 Atender do Estoque
+                          🚚 Entregar do Estoque
                         </button>
                       )}
 
@@ -1579,16 +1562,6 @@ ${pagHtml}
                 {fromStatus === 5 && (
                   <>
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
-                      <input type="checkbox" checked={revReverterProducao}
-                        onChange={e => {
-                          setRevReverterProducao(e.target.checked);
-                          setRevRestaurarInsumos(e.target.checked);
-                          setRevRemoverProdutos(e.target.checked);
-                        }}
-                        className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
-                      Reverter produção (restaura insumos + remove estoque gerado)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-amber-200 cursor-pointer">
                       <input type="checkbox" checked={revReporEstoque} onChange={e => setRevReporEstoque(e.target.checked)}
                         className="rounded border-gray-300 dark:border-[#2e1a0a] text-amber-600 focus:ring-amber-500" />
                       Repor produtos entregues (devolve ao estoque)
@@ -1612,8 +1585,12 @@ ${pagHtml}
                 <button onClick={async () => {
                   let errMsg: string | null = null;
                   try {
-                    if (revRestaurarInsumos || revRemoverProdutos || revReporEstoque) {
-                      const revResult = await store.reverterMovimentacoesPedido(pedidoId, { restaurarInsumos: revRestaurarInsumos, removerProdutos: revRemoverProdutos, reporEstoque: revReporEstoque });
+                    const isVoltar5to4 = fromStatus === 5 && targetStatus !== 6;
+                    const restaurarInsumos = isVoltar5to4 ? false : revRestaurarInsumos;
+                    const removerProdutos = isVoltar5to4 ? false : revRemoverProdutos;
+                    const reporEstoque = fromStatus === 5 ? revReporEstoque : false;
+                    if (restaurarInsumos || removerProdutos || reporEstoque) {
+                      const revResult = await store.reverterMovimentacoesPedido(pedidoId, { restaurarInsumos, removerProdutos, reporEstoque });
                       if (!revResult.success) { errMsg = revResult.error || 'Erro ao reverter movimentações'; return; }
                     }
                     const statusResult = await store.updatePedidoStatus(pedidoId, targetStatus);

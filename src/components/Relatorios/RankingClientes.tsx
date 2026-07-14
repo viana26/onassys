@@ -172,6 +172,7 @@ export default function RankingClientes({ store, isOpen, onClose }: RankingClien
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;

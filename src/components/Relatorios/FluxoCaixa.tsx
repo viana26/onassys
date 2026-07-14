@@ -165,6 +165,7 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;

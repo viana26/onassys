@@ -174,6 +174,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;

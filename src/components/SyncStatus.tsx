@@ -79,7 +79,7 @@ export default function SyncStatus({ store }: SyncStatusProps) {
             {(!online || store.errorType === 'network') && (
               <div className="flex items-start gap-1.5 text-red-400 dark:text-red-600 mt-1 pt-1.5 border-t border-white/10 dark:border-black/10">
                 <AlertCircle size={10} className="shrink-0 mt-0.5" />
-                <span className="leading-tight">Sem conexão com o servidor. Alterações não serão salvas.</span>
+                <span className="leading-tight">Sem conexão com o servidor.</span>
               </div>
             )}
             <div className="text-[8px] opacity-60 mt-1">

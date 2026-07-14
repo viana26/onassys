@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../lib/store';
 import { X, Search, Download, Printer, Calendar, Filter } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -218,13 +219,7 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
             </div>
             <div className="space-y-1">
               <label className="text-[9px] font-bold text-amber-900/60 uppercase">Cliente</label>
-              <select value={filtroCliente} onChange={e => setFiltroCliente(e.target.value)}
-                className="w-full p-2 border border-amber-200 rounded-lg text-xs bg-white">
-                <option value="todos">Todos</option>
-                {store.clientes.map(c => (
-                  <option key={c.id} value={c.id}>{c.nome}</option>
-                ))}
-              </select>
+              <SelectSearch value={filtroCliente} onChange={v => setFiltroCliente(v)} options={[{ value: 'todos', label: 'Todos os clientes' }, ...store.clientes.map(c => ({ value: c.id, label: c.nome }))]} placeholder="Filtrar por cliente" />
             </div>
           </div>
           <div className="relative">

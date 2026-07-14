@@ -182,6 +182,7 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;

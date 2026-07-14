@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import SelectSearch from '../SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -151,6 +152,7 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -173,19 +175,19 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
             <Filter size={14} className="text-amber-700 dark:text-amber-400" />
             <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Filtros</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Data Início</label>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[120px]">
+              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Data Início</label>
               <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}
                 className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Data Fim</label>
+            <div className="flex-1 min-w-[120px]">
+              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Data Fim</label>
               <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
                 className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Tipo</label>
+            <div className="flex-1 min-w-[120px]">
+              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Tipo</label>
               <select value={filtroTipo} onChange={e => setFiltroTipo(Number(e.target.value))}
                 className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
                 <option value={0}>Todos</option>
@@ -194,15 +196,9 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
                 ))}
               </select>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Produto</label>
-              <select value={filtroProduto} onChange={e => setFiltroProduto(e.target.value)}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                <option value="todos">Todos</option>
-                {store.produtos.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome}</option>
-                ))}
-              </select>
+            <div className="flex-[2] min-w-[140px]">
+              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Produto</label>
+              <SelectSearch value={filtroProduto} onChange={v => setFiltroProduto(v)} options={[{ value: 'todos', label: 'Todos' }, ...store.produtos.map(p => ({ value: p.id, label: p.nome }))]} placeholder="Filtrar por produto" />
             </div>
           </div>
         </div>
@@ -260,8 +256,8 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
                             {store.tipoMovNome(m.tipo_id)}
                           </span>
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-amber-950 dark:text-amber-100 whitespace-nowrap">
-                          {m.quantidade}
+                        <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${natureza === 'entrada' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {natureza === 'entrada' ? '+' : '-'}{m.quantidade}
                         </td>
                         <td className="p-3 text-right pr-4 text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                           {m.observacao || '—'}

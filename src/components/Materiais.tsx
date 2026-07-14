@@ -4,6 +4,7 @@ import { Material } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 import { 
   Plus, 
   Trash2, 
@@ -612,15 +613,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
                   <div className="flex gap-2">
-                    <select 
-                      value={unidadeId}
-                      onChange={(e) => setUnidadeId(Number(e.target.value))}
-                      className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
-                    >
-                      {store.unidades.map(u => (
-                        <option key={u.id} value={u.id} className="dark:bg-[#1c140c]">{u.nome} ({u.sigla})</option>
-                      ))}
-                    </select>
+                    <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: u.nome }))} placeholder="Selecione a unidade" />
                     <button type="button" onClick={() => setShowNovaUnidade(true)}
                       className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
                       + Nova
@@ -644,20 +637,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
                 <div className="flex gap-2">
-                  <select 
-                    value={fornecedorId}
-                    onChange={(e) => setFornecedorId(Number(e.target.value))}
-                    className="flex-1 p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
-                    required
-                  >
-                    <option value={0} className="dark:bg-[#1c140c]">-- Selecione --</option>
-                    {store.fornecedores.filter(f => f.ativo !== false).map(f => (
-                      <option key={f.id} value={f.id} className="dark:bg-[#1c140c]">{f.nome_fantasia}</option>
-                    ))}
-                    {fornecedorId > 0 && store.fornecedores.find(f => f.id === fornecedorId)?.ativo === false && (
-                      <option value={fornecedorId} className="dark:bg-[#1c140c]">{store.fornecedorNome(fornecedorId)} (inativo)</option>
-                    )}
-                  </select>
+                  <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" />
                   <button type="button" onClick={() => setShowNovoFornecedor(true)}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
                     + Novo
