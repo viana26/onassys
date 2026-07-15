@@ -1044,6 +1044,28 @@ export class MiniFactoryStore {
   }
 
   // ================================================
+  // LIMPEZA DE HISTÓRICO DE MOVIMENTAÇÕES
+  // ================================================
+  async deleteMovimentacoes(ids: string[], tipo: 'material' | 'produto'): Promise<{ success: boolean; removed: number; error?: string }> {
+    if (ids.length === 0) return { success: true, removed: 0 };
+    const table = tipo === 'material' ? 'movimentacoes_materiais' : 'movimentacoes_produtos';
+    try {
+      const { error } = await supabase.from(table).delete().in('id', ids);
+      if (error) return { success: false, removed: 0, error: error.message };
+      if (tipo === 'material') {
+        this.movMateriais = this.movMateriais.filter(m => !ids.includes(m.id));
+      } else {
+        this.movProdutos = this.movProdutos.filter(m => !ids.includes(m.id));
+      }
+      this.saveToLocalStorage();
+      this.notify();
+      return { success: true, removed: ids.length };
+    } catch {
+      return { success: false, removed: 0, error: 'Sem conexão com o servidor.' };
+    }
+  }
+
+  // ================================================
   // CRUD — PERFIS USUÁRIO
   // ================================================
   async listPerfisUsuarios() {

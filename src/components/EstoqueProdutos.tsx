@@ -5,6 +5,7 @@ import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
+import ConfirmarLimpezaHistorico from './ConfirmarLimpezaHistorico';
 import { 
   Plus, 
   Trash2, 
@@ -50,6 +51,8 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const [histDataFim, setHistDataFim] = useState('');
   const [histPage, setHistPage] = useState(1);
   const [histPageSize, setHistPageSize] = useState(10);
+  const [histSelected, setHistSelected] = useState<Set<string>>(new Set());
+  const [showLimparConfirm, setShowLimparConfirm] = useState(false);
 
   // Lote form state
   const [isLoteOpen, setIsLoteOpen] = useState(false);
@@ -139,6 +142,34 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     (histPage - 1) * histPageSize,
     histPage * histPageSize
   );
+
+  const allHistSelected = histPaginated.length > 0 && histPaginated.every(m => histSelected.has(m.id));
+
+  const toggleHistSelectAll = () => {
+    if (allHistSelected) {
+      setHistSelected(new Set());
+    } else {
+      setHistSelected(new Set(histPaginated.map(m => m.id) as string[]));
+    }
+  };
+
+  const toggleHistSelect = (id: string) => {
+    setHistSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleLimparSelecionados = async () => {
+    const ids = Array.from(histSelected) as string[];
+    const result = await store.deleteMovimentacoes(ids, 'produto');
+    if (result.success) {
+      setHistSelected(new Set());
+      setShowLimparConfirm(false);
+    }
+  };
 
   const handleSearchChange = (v: string) => {
     setSearchTerm(v);
@@ -281,16 +312,20 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       <div className="flex border-b border-amber-100 dark:border-[#22160b] gap-4" id="stock-nav">
         <button 
           onClick={() => setActiveTab('painel')}
-          className={`pb-2 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer ${
-            activeTab === 'painel' ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100 font-bold' : 'text-gray-500 dark:text-[#a08f80] hover:text-amber-950 dark:hover:text-amber-200'
+          className={`py-2 px-3 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer rounded-t-xl ${
+            activeTab === 'painel' 
+              ? 'border-b-2 border-amber-700 dark:border-amber-400 bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-bold' 
+              : 'text-gray-500 dark:text-[#a08f80] hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:text-amber-950 dark:hover:text-amber-200'
           }`}
         >
-          Prateleira Física
+          Estoque de Produtos
         </button>
         <button 
           onClick={() => setActiveTab('historico')}
-          className={`pb-2 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer ${
-            activeTab === 'historico' ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100 font-bold' : 'text-gray-500 dark:text-[#a08f80] hover:text-amber-950 dark:hover:text-amber-200'
+          className={`py-2 px-3 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer rounded-t-xl ${
+            activeTab === 'historico' 
+              ? 'border-b-2 border-amber-700 dark:border-amber-400 bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-bold' 
+              : 'text-gray-500 dark:text-[#a08f80] hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:text-amber-950 dark:hover:text-amber-200'
           }`}
         >
           Movimentações
@@ -551,9 +586,19 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
         <div className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold font-display text-amber-950 dark:text-amber-100 text-base">Histórico de Movimentações</h3>
-            <span className="text-[11px] bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-250 border border-amber-100 dark:border-[#382613] font-bold px-2 py-1 rounded">
-              {histFiltered.length} registros
-            </span>
+            <div className="flex items-center gap-2">
+              {histSelected.size > 0 && store.hasPermission('estoque.limpar_historico') && (
+                <button
+                  onClick={() => setShowLimparConfirm(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
+                >
+                  <Trash2 size={12} /> Excluir {histSelected.size} selecionado(s)
+                </button>
+              )}
+              <span className="text-[11px] bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-250 border border-amber-100 dark:border-[#382613] font-bold px-2 py-1 rounded">
+                {histFiltered.length} registros
+              </span>
+            </div>
           </div>
 
           {/* Filters */}
@@ -580,6 +625,16 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                 <thead>
                   <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
+                    {store.hasPermission('estoque.limpar_historico') && (
+                      <th className="p-3 pl-4 w-8">
+                        <input
+                          type="checkbox"
+                          checked={allHistSelected}
+                          onChange={toggleHistSelectAll}
+                          className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                        />
+                      </th>
+                    )}
                     <th className="p-3 pl-4 whitespace-nowrap font-semibold">Data</th>
                     <th className="p-3 whitespace-nowrap font-semibold">Produto</th>
                     <th className="p-3 whitespace-nowrap font-semibold">Tipo</th>
@@ -593,7 +648,17 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     const natureza = store.tiposMovimentacao.find(t => t.id === mov.tipo_id)?.natureza;
                     const isEntrada = natureza === 'entrada';
                     return (
-                      <tr key={mov.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
+                      <tr key={mov.id} className={`border-b border-amber-50/50 dark:border-[#22160b]/40 transition ${histSelected.has(mov.id) ? 'bg-amber-100/30 dark:bg-amber-950/20' : 'hover:bg-amber-50/20 dark:hover:bg-amber-950/10'}`}>
+                        {store.hasPermission('estoque.limpar_historico') && (
+                          <td className="p-3 pl-4">
+                            <input
+                              type="checkbox"
+                              checked={histSelected.has(mov.id)}
+                              onChange={() => toggleHistSelect(mov.id)}
+                              className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                            />
+                          </td>
+                        )}
                         <td className="p-3 pl-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                           {new Date(mov.criado_em).toLocaleDateString('pt-BR')}
                         </td>
@@ -929,6 +994,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
           </div>
         </div>
       )}
+
+      <ConfirmarLimpezaHistorico
+        open={showLimparConfirm}
+        onClose={() => setShowLimparConfirm(false)}
+        onConfirm={handleLimparSelecionados}
+        totalRegistros={histSelected.size}
+        tipoLabel="Produtos"
+      />
 
     </div>
   );

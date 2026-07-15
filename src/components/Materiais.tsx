@@ -5,6 +5,7 @@ import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
+import ConfirmarLimpezaHistorico from './ConfirmarLimpezaHistorico';
 import { 
   Plus, 
   Trash2, 
@@ -33,7 +34,7 @@ interface MateriaisProps {
 
 export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCritico, setFilterCritico] = useState(false);
+  const [filterType, setFilterType] = useState<'todos' | 'em_falta' | 'critico' | 'com_estoque'>('todos');
   const [activeTab, setActiveTab] = useState<'lista' | 'historico'>('lista');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
@@ -66,6 +67,16 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
+  // History tab states
+  const [histSearch, setHistSearch] = useState('');
+  const [histTipoFilter, setHistTipoFilter] = useState(0);
+  const [histDataInicio, setHistDataInicio] = useState('');
+  const [histDataFim, setHistDataFim] = useState('');
+  const [histPage, setHistPage] = useState(1);
+  const [histPageSize, setHistPageSize] = useState(10);
+  const [histSelected, setHistSelected] = useState<Set<string>>(new Set());
+  const [showLimparConfirm, setShowLimparConfirm] = useState(false);
+
   // Quick Inbound replenishment state
   const [isInbounding, setIsInbounding] = useState(false);
   const [inboundMaterialId, setInboundMaterialId] = useState<string>('');
@@ -78,15 +89,75 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const filteredMateriais = useMemo(() => {
     return store.materiais.filter(m => {
       const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      if (filterCritico) {
-        return batchesSearch && m.quantidade_atual < m.quantidade_minima;
+
+      if (filterType === 'em_falta') {
+        return batchesSearch && m.quantidade_atual === 0;
+      }
+      if (filterType === 'critico') {
+        return batchesSearch && m.quantidade_atual < m.quantidade_minima && m.quantidade_atual > 0;
+      }
+      if (filterType === 'com_estoque') {
+        return batchesSearch && m.quantidade_atual > 0;
       }
       return batchesSearch;
     });
-  }, [store.materiais, searchTerm, filterCritico]);
+  }, [store.materiais, searchTerm, filterType]);
 
   const { sortedItems: sortedMateriais, requestSort, sortConfig } = useSortableData(filteredMateriais, 'nome');
+
+  // History filtered list
+  const histFiltered = useMemo(() => {
+    return store.movMateriais.filter(m => {
+      const mat = store.materiais.find(ma => ma.id === m.material_id);
+      const nome = mat?.nome || '';
+      if (histSearch) {
+        const searchLow = histSearch.toLowerCase();
+        if (!nome.toLowerCase().includes(searchLow) && !(m.observacao || '').toLowerCase().includes(searchLow)) return false;
+      }
+      if (histTipoFilter && m.tipo_id !== histTipoFilter) return false;
+      if (histDataInicio && new Date(m.criado_em) < new Date(histDataInicio)) return false;
+      if (histDataFim) {
+        const fim = new Date(histDataFim);
+        fim.setDate(fim.getDate() + 1);
+        if (new Date(m.criado_em) > fim) return false;
+      }
+      return true;
+    }).sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+  }, [store.movMateriais, store.materiais, histSearch, histTipoFilter, histDataInicio, histDataFim]);
+
+  const histTotalPages = Math.max(1, Math.ceil(histFiltered.length / histPageSize));
+  const histPaginated = histFiltered.slice(
+    (histPage - 1) * histPageSize,
+    histPage * histPageSize
+  );
+
+  const allHistSelected = histPaginated.length > 0 && histPaginated.every(m => histSelected.has(m.id));
+
+  const toggleHistSelectAll = () => {
+    if (allHistSelected) {
+      setHistSelected(new Set());
+    } else {
+      setHistSelected(new Set(histPaginated.map(m => m.id) as string[]));
+    }
+  };
+
+  const toggleHistSelect = (id: string) => {
+    setHistSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleLimparSelecionados = async () => {
+    const ids = Array.from(histSelected) as string[];
+    const result = await store.deleteMovimentacoes(ids, 'material');
+    if (result.success) {
+      setHistSelected(new Set());
+      setShowLimparConfirm(false);
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(sortedMateriais.length / pageSize));
   const paginatedMateriais = sortedMateriais.slice(
@@ -99,8 +170,8 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
     setCurrentPage(1);
   };
 
-  const handleFilterCritico = () => {
-    setFilterCritico(v => !v);
+  const handleFilterChange = (type: 'todos' | 'em_falta' | 'critico' | 'com_estoque') => {
+    setFilterType(type);
     setCurrentPage(1);
   };
 
@@ -236,28 +307,38 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
           <p className="text-sm text-[#5c4a37]/60 dark:text-amber-100/50 mt-1">Gerencie os ingredientes, compre insumos, controle custos e resolva alertas de reestoque.</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {store.hasPermission('materiais.criar') && (
           <button 
-            onClick={() => setActiveTab('lista')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-sans transition border ${
-              activeTab === 'lista' 
-                ? 'bg-amber-104 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-[#3a2713] bg-amber-100' 
-                : 'bg-white dark:bg-[#150f09] text-gray-600 dark:text-[#a59587] border-gray-100 dark:border-[#20150b]'
-            }`}
+            onClick={handleOpenNew}
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center cursor-pointer"
           >
-            Estoque Atual
+            <Plus size={15} /> Novo Ingrediente
           </button>
-          <button 
-            onClick={() => setActiveTab('historico')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold font-sans transition border ${
-              activeTab === 'historico' 
-                ? 'bg-amber-104 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border-amber-200 dark:border-[#3a2713] bg-amber-100' 
-                : 'bg-white dark:bg-[#150f09] text-gray-600 dark:text-[#a59587] border-gray-100 dark:border-[#20150b]'
-            }`}
-          >
-            Histórico de Movimentações
-          </button>
-        </div>
+        )}
+      </div>
+
+      {/* Tabs navigation */}
+      <div className="flex border-b border-amber-100 dark:border-[#22160b] gap-4" id="materiais-nav">
+        <button 
+          onClick={() => setActiveTab('lista')}
+          className={`py-2 px-3 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer rounded-t-xl ${
+            activeTab === 'lista' 
+              ? 'border-b-2 border-amber-700 dark:border-amber-400 bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-bold' 
+              : 'text-gray-500 dark:text-[#a08f80] hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:text-amber-950 dark:hover:text-amber-200'
+          }`}
+        >
+          Estoque de Insumos
+        </button>
+        <button 
+          onClick={() => setActiveTab('historico')}
+          className={`py-2 px-3 text-xs font-semibold uppercase tracking-wider font-sans transition cursor-pointer rounded-t-xl ${
+            activeTab === 'historico' 
+              ? 'border-b-2 border-amber-700 dark:border-amber-400 bg-amber-100 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-bold' 
+              : 'text-gray-500 dark:text-[#a08f80] hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:text-amber-950 dark:hover:text-amber-200'
+          }`}
+        >
+          Movimentações
+        </button>
       </div>
 
       {activeTab === 'lista' ? (
@@ -278,56 +359,25 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               />
             </div>
 
-            <div className="flex flex-wrap w-full md:w-auto items-center justify-end gap-3">
-              <label className="flex items-center gap-2 text-xs font-medium text-amber-900/80 dark:text-amber-200/80 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={filterCritico}
-                  onChange={handleFilterCritico}
-                  className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500"
-                />
-                <span className="flex items-center gap-1">
-                  <AlertTriangle size={14} className="text-red-500" /> Somente críticos / em falta
-                </span>
-              </label>
-
-              {store.hasPermission('materiais.criar') && (
-                <button 
-                  onClick={handleOpenNew}
-                  className="bg-amber-700 hover:bg-amber-600 dark:bg-amber-800 dark:hover:bg-amber-750 shadow-sm text-white text-xs font-semibold font-sans py-2 px-3 rounded-xl transition flex items-center gap-1 w-full sm:w-auto justify-center cursor-pointer"
-                  data-help="materiais-novo"
+            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
+              {[
+                { type: 'todos' as const, label: 'Todos' },
+                { type: 'em_falta' as const, label: 'Em Falta' },
+                { type: 'critico' as const, label: 'Crítico' },
+                { type: 'com_estoque' as const, label: 'Com Estoque' }
+              ].map(item => (
+                <button
+                  key={item.type}
+                  onClick={() => handleFilterChange(item.type)}
+                  className={`px-3 py-1 rounded-full text-[10px] tracking-wide font-semibold border transition whitespace-nowrap cursor-pointer ${
+                    filterType === item.type 
+                      ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800' 
+                      : 'bg-white dark:bg-[#1c140c] text-gray-500 dark:text-amber-200/50 border-amber-100 dark:border-[#2d1e0d] hover:bg-amber-50 dark:hover:bg-amber-955'
+                  }`}
                 >
-                  <Plus size={14} /> Novo Ingrediente
+                  {item.label}
                 </button>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Stats overview */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in" id="materials-stats-grid">
-            <div className="bg-amber-50/40 dark:bg-amber-950/10 p-3 rounded-xl border border-amber-50 dark:border-[#22160b] text-xs flex flex-col justify-between overflow-hidden">
-              <p className="text-gray-500 dark:text-amber-100/40 font-sans truncate">Total de Categorias</p>
-              <p className="text-sm sm:text-base lg:text-lg font-bold font-mono text-amber-950 dark:text-amber-100 mt-1 truncate" title={`${store.materiais.length} itens`}>
-                {store.materiais.length} itens
-              </p>
-            </div>
-            <div className="bg-amber-50/40 dark:bg-amber-950/10 p-3 rounded-xl border border-amber-50 dark:border-[#22160b] text-xs flex flex-col justify-between overflow-hidden">
-              <p className="text-red-650 dark:text-red-400 flex items-center gap-1 font-medium font-sans truncate">⚠️ Abaixo do Mínimo</p>
-              <p className="text-sm sm:text-base lg:text-lg font-bold font-mono text-red-650 dark:text-red-400 mt-1 truncate" title={`${store.materiais.filter(m => m.quantidade_atual < m.quantidade_minima).length} itens`}>
-                {store.materiais.filter(m => m.quantidade_atual < m.quantidade_minima).length} itens
-              </p>
-            </div>
-            <div className="bg-amber-50/40 dark:bg-amber-950/10 p-3 rounded-xl border border-amber-50 dark:border-[#22160b] text-xs flex flex-col justify-between overflow-hidden">
-              <p className="text-gray-500 dark:text-amber-100/40 font-sans truncate">Ativos no Cardápio</p>
-              <p className="text-sm sm:text-base lg:text-lg font-bold font-mono text-amber-950 dark:text-amber-100 mt-1 truncate" title={`${store.produtos.length} produtos`}>
-                {store.produtos.length} produtos
-              </p>
-            </div>
-            <div className="bg-amber-50/40 dark:bg-amber-950/10 p-3 rounded-xl border border-amber-50 dark:border-[#22160b] text-xs flex flex-col justify-between overflow-hidden">
-              <p className="text-gray-500 dark:text-amber-100/40 font-sans truncate" title="Valor Investido (Estoque)">Valor Investido (Estoque)</p>
-              <p className="text-sm sm:text-base lg:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-1 truncate" title={(store.materiais.reduce((sum, m) => sum + (m.quantidade_atual * m.custo_unitario), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}>
-                {(store.materiais.reduce((sum, m) => sum + (m.quantidade_atual * m.custo_unitario), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </p>
+              ))}
             </div>
           </div>
 
@@ -513,69 +563,204 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
         <div className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold font-display text-amber-950 dark:text-amber-100 text-base">Registro de Entradas e Saídas</h3>
-            <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-100 dark:border-[#382613] font-bold px-2 py-0.5 rounded font-mono">
-              {store.movMateriais.length} movimentações no total
-            </span>
+            <div className="flex items-center gap-2">
+              {histSelected.size > 0 && store.hasPermission('estoque.limpar_historico') && (
+                <button
+                  onClick={() => setShowLimparConfirm(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold rounded-lg transition cursor-pointer"
+                >
+                  <Trash2 size={12} /> Excluir {histSelected.size} selecionado(s)
+                </button>
+              )}
+              <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border border-amber-100 dark:border-[#382613] font-bold px-2 py-0.5 rounded font-mono">
+                {histFiltered.length} registros
+              </span>
+            </div>
           </div>
 
-          {store.movMateriais.length === 0 ? (
-            <p className="text-center text-gray-400 dark:text-amber-100/30 py-8 text-xs font-sans">Nenhuma movimentação registrada.</p>
-          ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto no-scrollbar">
-              {store.movMateriais.map((mov, idx) => {
-                const mat = store.materiais.find(m => m.id === mov.material_id);
-                const isEntrada = mov.tipo_id === 1;
-
-                const hasCostInfo = isEntrada && (
-                  (mov.valor_pago !== null && mov.valor_pago !== undefined) ||
-                  (mov.custo_unitario !== null && mov.custo_unitario !== undefined) ||
-                  (mat?.custo_unitario !== null && mat?.custo_unitario !== undefined)
-                );
-
-                const valPago = (mov.valor_pago !== null && mov.valor_pago !== undefined)
-                  ? Number(mov.valor_pago)
-                  : ((mov.custo_unitario !== null && mov.custo_unitario !== undefined) ? Number(mov.custo_unitario) : (mat?.custo_unitario || 0)) * mov.quantidade;
-
-                const custUnit = (mov.custo_unitario !== null && mov.custo_unitario !== undefined)
-                  ? Number(mov.custo_unitario)
-                  : (mat?.custo_unitario || 0);
-
-                const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
-                const isDateValid = dateObj && !isNaN(dateObj.getTime());
-
-                return (
-                  <div key={idx} className="p-3 bg-amber-50/10 dark:bg-[#1d160e]/30 rounded-xl border border-amber-50 dark:border-[#2d1e0d] flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-lg ${isEntrada ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-355' : 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'}`}>
-                        {isEntrada ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-amber-950 dark:text-amber-150">{mat?.nome || 'Ingrediente Desconhecido'}</p>
-                        <p className="text-gray-500 dark:text-amber-100/40 text-[10px] mt-0.5 font-sans">{mov.observacao}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
-                        {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
-                      </p>
-                      {hasCostInfo && (
-                        <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-mono">
-                          PAGO: {valPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                          <span className="text-gray-400 dark:text-amber-100/30 font-sans font-normal ml-1">
-                            ({custUnit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0) || ''})
-                          </span>
-                        </p>
-                      )}
-                      {isDateValid && (
-                        <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
-                          {dateObj.toLocaleDateString('pt-BR')} {dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={histSearch}
+                onChange={e => { setHistSearch(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
+                placeholder="Buscar ingrediente ou observação..."
+                className="w-full pl-7 pr-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400"
+              />
             </div>
+            <select
+              value={histTipoFilter}
+              onChange={e => { setHistTipoFilter(Number(e.target.value)); setHistPage(1); setHistSelected(new Set()); }}
+              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
+            >
+              <option value={0}>Todos os tipos</option>
+              {store.tiposMovimentacao.filter(t => t.entidade === 'material' || t.entidade === 'ambos').map(t => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={histDataInicio}
+              onChange={e => { setHistDataInicio(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
+              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
+              placeholder="Data início"
+            />
+            <input
+              type="date"
+              value={histDataFim}
+              onChange={e => { setHistDataFim(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
+              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
+              placeholder="Data fim"
+            />
+          </div>
+
+          {histFiltered.length === 0 ? (
+            <p className="text-center text-gray-400 dark:text-amber-100/30 py-8 text-xs font-sans">Nenhuma movimentação encontrada para os filtros atuais.</p>
+          ) : (
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+                  <thead>
+                    <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
+                      {store.hasPermission('estoque.limpar_historico') && (
+                        <th className="p-3 pl-4 w-8">
+                          <input
+                            type="checkbox"
+                            checked={allHistSelected}
+                            onChange={toggleHistSelectAll}
+                            className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                        </th>
+                      )}
+                      <th className="p-3 whitespace-nowrap font-semibold">Data</th>
+                      <th className="p-3 whitespace-nowrap font-semibold">Ingrediente</th>
+                      <th className="p-3 whitespace-nowrap font-semibold">Tipo</th>
+                      <th className="p-3 text-right whitespace-nowrap font-semibold">Quantidade</th>
+                      <th className="p-3 text-right whitespace-nowrap font-semibold">Custo</th>
+                      <th className="p-3 whitespace-nowrap font-semibold">Observação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {histPaginated.map(mov => {
+                      const mat = store.materiais.find(m => m.id === mov.material_id);
+                      const tipo = store.tiposMovimentacao.find(t => t.id === mov.tipo_id);
+                      const isEntrada = tipo?.natureza === 'entrada';
+                      const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
+                      const isDateValid = dateObj && !isNaN(dateObj.getTime());
+                      const valPago = (mov.valor_pago ?? mov.custo_unitario ?? mat?.custo_unitario ?? 0) * mov.quantidade;
+
+                      return (
+                        <tr key={mov.id} className={`border-b border-amber-50/50 dark:border-[#22160b]/40 transition ${histSelected.has(mov.id) ? 'bg-amber-100/30 dark:bg-amber-950/20' : 'hover:bg-amber-50/20 dark:hover:bg-amber-950/10'}`}>
+                          {store.hasPermission('estoque.limpar_historico') && (
+                            <td className="p-3 pl-4">
+                              <input
+                                type="checkbox"
+                                checked={histSelected.has(mov.id)}
+                                onChange={() => toggleHistSelect(mov.id)}
+                                className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                              />
+                            </td>
+                          )}
+                          <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                            {isDateValid ? dateObj.toLocaleDateString('pt-BR') + ' ' + dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
+                          <td className="p-3 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">{mat?.nome || 'Ingrediente Desconhecido'}</td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                              isEntrada
+                                ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                            }`}>
+                              {isEntrada ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
+                              {tipo?.nome || '—'}
+                            </span>
+                          </td>
+                          <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
+                            {isEntrada ? '+' : '-'}{mov.quantidade} {store.unidadeSigla(mat?.unidade_id || 0) || ''}
+                          </td>
+                          <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                            {isEntrada ? valPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                          </td>
+                          <td className="p-3 text-gray-500 dark:text-amber-100/40 whitespace-nowrap max-w-[200px] truncate">{mov.observacao || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-2">
+                {histPaginated.map(mov => {
+                  const mat = store.materiais.find(m => m.id === mov.material_id);
+                  const tipo = store.tiposMovimentacao.find(t => t.id === mov.tipo_id);
+                  const isEntrada = tipo?.natureza === 'entrada';
+                  const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
+                  const isDateValid = dateObj && !isNaN(dateObj.getTime());
+
+                  return (
+                    <div key={mov.id} className={`p-3 rounded-xl border text-xs flex items-center justify-between ${histSelected.has(mov.id) ? 'bg-amber-100/30 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700' : 'bg-amber-50/10 dark:bg-[#1d160e]/30 border-amber-50 dark:border-[#2d1e0d]'}`}>
+                      <div className="flex items-center gap-3">
+                        {store.hasPermission('estoque.limpar_historico') && (
+                          <input
+                            type="checkbox"
+                            checked={histSelected.has(mov.id)}
+                            onChange={() => toggleHistSelect(mov.id)}
+                            className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                          />
+                        )}
+                        <div className={`p-1.5 rounded-lg ${isEntrada ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'}`}>
+                          {isEntrada ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-amber-950 dark:text-amber-150">{mat?.nome || 'Ingrediente Desconhecido'}</p>
+                          <p className="text-gray-500 dark:text-amber-100/40 text-[10px] mt-0.5 font-sans">{mov.observacao}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
+                          {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
+                        </p>
+                        {isDateValid && (
+                          <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
+                            {dateObj.toLocaleDateString('pt-BR')} {dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination */}
+              {histFiltered.length > histPageSize && (
+                <div className="flex items-center justify-between pt-2 border-t border-amber-100 dark:border-[#22160b]">
+                  <div className="text-[10px] text-gray-500 dark:text-amber-100/40">
+                    {histFiltered.length} registros — Pág. {histPage} de {histTotalPages}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={histPage === 1}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+                      Anterior
+                    </button>
+                    <button onClick={() => setHistPage(p => Math.min(histTotalPages, p + 1))} disabled={histPage === histTotalPages}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+                      Próximo
+                    </button>
+                    <select value={histPageSize} onChange={e => { setHistPageSize(Number(e.target.value)); setHistPage(1); setHistSelected(new Set()); }}
+                      className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none">
+                      <option value={10}>10 / pág</option>
+                      <option value={20}>20 / pág</option>
+                      <option value={50}>50 / pág</option>
+                      <option value={100}>100 / pág</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -921,6 +1106,14 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
           </div>
         </div>
       )}
+
+      <ConfirmarLimpezaHistorico
+        open={showLimparConfirm}
+        onClose={() => setShowLimparConfirm(false)}
+        onConfirm={handleLimparSelecionados}
+        totalRegistros={histSelected.size}
+        tipoLabel="Insumos (Matérias-Primas)"
+      />
 
     </div>
   );

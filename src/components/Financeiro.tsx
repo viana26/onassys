@@ -1,13 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt, Wallet, CreditCard } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
 import BalancetePeriodo from './Relatorios/BalancetePeriodo';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const pagamentoIcons: Record<string, React.ReactNode> = {
+  dinheiro: <Wallet size={12} />,
+  pix: <DollarSign size={12} />,
+  cartao_credito: <CreditCard size={12} />,
+  cartao_debito: <CreditCard size={12} />,
+  boleto: <Receipt size={12} />,
+  transferencia: <TrendingUp size={12} />,
+};
+
+const pagamentoLabel: Record<string, string> = {
+  dinheiro: 'Dinheiro',
+  pix: 'Pix',
+  cartao_credito: 'Crédito',
+  cartao_debito: 'Débito',
+  boleto: 'Boleto',
+  transferencia: 'Transferência',
+};
 
 interface FinanceiroProps {
   store: MiniFactoryStore;
@@ -19,12 +37,23 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const [showModalTipo, setShowModalTipo] = useState<'receita' | 'despesa' | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<LancamentoFinanceiro | null>(null);
   const [showBalancete, setShowBalancete] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  const lancamentosFiltrados = (filtroTipo === 'todas'
-    ? [...store.lancamentos]
-    : store.lancamentos.filter(l => l.tipo === filtroTipo));
+  const lancamentosFiltrados = useMemo(() => {
+    const base = filtroTipo === 'todas'
+      ? [...store.lancamentos]
+      : store.lancamentos.filter(l => l.tipo === filtroTipo);
+    return base.sort((a, b) => new Date(b.data_lancamento).getTime() - new Date(a.data_lancamento).getTime());
+  }, [store.lancamentos, filtroTipo]);
 
   const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento');
+
+  const totalPages = Math.max(1, Math.ceil(sortedLancamentos.length / pageSize));
+  const paginatedLancamentos = sortedLancamentos.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const receitas = store.lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
   const despesas = store.lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
@@ -101,7 +130,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
       <div className="flex items-center gap-2">
         <Filter size={14} className="text-[#5c4a37]/60 dark:text-amber-100/50" />
         {(['todas', 'receita', 'despesa'] as const).map(t => (
-          <button key={t} onClick={() => setFiltroTipo(t)}
+          <button key={t} onClick={() => { setFiltroTipo(t); setCurrentPage(1); }}
             className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
               filtroTipo === t
                 ? 'bg-amber-600 text-white'
@@ -112,7 +141,8 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         ))}
       </div>
 
-      <div className="bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] overflow-hidden overflow-x-auto">
+      {/* Desktop Table */}
+      <div className="hidden md:block bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] overflow-hidden overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
             <tr>
@@ -125,7 +155,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
-            {sortedLancamentos.map(l => (
+            {paginatedLancamentos.map(l => (
               <tr key={l.id} className="hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition">
                 <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 font-mono">
                   {new Date(l.data_lancamento).toLocaleDateString('pt-BR')}
@@ -136,7 +166,10 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                     {store.categoriaFinanceiroNome(l.categoria_id)}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70">{l.forma_pagamento || '—'}</td>
+                <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 flex items-center gap-1.5">
+                  {pagamentoIcons[l.forma_pagamento || ''] || null}
+                  {pagamentoLabel[l.forma_pagamento || ''] || '—'}
+                </td>
                 <td className={`px-4 py-3 text-right text-sm font-bold font-mono ${l.tipo === 'receita' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                   {l.tipo === 'receita' ? '+' : '-'}{brl(l.valor)}
                 </td>
@@ -153,9 +186,82 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
           </tbody>
         </table>
         {sortedLancamentos.length === 0 && (
-          <div className="p-8 text-center text-[#5c4a37]/60 dark:text-amber-100/50">Nenhum lançamento encontrado</div>
+          <div className="p-12 text-center">
+            <Receipt size={36} className="mx-auto text-amber-600/30 mb-3" />
+            <p className="text-sm font-medium text-[#5c4a37]/60 dark:text-amber-100/50">Nenhum lançamento encontrado</p>
+            <p className="text-xs text-[#5c4a37]/40 dark:text-amber-100/30 mt-1">Registre receitas ou despesas usando os botões acima.</p>
+          </div>
         )}
       </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-3">
+        {paginatedLancamentos.length === 0 ? (
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl border border-[#ebdcc9] dark:border-[#2e1a0a] p-8 text-center">
+            <Receipt size={36} className="mx-auto text-amber-600/30 mb-3" />
+            <p className="text-sm font-medium text-[#5c4a37]/60 dark:text-amber-100/50">Nenhum lançamento encontrado</p>
+            <p className="text-xs text-[#5c4a37]/40 dark:text-amber-100/30 mt-1">Registre receitas ou despesas usando os botões acima.</p>
+          </div>
+        ) : (
+          paginatedLancamentos.map(l => (
+            <div key={l.id} className="bg-white dark:bg-[#1a1208] rounded-xl border border-[#ebdcc9] dark:border-[#2e1a0a] p-4 shadow-sm space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm text-[#2e2315] dark:text-amber-50 truncate">{l.descricao || 'Sem descrição'}</p>
+                  <p className="text-[10px] text-[#5c4a37]/50 dark:text-amber-100/30 mt-0.5 font-mono">
+                    {new Date(l.data_lancamento).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                <span className={`text-base font-bold font-mono ${l.tipo === 'receita' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {l.tipo === 'receita' ? '+' : '-'}{brl(l.valor)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="px-2 py-0.5 rounded bg-[#f0eade] dark:bg-[#130b04] text-[#5c4a37] dark:text-amber-100/70 font-medium">
+                  {store.categoriaFinanceiroNome(l.categoria_id)}
+                </span>
+                <span className="flex items-center gap-1 text-[#5c4a37]/60 dark:text-amber-100/40">
+                  {pagamentoIcons[l.forma_pagamento || ''] || null}
+                  {pagamentoLabel[l.forma_pagamento || ''] || '—'}
+                </span>
+              </div>
+              {store.hasPermission('financeiro.lancar') && (
+                <div className="flex justify-end pt-1 border-t border-[#ebdcc9]/50 dark:border-[#2e1a0a]/50">
+                  <button onClick={() => setDeleteConfirm(l)}
+                    className="text-[10px] text-red-600/60 dark:text-red-400/60 hover:text-red-600 dark:hover:text-red-400 font-medium flex items-center gap-1 transition">
+                    <Trash2 size={10} /> Excluir
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Pagination */}
+      {sortedLancamentos.length > pageSize && (
+        <div className="flex items-center justify-between pt-2">
+          <div className="text-[10px] text-gray-500 dark:text-amber-100/40">
+            {sortedLancamentos.length} lançamentos — Pág. {currentPage} de {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+              Anterior
+            </button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-900 dark:text-amber-100 disabled:opacity-30 hover:bg-amber-50 dark:hover:bg-[#1d160e] transition">
+              Próximo
+            </button>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              className="px-2 py-1 rounded-lg text-[10px] font-semibold border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#150f09] text-amber-950 dark:text-amber-100 cursor-pointer focus:outline-none">
+              <option value={10}>10 / pág</option>
+              <option value={20}>20 / pág</option>
+              <option value={50}>50 / pág</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {showModalTipo && <NovoLancamentoModal store={store} initialTipo={showModalTipo} onClose={() => setShowModalTipo(null)} onSaved={() => { setShowModalTipo(null); onUpdate(); }} />}
 

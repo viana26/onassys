@@ -482,6 +482,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Margem</th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Cap.</th>
                   <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-24">Ações</th>
                 </tr>
@@ -511,6 +512,17 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                         <span className={`${!p.preco_venda || p.preco_venda <= 0 ? 'text-gray-400 dark:text-amber-100/30' : p.preco_venda < p.custo_producao_calculado ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-emerald-700 dark:text-emerald-450 font-bold'}`}>
                           {!p.preco_venda || p.preco_venda <= 0 ? <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5 rounded text-[7px] font-bold">—</span> : formatCurrency(p.preco_venda)}
                         </span>
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono">
+                        {p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (
+                          <span className={`text-[10px] font-bold ${p.preco_venda > p.custo_producao_calculado ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                            {p.preco_venda > p.custo_producao_calculado
+                              ? ((1 - p.custo_producao_calculado / p.preco_venda) * 100).toFixed(1) + '%'
+                              : 'prej.'}
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 dark:text-amber-100/20">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right font-mono">
                         <span className={`${maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500'} font-bold`}>
@@ -572,6 +584,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Prep</span><p className="text-[10px] font-semibold text-amber-950 dark:text-amber-100 font-mono">{p.tempo_producao_minutos}m</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Custo</span><p className="text-[10px] font-semibold text-gray-600 dark:text-amber-200/65 font-mono truncate" title={formatCurrency(p.custo_producao_calculado)}>{formatCurrency(p.custo_producao_calculado)}</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Preço</span><p className={`text-[10px] font-mono truncate ${!p.preco_venda || p.preco_venda <= 0 ? 'text-gray-400 dark:text-amber-100/30' : p.preco_venda < p.custo_producao_calculado ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-emerald-700 dark:text-emerald-450 font-bold'}`}>{!p.preco_venda || p.preco_venda <= 0 ? <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5 rounded text-[7px] font-bold">—</span> : formatCurrency(p.preco_venda)}</p></div>
+                      <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Margem</span><p className={`text-[10px] font-mono truncate ${p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500') : 'text-gray-300 dark:text-amber-100/20'}`}>{p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? ((1 - p.custo_producao_calculado / p.preco_venda) * 100).toFixed(1) + '%' : 'prej.') : '—'}</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Cap.</span><p className={`text-[10px] font-bold font-mono truncate ${maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500'}`}>{maxQtd} {store.unidadeSigla(p.unidade_producao_id)}</p></div>
                     </div>
 
@@ -815,19 +828,35 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
                     <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
                       <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div className="space-y-0.5">
                           <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
                           <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem (%)</label>
+                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Markup / % s/ custo</label>
                           <div className="relative">
                             <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
                               {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
                               className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
                             <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
                           </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem de Lucro</span>
+                          <p className={`p-2 border border-dashed rounded-lg font-mono text-xs h-8 flex items-center justify-center font-bold ${
+                            liveCustoProducao > 0 && precoVenda > 0
+                              ? precoVenda > liveCustoProducao
+                                ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-red-50/60 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                              : 'bg-amber-50/10 dark:bg-amber-950/5 border-amber-100 dark:border-amber-950/50 text-gray-400 dark:text-amber-100/30'
+                          }`}>
+                            {liveCustoProducao > 0 && precoVenda > 0
+                              ? precoVenda > liveCustoProducao
+                                ? ((1 - liveCustoProducao / precoVenda) * 100).toFixed(1) + '%'
+                                : 'prejuízo'
+                              : '—'}
+                          </p>
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>

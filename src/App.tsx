@@ -638,7 +638,7 @@ export default function App() {
           { id: 'dashboard', label: 'Monitor', icon: <LayoutDashboard size={18} />, perm: null },
           { id: 'materiais', label: 'Insumos', icon: <Coins size={18} />, perm: 'materiais.ver' },
           { id: 'pedidos', label: 'Pedidos', icon: <ShoppingBag size={18} />, perm: 'pedidos.ver' },
-          { id: 'estoque', label: 'Prateleira', icon: <Warehouse size={18} />, perm: 'estoque.ver' },
+          { id: 'estoque', label: 'Estoque de Produtos', icon: <Warehouse size={18} />, perm: 'estoque.ver' },
         ].filter(item => !item.perm || store.hasPermission(item.perm)).map(item => {
           const active = currentTab === item.id;
           return (

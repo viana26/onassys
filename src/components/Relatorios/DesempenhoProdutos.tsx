@@ -22,6 +22,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
 
   const ranking = useMemo(() => {
     const pedidosFiltrados = store.pedidos.filter(p => {
+      if (p.status_id !== 5) return false;
       if (dataInicio && new Date(p.data_pedido) < new Date(dataInicio)) return false;
       if (dataFim) {
         const fim = new Date(dataFim);
