@@ -7,6 +7,7 @@ import {
   ArrowUpCircle, ArrowDownCircle, BarChart3
 } from 'lucide-react';
 import { normalizarQuantidade } from '../lib/calculos';
+import DashboardCharts from './DashboardCharts';
 
 interface DashboardProps {
   store: MiniFactoryStore;
@@ -18,7 +19,7 @@ interface DashboardProps {
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQuickLot, appName }: DashboardProps) {
+export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQuickLot }: DashboardProps) {
   const hoje = new Date();
   const hojeStr = hoje.toISOString().split('T')[0];
   const umaSemanaAtras = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -76,7 +77,7 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
     }, 0);
     const itensVendidos = store.itensPedido.filter(i => {
       const ped = store.pedidos.find(p => p.id === i.pedido_id);
-      return i.produto_id === prod.id && ped && ped.status_id !== 6;
+      return i.produto_id === prod.id && ped && ped.status_id === 5;
     });
     const qtdVendida = itensVendidos.reduce((s, i) => s + i.quantidade_solicitada, 0);
     const receitaTotal = itensVendidos.reduce((s, i) => s + i.quantidade_solicitada * i.preco_unitario, 0);
@@ -125,32 +126,53 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
     };
   });
 
+  const statusLabels = ['Confirmado', 'Em Produção', 'Pronto'];
+  const statusColors = ['#2563eb', '#d97706', '#059669'];
+  const statusCounts = [
+    store.pedidos.filter(p => p.status_id === 2).length,
+    store.pedidos.filter(p => p.status_id === 3).length,
+    store.pedidos.filter(p => p.status_id === 4).length,
+  ];
+
+  const statusPedidosData = {
+    labels: statusLabels,
+    datasets: [{
+      data: statusCounts,
+      backgroundColor: statusColors,
+      borderWidth: 0,
+      hoverOffset: 4,
+    }],
+  };
+
   return (
     <div className="space-y-6" id="dashboard-tab" data-help="dashboard">
-      <div className="bg-gradient-to-r from-amber-800 to-amber-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden" id="dash-banner">
-        <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none">
-          <Sparkles size={250} />
-        </div>
-        <div className="relative z-10" id="dash-banner-content">
-          <span className="bg-amber-700/50 text-amber-200 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider font-mono">
+      <div className="bg-gradient-to-r from-orange-50/90 to-amber-100/90 dark:from-amber-800/40 dark:to-amber-900/40 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.3)] flex items-center justify-between backdrop-blur-sm border-t border-amber-200/50 dark:border-t-amber-700/20" id="dash-banner">
+        <div className="flex items-center gap-3">
+          <span className="bg-amber-200/70 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider font-mono">
             Painel Geral
           </span>
-          <h1 className="text-2xl md:text-3xl font-display font-semibold mt-2 tracking-tight">
-            Olá, {appName || 'Mini Fábrica'}! 🥖🍰
+          <h1 className="text-lg font-display font-semibold text-amber-950 dark:text-amber-100 tracking-tight">
+            {(() => {
+              const h = hoje.getHours();
+              const nome = store.perfisUsuarios.find(u => u.id === store.currentUserId)?.nome?.split(' ')[0] || 'fofura';
+              if (h < 6) return `Vira madrugada, ${nome}? 🦉`;
+              if (h < 12) return `Bom dia, ${nome}! O forno já pré‑aqueceu? 🔥`;
+              if (h < 14) return `Bora almoçar, ${nome}? 🍽️`;
+              if (h < 18) return `Boa tarde, ${nome}! Produção a todo vapor 🚀`;
+              if (h < 22) return `Boa noite, ${nome}! Última fornada do dia? 🌙`;
+              return `Indo dormir, ${nome}? Apaga o forno primeiro ⏰`;
+            })()}
           </h1>
-          <p className="text-amber-100/90 text-sm mt-1 max-w-xl">
-            Acompanhe o ritmo de produção, os insumos na cozinha e as próximas entregas de hoje.
-          </p>
-          <div className="flex flex-wrap gap-2 mt-4" id="quick-actions">
-            <button onClick={onSetQuickOrder}
-              className="bg-amber-500 hover:bg-amber-400 text-amber-950 text-xs font-semibold py-2 px-4 rounded-xl transition flex items-center gap-1 shadow-sm font-sans">
-              <PlusCircle size={14} /> Novo Pedido
-            </button>
-            <button onClick={onSetQuickLot}
-              className="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold py-2 px-4 rounded-xl transition flex items-center gap-1 border border-white/20 font-sans">
-              <TrendingUp size={14} /> Concluir Lote de Produção
-            </button>
-          </div>
+        </div>
+        <div className="flex gap-2" id="quick-actions">
+          <button onClick={onSetQuickOrder}
+            className="bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center gap-1 shadow-sm font-sans">
+            <PlusCircle size={14} /> Novo Pedido
+          </button>
+          <button onClick={onSetQuickLot}
+            className="bg-white dark:bg-[#22160b] border border-amber-300 dark:border-white/20 text-amber-800 dark:text-amber-300 text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center gap-1 font-sans hover:bg-amber-50 dark:hover:bg-[#2a1d10]">
+            <TrendingUp size={14} /> Concluir Lote
+          </button>
         </div>
       </div>
 
@@ -256,6 +278,9 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
           </div>
         </div>
       </div>
+
+      {/* === GRÁFICOS === */}
+      <DashboardCharts store={store} />
 
       {/* === MAIN SPLIT === */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -491,6 +516,40 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* STATUS DOS PEDIDOS ATIVOS */}
+          <div className="bg-white dark:bg-[#150f09] rounded-2xl p-5 border border-amber-100 dark:border-[#22160b] shadow-sm">
+            <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100 mb-3 flex items-center gap-2">
+              <ShoppingBag className="text-amber-600" size={18} />
+              Status dos Pedidos
+            </h3>
+            {pedidosAtivos.length === 0 ? (
+              <p className="text-xs text-gray-400 dark:text-amber-100/40 py-4 text-center">Nenhum pedido ativo.</p>
+            ) : (
+              <div className="flex flex-col items-center gap-4 py-2">
+                <div className="text-center">
+                  <span className="text-4xl font-bold font-mono text-amber-950 dark:text-amber-100">{pedidosAtivos.length}</span>
+                  <p className="text-[10px] text-gray-500 dark:text-amber-100/40 uppercase tracking-wider font-semibold">Pedidos Ativos</p>
+                </div>
+                <div className="w-full space-y-2">
+                  {statusPedidosData.labels.map((label, i) => (
+                    <div key={label} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusPedidosData.datasets[0].backgroundColor[i] }} />
+                        <span className="text-amber-900/70 dark:text-amber-100/60">{label}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pedidosAtivos.length > 0 ? (statusPedidosData.datasets[0].data[i] / pedidosAtivos.length * 100) : 0}%`, backgroundColor: statusPedidosData.datasets[0].backgroundColor[i] }} />
+                        </div>
+                        <span className="font-mono font-bold text-amber-950 dark:text-amber-200 min-w-[1.5rem] text-right">{statusPedidosData.datasets[0].data[i]}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
-import { BarChart3, DollarSign, ShoppingCart, Package, Users, Warehouse, ChevronRight } from 'lucide-react';
+import { BarChart3, DollarSign, ShoppingCart, Package, Users, Warehouse, ChevronRight, BadgeDollarSign } from 'lucide-react';
 import BalancetePeriodo from './BalancetePeriodo';
 import FluxoCaixa from './FluxoCaixa';
 import NivelEstoque from './NivelEstoque';
@@ -9,6 +9,7 @@ import DesempenhoProdutos from './DesempenhoProdutos';
 import ConsumoInsumos from './ConsumoInsumos';
 import ReceitasPagamento from './ReceitasPagamento';
 import MovimentacoesEstoque from './MovimentacoesEstoque';
+import LucratividadePedidos from './LucratividadePedidos';
 
 interface RelatoriosProps {
   store: MiniFactoryStore;
@@ -79,6 +80,14 @@ const relatorios = [
     cor: 'orange',
     modulo: 'estoque',
   },
+  {
+    id: 'lucratividade_pedidos',
+    titulo: 'Lucratividade por Pedido',
+    descricao: 'Custo geral, preço total, recebido, pendente e lucro atual por pedido no período',
+    icon: BadgeDollarSign,
+    cor: 'emerald',
+    modulo: 'financeiro',
+  },
 ];
 
 const corMap: Record<string, { bg: string; text: string; border: string }> = {
@@ -101,6 +110,7 @@ const relatorioComponents: Record<string, React.FC<{ store: MiniFactoryStore; is
   consumo_insumos: ConsumoInsumos,
   receitas_pagamento: ReceitasPagamento,
   movimentacoes_estoque: MovimentacoesEstoque,
+  lucratividade_pedidos: LucratividadePedidos,
 };
 
 export default function Relatorios({ store }: RelatoriosProps) {
