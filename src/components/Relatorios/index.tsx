@@ -18,8 +18,8 @@ interface RelatoriosProps {
 const relatorios = [
   {
     id: 'balancete',
-    titulo: 'Balancete do Período',
-    descricao: 'Resumo financeiro com receitas, despesas e saldo por período',
+    titulo: 'Demonstração do Resultado',
+    descricao: 'Receitas e despesas agrupadas por categoria com resultado líquido do período',
     icon: DollarSign,
     cor: 'emerald',
     modulo: 'financeiro',
@@ -27,7 +27,7 @@ const relatorios = [
   {
     id: 'fluxo_caixa',
     titulo: 'Fluxo de Caixa',
-    descricao: 'Entradas e saídas com saldo acumulado por período',
+    descricao: 'Entradas, saídas e evolução do saldo com gráfico acumulado por período',
     icon: BarChart3,
     cor: 'blue',
     modulo: 'financeiro',

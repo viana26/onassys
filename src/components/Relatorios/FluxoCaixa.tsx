@@ -1,8 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
-import { X, Download, Printer, Filter, ArrowRightLeft } from 'lucide-react';
-import { useSortableData } from '../../lib/hooks/useSortableData';
-import { SortButton } from '../SortButton';
+import { X, Download, Printer, Filter, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -15,10 +27,38 @@ interface FluxoCaixaProps {
   onClose: () => void;
 }
 
+interface FluxoItem {
+  id: string;
+  data: Date;
+  dataStr: string;
+  tipo: string;
+  categoria: string;
+  descricao: string;
+  pagamento: string;
+  entrada: number;
+  saida: number;
+  saldo: number;
+}
+
 export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [filtroPagamento, setFiltroPagamento] = useState<string>('todos');
+  const [saldoInicialInput, setSaldoInicialInput] = useState('');
+
+  const saldoAuto = useMemo(() => {
+    if (!dataInicio) return 0;
+    const corte = new Date(dataInicio);
+    return store.lancamentos
+      .filter(l => new Date(l.data_lancamento) < corte)
+      .reduce((acc, l) => acc + (l.tipo === 'receita' ? l.valor : -l.valor), 0);
+  }, [store.lancamentos, dataInicio]);
+
+  const saldoAnterior = useMemo(() => {
+    const parsed = parseFloat(saldoInicialInput.replace(/[^0-9,-]/g, '').replace(',', '.'));
+    if (saldoInicialInput && !isNaN(parsed)) return parsed;
+    return saldoAuto;
+  }, [saldoInicialInput, saldoAuto]);
 
   const filteredLancamentos = useMemo(() => {
     return store.lancamentos
@@ -35,37 +75,111 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
       .sort((a, b) => new Date(a.data_lancamento).getTime() - new Date(b.data_lancamento).getTime());
   }, [store.lancamentos, dataInicio, dataFim, filtroPagamento]);
 
-  const fluxoComSaldo = useMemo(() => {
-    let saldo = 0;
+  const fluxoItems = useMemo(() => {
+    let saldo = saldoAnterior;
     return filteredLancamentos.map(l => {
       const delta = l.tipo === 'receita' ? l.valor : -l.valor;
       saldo += delta;
-      return { ...l, delta, saldo };
+      const dt = new Date(l.data_lancamento);
+      return {
+        id: l.id,
+        data: dt,
+        dataStr: dt.toLocaleDateString('pt-BR'),
+        tipo: l.tipo,
+        categoria: store.categoriaFinanceiroNome(l.categoria_id),
+        descricao: l.descricao || '—',
+        pagamento: l.forma_pagamento || '—',
+        entrada: l.tipo === 'receita' ? l.valor : 0,
+        saida: l.tipo === 'despesa' ? l.valor : 0,
+        saldo,
+      } as FluxoItem;
     });
-  }, [filteredLancamentos]);
+  }, [filteredLancamentos, saldoAnterior, store]);
 
-  const { sortedItems: sortedFluxo, requestSort, sortConfig } = useSortableData(
-    fluxoComSaldo.map((f, i) => ({ ...f, _idx: i })),
-    'data_lancamento'
-  );
+  const dailyGroups = useMemo(() => {
+    const groups: { data: string; items: FluxoItem[]; saldoFinal: number }[] = [];
+    let currentDay: string | null = null;
+    for (const item of fluxoItems) {
+      if (item.dataStr !== currentDay) {
+        currentDay = item.dataStr;
+        groups.push({ data: item.dataStr, items: [], saldoFinal: 0 });
+      }
+      groups[groups.length - 1].items.push(item);
+      groups[groups.length - 1].saldoFinal = item.saldo;
+    }
+    return groups;
+  }, [fluxoItems]);
 
-  const totalEntradas = filteredLancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
-  const totalSaidas = filteredLancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
-  const saldoFinal = totalEntradas - totalSaidas;
+  const dailyTotals = useMemo(() => {
+    let acum = saldoAnterior;
+    return dailyGroups.map(g => {
+      const entrada = g.items.reduce((s, i) => s + i.entrada, 0);
+      const saida = g.items.reduce((s, i) => s + i.saida, 0);
+      const saldoDia = entrada - saida;
+      acum += saldoDia;
+      return { ...g, totalEntrada: entrada, totalSaida: saida, saldoDia, saldoAcumulado: acum, qtd: g.items.length };
+    });
+  }, [dailyGroups, saldoAnterior]);
+
+  const totalEntradas = fluxoItems.reduce((s, i) => s + i.entrada, 0);
+  const totalSaidas = fluxoItems.reduce((s, i) => s + i.saida, 0);
+  const saldoFinal = saldoAnterior + totalEntradas - totalSaidas;
+
+  const chartData = useMemo(() => {
+    return {
+      labels: fluxoItems.map(i => i.dataStr),
+      datasets: [{
+        label: 'Saldo Acumulado',
+        data: fluxoItems.map(i => i.saldo),
+        borderColor: '#d97706',
+        backgroundColor: 'rgba(217,119,6,0.08)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 2,
+        pointHitRadius: 10,
+        borderWidth: 2,
+      }],
+    };
+  }, [fluxoItems]);
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: { label: (ctx: any) => `Saldo: ${formatCurrency(ctx.raw)}` },
+      },
+    },
+    scales: {
+      x: {
+        ticks: { color: '#a8a29e', font: { size: 8 }, maxRotation: 45 },
+        grid: { color: '#e7e5e4' },
+      },
+      y: {
+        ticks: { color: '#a8a29e', font: { size: 9 }, callback: (val: any) => formatCurrency(val) },
+        grid: { color: '#e7e5e4' },
+      },
+    },
+  };
 
   const exportCSV = () => {
     const headers = ['Data', 'Tipo', 'Categoria', 'Descrição', 'Pagamento', 'Entrada', 'Saída', 'Saldo'];
-    const rows = fluxoComSaldo.map(f => [
-      new Date(f.data_lancamento).toLocaleDateString('pt-BR'),
-      f.tipo === 'receita' ? 'Entrada' : 'Saída',
-      store.categoriaFinanceiroNome(f.categoria_id),
-      f.descricao || '—',
-      f.forma_pagamento || '—',
-      f.tipo === 'receita' ? f.valor.toFixed(2) : '',
-      f.tipo === 'despesa' ? f.valor.toFixed(2) : '',
-      f.saldo.toFixed(2),
-    ].join(','));
-    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const rows = [['Saldo Anterior', '', '', '', '', '', '', saldoAnterior.toFixed(2)]];
+    for (const i of fluxoItems) {
+      rows.push([
+        i.dataStr,
+        i.tipo === 'receita' ? 'Entrada' : 'Saída',
+        i.categoria,
+        i.descricao,
+        i.pagamento,
+        i.entrada ? i.entrada.toFixed(2) : '',
+        i.saida ? i.saida.toFixed(2) : '',
+        i.saldo.toFixed(2),
+      ]);
+    }
+    rows.push(['SALDO FINAL', '', '', '', '', totalEntradas.toFixed(2), totalSaidas.toFixed(2), saldoFinal.toFixed(2)]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -83,25 +197,24 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
     const cnpjHtml = store.dadosEmpresa?.cnpj ? `<p style="margin:0;font-size:9px;color:#a8a29e">CNPJ: ${store.dadosEmpresa.cnpj}</p>` : '';
     const periodoLabel = `${dataInicio ? new Date(dataInicio).toLocaleDateString('pt-BR') : 'Início'} a ${dataFim ? new Date(dataFim).toLocaleDateString('pt-BR') : 'Hoje'}`;
 
-    const rowsHtml = fluxoComSaldo.map((f, idx) => {
-      const bg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
-      const tipoColor = f.tipo === 'receita' ? '#059669' : '#dc2626';
-      return `<tr>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-family:monospace;color:#57534e;background:${bg}">${new Date(f.data_lancamento).toLocaleDateString('pt-BR')}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;background:${bg}"><span style="color:${tipoColor};font-weight:600;font-size:9px;text-transform:uppercase">${f.tipo === 'receita' ? 'Entrada' : 'Saída'}</span></td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${store.categoriaFinanceiroNome(f.categoria_id)}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-weight:600;color:#1c1917;background:${bg}">${f.descricao || '—'}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:${f.tipo === 'receita' ? '#059669' : '#dc2626'};background:${bg}">${f.tipo === 'receita' ? '+' : '−'}${formatCurrency(f.valor)}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:${f.saldo >= 0 ? '#059669' : '#dc2626'};background:${bg}">${formatCurrency(f.saldo)}</td>
+    let rowsHtml = '';
+    for (const d of dailyTotals) {
+      rowsHtml += `<tr>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;font-family:monospace;color:#57534e">${d.data}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;text-align:center;color:#a8a29e">${d.qtd}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#059669">${formatCurrency(d.totalEntrada)}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#dc2626">${formatCurrency(d.totalSaida)}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:${d.saldoDia >= 0 ? '#059669' : '#dc2626'}">${formatCurrency(d.saldoDia)}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.4rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:${d.saldoAcumulado >= 0 ? '#059669' : '#dc2626'}">${formatCurrency(d.saldoAcumulado)}</td>
       </tr>`;
-    }).join('');
+    }
 
     printWindow.document.write(`<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Fluxo de Caixa - ${appName()}</title>
 <style>
-  @page { margin: 1.5cm; size: A4 portrait; }
+  @page { margin: 1.5cm; size: A4 landscape; }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; color: #1c1917; font-size: 11px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; color: #1c1917; font-size: 10px; }
   table { width: 100%; border-collapse: collapse; }
   thead { display: table-header-group; }
   tfoot { display: table-footer-group; }
@@ -127,35 +240,44 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
   <table style="width:100%;border:none;margin-bottom:1rem;font-size:9px;color:#57534e"><tr>
     <td style="border:none"><strong>Período:</strong> ${periodoLabel}</td>
     <td style="border:none"><strong>Pagamento:</strong> ${filtroPagamento === 'todos' ? 'Todos' : filtroPagamento}</td>
-    <td style="border:none;text-align:right"><strong>Registros:</strong> ${filteredLancamentos.length}</td>
+    <td style="border:none;text-align:right"><strong>Saldo Inicial:</strong> ${formatCurrency(saldoAnterior)}</td>
+    <td style="border:none;text-align:right"><strong>Registros:</strong> ${fluxoItems.length}</td>
   </tr></table>
   <table style="width:100%;border:none;margin-bottom:1.5rem;border-collapse:collapse;font-size:9px"><tr>
-    <td style="width:33%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#ecfdf5">
-      <p style="margin:0;font-size:8px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:1px">Entradas</p>
-      <p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#059669">${formatCurrency(totalEntradas)}</p>
+    <td style="width:25%;border:1px solid #d6d3d1;padding:0.5rem;text-align:center;background:#ecfdf5">
+      <p style="margin:0;font-size:7px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:1px">Entradas</p>
+      <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:#059669">${formatCurrency(totalEntradas)}</p>
     </td>
-    <td style="width:33%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#fef2f2">
-      <p style="margin:0;font-size:8px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:1px">Saídas</p>
-      <p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#dc2626">${formatCurrency(totalSaidas)}</p>
+    <td style="width:25%;border:1px solid #d6d3d1;padding:0.5rem;text-align:center;background:#fef2f2">
+      <p style="margin:0;font-size:7px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:1px">Saídas</p>
+      <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:#dc2626">${formatCurrency(totalSaidas)}</p>
     </td>
-    <td style="width:33%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:${saldoFinal >= 0 ? '#ecfdf5' : '#fef2f2'}">
-      <p style="margin:0;font-size:8px;font-weight:700;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'};text-transform:uppercase;letter-spacing:1px">Saldo</p>
-      <p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'}">${formatCurrency(saldoFinal)}</p>
+    <td style="width:25%;border:1px solid #d6d3d1;padding:0.5rem;text-align:center;background:#fffbeb">
+      <p style="margin:0;font-size:7px;font-weight:700;color:#d97706;text-transform:uppercase;letter-spacing:1px">Saldo Inicial</p>
+      <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:#d97706">${formatCurrency(saldoAnterior)}</p>
+    </td>
+    <td style="width:25%;border:1px solid #d6d3d1;padding:0.5rem;text-align:center;background:${saldoFinal >= 0 ? '#ecfdf5' : '#fef2f2'}">
+      <p style="margin:0;font-size:7px;font-weight:700;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'};text-transform:uppercase;letter-spacing:1px">Saldo Final</p>
+      <p style="margin:4px 0 0 0;font-size:15px;font-weight:700;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'}">${formatCurrency(saldoFinal)}</p>
     </td>
   </tr></table>
   <table>
     <thead><tr>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Data</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Tipo</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Categoria</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Descrição</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Entrada/Saída</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Saldo</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Data</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:center;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Qtd</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Entrada</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Saída</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Saldo do Dia</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.4rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:7px;text-transform:uppercase">Acumulado</th>
     </tr></thead>
-    <tbody>${rowsHtml}</tbody>
+    <tbody>
+      <tr style="background:#fffbeb"><td colspan="4" style="padding:0.4rem 0.75rem;font-weight:700;font-size:10px;color:#d97706">Saldo Anterior</td><td style="padding:0.4rem 0.75rem;text-align:right"></td><td style="padding:0.4rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:#d97706">${formatCurrency(saldoAnterior)}</td></tr>
+      ${rowsHtml}
+    </tbody>
     <tfoot><tr>
-      <td colspan="5" style="border-top:2px solid #d97706;padding:0.625rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;font-size:10px">SALDO FINAL:</td>
-      <td style="border-top:2px solid #d97706;padding:0.625rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'};font-size:10px">${formatCurrency(saldoFinal)}</td>
+      <td colspan="4" style="border-top:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:800;color:#1c1917;font-size:10px">SALDO FINAL:</td>
+      <td style="border-top:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:${(totalEntradas - totalSaidas) >= 0 ? '#059669' : '#dc2626'}">${formatCurrency(totalEntradas - totalSaidas)}</td>
+      <td style="border-top:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:800;color:${saldoFinal >= 0 ? '#059669' : '#dc2626'};font-size:10px">${formatCurrency(saldoFinal)}</td>
     </tr></tfoot>
   </table>
   <div style="margin-top:2.5rem;padding-top:1rem;border-top:1px solid #d6d3d1;font-size:7px;color:#a8a29e;text-align:center">
@@ -172,7 +294,7 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans">
-      <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-5xl max-h-[90vh] rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
+      <div className="bg-white dark:bg-[#120c06] w-full sm:max-w-6xl max-h-[90vh] rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col animate-in slide-in-from-bottom border-t border-amber-100 dark:border-[#2d1e0d]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-amber-100 dark:border-[#2d1e0d]">
           <div>
@@ -190,7 +312,7 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
             <Filter size={14} className="text-amber-700 dark:text-amber-400" />
             <span className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Filtros</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Data Início</label>
               <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}
@@ -200,6 +322,12 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Data Fim</label>
               <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}
                 className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Saldo Inicial (manual)</label>
+              <input type="text" inputMode="decimal" value={saldoInicialInput} onChange={e => setSaldoInicialInput(e.target.value)}
+                placeholder={formatCurrency(saldoAuto)}
+                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 font-mono" />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Pagamento</label>
@@ -217,7 +345,11 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Summary */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800">
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase">Saldo Inicial</span>
+              <p className="text-lg font-bold font-mono text-amber-800 dark:text-amber-300">{formatCurrency(saldoAnterior)}</p>
+            </div>
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800">
               <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">Entradas</span>
               <p className="text-lg font-bold font-mono text-emerald-800 dark:text-emerald-300">{formatCurrency(totalEntradas)}</p>
@@ -227,63 +359,79 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
               <p className="text-lg font-bold font-mono text-red-800 dark:text-red-300">{formatCurrency(totalSaidas)}</p>
             </div>
             <div className={`p-3 rounded-xl border ${saldoFinal >= 0 ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800' : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'}`}>
-              <span className={`text-[10px] font-bold uppercase ${saldoFinal >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>Saldo Acumulado</span>
+              <span className={`text-[10px] font-bold uppercase ${saldoFinal >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>Saldo Final</span>
               <p className={`text-lg font-bold font-mono ${saldoFinal >= 0 ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300'}`}>{formatCurrency(saldoFinal)}</p>
             </div>
           </div>
 
+          {/* Chart */}
+          {fluxoItems.length > 1 && (
+            <div className="bg-white dark:bg-[#150f09] rounded-xl border border-amber-100 dark:border-[#22160b] p-4">
+              <h3 className="text-[10px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider mb-3">Evolução do Saldo</h3>
+              <div className="h-48">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            </div>
+          )}
+
           {/* Table */}
-          {sortedFluxo.length === 0 ? (
+          {fluxoItems.length === 0 ? (
             <div className="text-center py-12 text-gray-400 dark:text-amber-100/30">
               <p className="text-sm">Nenhum lançamento encontrado para os filtros selecionados.</p>
             </div>
           ) : (
             <div className="bg-white dark:bg-[#150f09] rounded-2xl border border-amber-100 dark:border-[#22160b] shadow-sm overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                    <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Data" sortKey="data_lancamento" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 whitespace-nowrap"><SortButton label="Tipo" sortKey="tipo" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 whitespace-nowrap"><SortButton label="Categoria" sortKey="categoria_id" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 whitespace-nowrap"><SortButton label="Descrição" sortKey="descricao" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 text-right whitespace-nowrap"><SortButton label="Entrada/Saída" sortKey="delta" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                    <th className="p-3 text-right pr-4 whitespace-nowrap"><SortButton label="Saldo" sortKey="saldo" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                    <th className="p-2 pl-4 whitespace-nowrap font-semibold">Data</th>
+                    <th className="p-2 text-center whitespace-nowrap font-semibold">Qtd</th>
+                    <th className="p-2 text-right whitespace-nowrap font-semibold">Entrada</th>
+                    <th className="p-2 text-right whitespace-nowrap font-semibold">Saída</th>
+                    <th className="p-2 text-right whitespace-nowrap font-semibold">Saldo do Dia</th>
+                    <th className="p-2 text-right pr-4 whitespace-nowrap font-semibold">Acumulado</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedFluxo.map((f) => (
-                    <tr key={f.id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
-                      <td className="p-3 pl-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                        {new Date(f.data_lancamento).toLocaleDateString('pt-BR')}
+                  <tr className="bg-amber-50/30 dark:bg-amber-950/10 border-b border-amber-100 dark:border-[#22160b]">
+                    <td colSpan={4} className="p-2 pl-4 font-bold text-amber-700 dark:text-amber-400 text-[10px]">Saldo Anterior</td>
+                    <td className="p-2 text-right"></td>
+                    <td className="p-2 pr-4 text-right font-mono font-bold text-amber-700 dark:text-amber-400">{formatCurrency(saldoAnterior)}</td>
+                  </tr>
+                  {dailyTotals.map(d => (
+                    <tr key={d.data} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
+                      <td className="p-2 pl-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">{d.data}</td>
+                      <td className="p-2 text-center text-gray-400 dark:text-amber-100/30">{d.qtd}</td>
+                      <td className="p-2 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
+                        {formatCurrency(d.totalEntrada)}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                          f.tipo === 'receita'
-                            ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                            : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                        }`}>
-                          {f.tipo === 'receita' ? '↑ Entrada' : '↓ Saída'}
-                        </span>
+                      <td className="p-2 text-right font-mono font-bold text-red-700 dark:text-red-400 whitespace-nowrap">
+                        {formatCurrency(d.totalSaida)}
                       </td>
-                      <td className="p-3 text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                        {store.categoriaFinanceiroNome(f.categoria_id)}
-                      </td>
-                      <td className="p-3 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">
-                        {f.descricao || '—'}
-                      </td>
-                      <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${
-                        f.tipo === 'receita' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+                      <td className={`p-2 text-right font-mono font-bold whitespace-nowrap ${
+                        d.saldoDia >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
                       }`}>
-                        {f.tipo === 'receita' ? '+' : '−'}{formatCurrency(f.valor)}
+                        {formatCurrency(d.saldoDia)}
                       </td>
-                      <td className={`p-3 text-right pr-4 font-mono font-bold whitespace-nowrap ${
-                        f.saldo >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+                      <td className={`p-2 pr-4 text-right font-mono font-bold whitespace-nowrap ${
+                        d.saldoAcumulado >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
                       }`}>
-                        {formatCurrency(f.saldo)}
+                        {formatCurrency(d.saldoAcumulado)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-amber-950 dark:border-amber-100 bg-amber-50/30 dark:bg-amber-950/10">
+                    <td colSpan={4} className="p-3 pl-4 font-bold text-amber-950 dark:text-amber-100">SALDO FINAL</td>
+                    <td className="p-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(totalEntradas - totalSaidas)}</td>
+                    <td className={`p-3 pr-4 text-right font-mono font-bold text-sm ${
+                      saldoFinal >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'
+                    }`}>
+                      {formatCurrency(saldoFinal)}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
