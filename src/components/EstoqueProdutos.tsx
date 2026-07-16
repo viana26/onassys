@@ -645,8 +645,8 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 <tbody>
                   {histPaginated.map((mov) => {
                     const prod = store.produtos.find(p => p.id === mov.produto_id);
-                    const natureza = store.tiposMovimentacao.find(t => t.id === mov.tipo_id)?.natureza;
-                    const isEntrada = natureza === 'entrada';
+                    const tipo = store.tiposMovimentacao.find(t => t.id === mov.tipo_id);
+                    const isEntrada = tipo?.natureza === 'entrada';
                     return (
                       <tr key={mov.id} className={`border-b border-amber-50/50 dark:border-[#22160b]/40 transition ${histSelected.has(mov.id) ? 'bg-amber-100/30 dark:bg-amber-950/20' : 'hover:bg-amber-50/20 dark:hover:bg-amber-950/10'}`}>
                         {store.hasPermission('estoque.limpar_historico') && (
@@ -985,7 +985,8 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow"
+                  disabled={adjustStockNovoSaldo === (store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.quantidade_disponivel ?? 0)}
+                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Confirmar Ajuste
                 </button>

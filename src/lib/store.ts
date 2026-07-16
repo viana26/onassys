@@ -555,11 +555,21 @@ export class MiniFactoryStore {
     const delta = novoDisponivel - antigo;
     if (delta === 0) return { success: true };
 
+    let tipoId = 3;
+    let qtdMov = delta;
+    if (delta < 0) {
+      const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
+      if (tipoSaida) {
+        tipoId = tipoSaida.id;
+      }
+      qtdMov = Math.abs(delta);
+    }
+
     const mov: MovimentacaoProduto = {
       id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
       produto_id: this.estoqueProdutos[idx].produto_id,
-      tipo_id: 3,
-      quantidade: delta,
+      tipo_id: tipoId,
+      quantidade: qtdMov,
       observacao: observacao || `Ajuste manual: ${antigo} → ${novoDisponivel}`,
       usuario_id: this.currentUserId ?? undefined,
       criado_em: new Date().toISOString()
