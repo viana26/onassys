@@ -72,6 +72,9 @@ export class MiniFactoryStore {
   private getCategoriaEstornoId(): number {
     return this.categoriasFinanceiro.find(c => c.nome === 'Estorno')?.id || 0;
   }
+  private getTipoVendaDiretaId(): number {
+    return this.tiposMovimentacao.find(t => t.nome === 'Venda Direta')?.id || 6;
+  }
 
   getEstornoPendente(): Pedido[] {
     return this.pedidos.filter(p => {
@@ -550,6 +553,8 @@ export class MiniFactoryStore {
     };
 
     const delta = novoDisponivel - antigo;
+    if (delta === 0) return { success: true };
+
     const mov: MovimentacaoProduto = {
       id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
       produto_id: this.estoqueProdutos[idx].produto_id,
@@ -641,6 +646,7 @@ export class MiniFactoryStore {
       status_id: data.status_id || 1,
       data_entrega_prevista: data.data_entrega_prevista || new Date().toISOString(),
       observacoes: data.observacoes, criado_by: data.criado_by || '', valor_total: data.valor_total ?? 0,
+      categoria_receita_id: data.categoria_receita_id,
       id: 'ped_' + Math.random().toString(36).substring(2, 9),
       data_pedido: new Date().toISOString(), atualizado_em: new Date().toISOString()
     };
@@ -1281,12 +1287,16 @@ export class MiniFactoryStore {
     const pedido = this.pedidos.find(p => p.id === pedidoId);
     if (!pedido) return null;
     const cliente = this.clientes.find(c => c.id === pedido.cliente_id);
-    const catVenda = this.categoriasFinanceiro.find(c => c.tipo === 'receita');
+    let catId = pedido.categoria_receita_id;
+    if (!catId) {
+      const cat = this.categoriasFinanceiro.find(c => c.tipo === 'receita');
+      catId = cat?.id || 1;
+    }
     return await this.addLancamentoFinanceiro({
       data_lancamento: dataLancamento || new Date().toISOString().split('T')[0],
       valor,
       tipo: 'receita',
-      categoria_id: catVenda?.id || 1,
+      categoria_id: catId,
       descricao: `Pagamento pedido #${pedidoId.slice(-6)} - ${cliente?.nome || 'Cliente'}`,
       pedido_id: pedidoId,
       forma_pagamento: formaPagamento,
@@ -1332,6 +1342,81 @@ export class MiniFactoryStore {
     this.notify();
     return { success: true };
   }
+  // ================================================
+  // VENDA DIRETA (Caixa, sem pedido)
+  // ================================================
+  async registrarVendaDireta(params: {
+    itens: Array<{ produtoId: string; quantidade: number; precoUnitario: number }>;
+    clienteId?: string;
+    formaPagamento?: string;
+    categoriaId: number;
+    valorPago?: number;
+  }): Promise<{ success: boolean; error?: string }> {
+    this.error = null;
+    this.errorType = null;
+
+    for (const item of params.itens) {
+      const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produtoId);
+      const disponivel = estoque?.quantidade_disponivel || 0;
+      if (disponivel < item.quantidade) {
+        const prod = this.produtos.find(p => p.id === item.produtoId);
+        return { success: false, error: `Estoque insuficiente: ${prod?.nome || item.produtoId} (disponível: ${disponivel}, solicitado: ${item.quantidade})` };
+      }
+    }
+
+    const promises: Promise<boolean>[] = [];
+    const movsCriadas: MovimentacaoProduto[] = [];
+
+    for (const item of params.itens) {
+      const idx = this.estoqueProdutos.findIndex(e => e.produto_id === item.produtoId);
+      if (idx >= 0) {
+        const original = this.estoqueProdutos[idx];
+        const updated = {
+          ...original,
+          quantidade_disponivel: Math.max(0, original.quantidade_disponivel - item.quantidade),
+          data_atualizacao: new Date().toISOString()
+        };
+        this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? updated : e);
+        promises.push(this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>));
+      }
+
+      const mov: MovimentacaoProduto = {
+        id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
+        produto_id: item.produtoId,
+        tipo_id: this.getTipoVendaDiretaId(),
+        quantidade: item.quantidade,
+        observacao: params.clienteId ? `Venda direta — ${this.clientes.find(c => c.id === params.clienteId)?.nome || ''}` : 'Venda direta (balcão)',
+        usuario_id: this.currentUserId ?? undefined,
+        criado_em: new Date().toISOString()
+      };
+      movsCriadas.push(mov);
+      promises.push(this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>));
+    }
+
+    const total = params.itens.reduce((s, i) => s + i.quantidade * i.precoUnitario, 0);
+    const descricao = params.itens.map(i => {
+      const prod = this.produtos.find(p => p.id === i.produtoId);
+      return `${i.quantidade}x ${prod?.nome || i.produtoId}`;
+    }).join(', ');
+
+    const lanc = await this.addLancamentoFinanceiro({
+      data_lancamento: new Date().toISOString().split('T')[0],
+      valor: params.valorPago ?? total,
+      tipo: 'receita',
+      categoria_id: params.categoriaId,
+      descricao: `Venda balcão: ${descricao}`,
+      forma_pagamento: params.formaPagamento,
+    });
+
+    const results = await Promise.all(promises);
+    if (results.some(r => !r)) return { success: false, error: 'Erro ao salvar movimentações no servidor.' };
+
+    this.movProdutos = [...movsCriadas, ...this.movProdutos];
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
+  }
+
   // ================================================
   // PLANEJAMENTO DE COMPRAS
   // ================================================

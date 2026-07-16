@@ -104,7 +104,7 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${getUserName(m.usuario_id)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-weight:600;color:#1c1917;background:${bg}">${store.produtos.find(p => p.id === m.produto_id)?.nome || m.produto_id}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;background:${bg}"><span style="color:${tipoColor};font-weight:600;font-size:9px;text-transform:uppercase">${icon} ${store.tipoMovNome(m.tipo_id)}</span></td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:#1c1917;background:${bg}">${Math.abs(m.quantidade)}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:${m.quantidade >= 0 ? '#059669' : '#dc2626'};background:${bg}">${m.quantidade}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${m.observacao || '—'}</td>
       </tr>`;
     }).join('');
@@ -276,8 +276,8 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
                             {store.tipoMovNome(m.tipo_id)}
                           </span>
                         </td>
-                        <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${natureza === 'entrada' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {natureza === 'entrada' ? '+' : '-'}{Math.abs(m.quantidade)}
+                        <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${m.quantidade >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {m.quantidade}
                         </td>
                         <td className="p-3 pr-4 text-right text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                           {m.observacao || '—'}

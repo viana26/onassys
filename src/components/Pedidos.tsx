@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Pedido, Cliente } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
@@ -54,6 +54,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   const [observacoes, setObservacoes] = useState('');
   const [statusId, setStatusId] = useState<number>(2);
   const [itensPedido, setItensPedido] = useState<{ produto_id: string; quantidade_solicitada: number; preco_unitario: number; observacao?: string }[]>([]);
+  const [categoriaReceitaId, setCategoriaReceitaId] = useState<number>(0);
+  const categoriasReceita = store.categoriasFinanceiro.filter(c => c.tipo === 'receita');
 
   // Selected Order detail popup state
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(null);
@@ -127,6 +129,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setDataEntrega(dateFormatted);
     setObservacoes('');
     setStatusId(2);
+    setCategoriaReceitaId(0);
     // Adiciona primeiramente uma coxinha
     setItensPedido([{ produto_id: store.produtos[0]?.id || '', quantidade_solicitada: 10, preco_unitario: 15.00 }]);
     setAnaliseResultado(null);
@@ -141,6 +144,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setDataEntrega(pedido.data_entrega_prevista);
     setObservacoes(pedido.observacoes || '');
     setStatusId(pedido.status_id);
+    setCategoriaReceitaId(pedido.categoria_receita_id || 0);
 
     const itens = store.itensPedido.filter(it => it.pedido_id === pedidoId);
     setItensPedido(itens.map(it => ({
@@ -222,7 +226,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
         status_id: statusId,
         data_entrega_prevista: dataEntrega,
         observacoes: observacoes,
-        criado_by: 'Cozinha'
+        criado_by: 'Cozinha',
+        categoria_receita_id: categoriaReceitaId || undefined,
       });
 
       const existingItens = store.itensPedido.filter(it => it.pedido_id === editingPedidoId);
@@ -270,7 +275,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       status_id: statusId,
       data_entrega_prevista: dataEntrega,
       observacoes: observacoes,
-      criado_by: 'Cozinha'
+      criado_by: 'Cozinha',
+      categoria_receita_id: categoriaReceitaId || undefined,
     });
 
     if (!savedPedido) return;
@@ -1100,6 +1106,19 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                   onChange={(e) => setObservacoes(e.target.value)}
                   placeholder="Ex: Coxinhas com catupiry. Brigadeiros decorados com granulado dourado."
                   className="w-full h-14 p-2 border border-amber-200 rounded-lg text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-amber-950 font-medium font-sans">Categoria Financeira</label>
+                <SelectSearch
+                  value={categoriaReceitaId.toString()}
+                  onChange={v => setCategoriaReceitaId(Number(v))}
+                  options={[
+                    { value: '0', label: 'Sem categoria' },
+                    ...categoriasReceita.map(c => ({ value: c.id.toString(), label: c.nome })),
+                  ]}
+                  placeholder="Selecione uma categoria"
                 />
               </div>
 

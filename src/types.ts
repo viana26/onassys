@@ -28,6 +28,7 @@ export interface TipoMovimentacao {
 export interface TipoCliente {
   id: number;
   nome: string;
+  categoria_receita_id?: number;
 }
 
 export interface NivelAcesso {
@@ -175,6 +176,7 @@ export interface Pedido {
   observacoes?: string;
   valor_total: number;
   criado_by: string;
+  categoria_receita_id?: number;
   atualizado_em: string;
 }
 
