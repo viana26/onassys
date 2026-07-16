@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
-import { BarChart3, DollarSign, ShoppingCart, Package, Users, Warehouse, ChevronRight, BadgeDollarSign } from 'lucide-react';
+import { BarChart3, DollarSign, ShoppingCart, Package, Users, Warehouse, BadgeDollarSign } from 'lucide-react';
 import BalancetePeriodo from './BalancetePeriodo';
 import FluxoCaixa from './FluxoCaixa';
 import NivelEstoque from './NivelEstoque';
@@ -18,7 +18,7 @@ interface RelatoriosProps {
 const relatorios = [
   {
     id: 'balancete',
-    titulo: 'Demonstração do Resultado',
+    titulo: 'Balancete por Período',
     descricao: 'Receitas e despesas agrupadas por categoria com resultado líquido do período',
     icon: DollarSign,
     cor: 'emerald',
@@ -139,16 +139,15 @@ export default function Relatorios({ store }: RelatoriosProps) {
             <button
               key={r.id}
               onClick={() => setRelatorioAtivo(r.id)}
-              className={`relative text-left p-4 rounded-xl border transition group ${cor.bg} ${cor.border} hover:shadow-md cursor-pointer`}
+              className={`relative text-left px-3 py-2.5 rounded-xl border transition group ${cor.bg} ${cor.border} hover:shadow-md cursor-pointer h-28 flex flex-col`}
             >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${cor.bg} border ${cor.border}`}>
-                <Icon size={20} className={cor.text} />
+              <div className="flex items-center gap-2 mb-1.5 shrink-0">
+                <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${cor.bg} border ${cor.border}`}>
+                  <Icon size={15} className={cor.text} />
+                </div>
+                <h3 className="font-semibold text-sm text-amber-950 dark:text-amber-100 leading-tight line-clamp-1" title={r.titulo}>{r.titulo}</h3>
               </div>
-              <h3 className="font-semibold text-sm text-amber-950 dark:text-amber-100 mb-1">{r.titulo}</h3>
-              <p className="text-[11px] text-gray-500 dark:text-amber-100/40 leading-relaxed">{r.descricao}</p>
-              <div className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 group-hover:gap-2 transition-all">
-                Abrir <ChevronRight size={12} />
-              </div>
+              <p className="text-[11px] text-gray-500 dark:text-amber-100/40 leading-relaxed pl-9 line-clamp-3" title={r.descricao}>{r.descricao}</p>
             </button>
           );
         })}

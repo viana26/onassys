@@ -22,6 +22,19 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
   const [filtroTipo, setFiltroTipo] = useState<number>(0);
   const [filtroProduto, setFiltroProduto] = useState<string>('todos');
 
+  const getNaturezaEfetiva = (m: { tipo_id: number; quantidade: number }): 'entrada' | 'saida' => {
+    const tipo = store.tiposMovimentacao.find(t => t.id === m.tipo_id);
+    if (!tipo) return 'saida';
+    return m.quantidade < 0
+      ? (tipo.natureza === 'entrada' ? 'saida' : 'entrada')
+      : tipo.natureza as 'entrada' | 'saida';
+  };
+
+  const getUserName = (usuarioId?: string): string => {
+    if (!usuarioId) return '—';
+    return store.perfisUsuarios.find(u => u.id === usuarioId)?.nome || usuarioId.slice(0, 8);
+  };
+
   const filteredMovimentacoes = useMemo(() => {
     return store.movProdutos.filter(m => {
       if (dataInicio && new Date(m.criado_em) < new Date(dataInicio)) return false;
@@ -43,24 +56,25 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
 
   const totalEntradas = useMemo(() => {
     return filteredMovimentacoes
-      .filter(m => store.tiposMovimentacao.find(t => t.id === m.tipo_id)?.natureza === 'entrada')
-      .reduce((s, m) => s + m.quantidade, 0);
+      .filter(m => getNaturezaEfetiva(m) === 'entrada')
+      .reduce((s, m) => s + Math.abs(m.quantidade), 0);
   }, [filteredMovimentacoes, store.tiposMovimentacao]);
 
   const totalSaidas = useMemo(() => {
     return filteredMovimentacoes
-      .filter(m => store.tiposMovimentacao.find(t => t.id === m.tipo_id)?.natureza === 'saida')
-      .reduce((s, m) => s + m.quantidade, 0);
+      .filter(m => getNaturezaEfetiva(m) === 'saida')
+      .reduce((s, m) => s + Math.abs(m.quantidade), 0);
   }, [filteredMovimentacoes, store.tiposMovimentacao]);
 
   const exportCSV = () => {
-    const headers = ['Data', 'Produto', 'Tipo', 'Quantidade', 'Observação'];
+    const headers = ['Data', 'Produto', 'Tipo', 'Quantidade', 'Observação', 'Usuário'];
     const rows = filteredMovimentacoes.map(m => [
       new Date(m.criado_em).toLocaleDateString('pt-BR'),
       store.produtos.find(p => p.id === m.produto_id)?.nome || m.produto_id,
       store.tipoMovNome(m.tipo_id),
       m.quantidade,
       m.observacao || '',
+      getUserName(m.usuario_id),
     ].join(','));
     const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -82,14 +96,15 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
 
     const rowsHtml = sortedMov.map((m, idx) => {
       const bg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
-      const natureza = store.tiposMovimentacao.find(t => t.id === m.tipo_id)?.natureza;
+      const natureza = getNaturezaEfetiva(m);
       const tipoColor = natureza === 'entrada' ? '#059669' : '#dc2626';
       const icon = natureza === 'entrada' ? '↑' : '↓';
       return `<tr>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-family:monospace;color:#57534e;background:${bg}">${new Date(m.criado_em).toLocaleDateString('pt-BR')}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${getUserName(m.usuario_id)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-weight:600;color:#1c1917;background:${bg}">${store.produtos.find(p => p.id === m.produto_id)?.nome || m.produto_id}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;background:${bg}"><span style="color:${tipoColor};font-weight:600;font-size:9px;text-transform:uppercase">${icon} ${store.tipoMovNome(m.tipo_id)}</span></td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:#1c1917;background:${bg}">${m.quantidade}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:#1c1917;background:${bg}">${Math.abs(m.quantidade)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${m.observacao || '—'}</td>
       </tr>`;
     }).join('');
@@ -138,6 +153,7 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
   <table>
     <thead><tr>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Data</th>
+      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Usuário</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Produto</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Tipo</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Quantidade</th>
@@ -229,19 +245,23 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
                 <thead>
                   <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
                     <th className="p-3 pl-4 whitespace-nowrap"><SortButton label="Data" sortKey="criado_em" sortConfig={sortConfig} onSort={requestSort} /></th>
+                    <th className="p-3 whitespace-nowrap"><SortButton label="Usuário" sortKey="usuario_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 whitespace-nowrap"><SortButton label="Produto" sortKey="produto_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 whitespace-nowrap"><SortButton label="Tipo" sortKey="tipo_id" sortConfig={sortConfig} onSort={requestSort} /></th>
                     <th className="p-3 text-right whitespace-nowrap"><SortButton label="Quantidade" sortKey="quantidade" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                    <th className="p-3 text-right pr-4 whitespace-nowrap"><SortButton label="Observação" sortKey="observacao" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                    <th className="p-3 pr-4 text-right whitespace-nowrap"><SortButton label="Observação" sortKey="observacao" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedMov.map((m) => {
-                    const natureza = store.tiposMovimentacao.find(t => t.id === m.tipo_id)?.natureza;
+                    const natureza = getNaturezaEfetiva(m);
                     return (
                       <tr key={m._key} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                         <td className="p-3 pl-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                           {new Date(m.criado_em).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="p-3 text-gray-600 dark:text-amber-100/50 whitespace-nowrap">
+                          {getUserName(m.usuario_id)}
                         </td>
                         <td className="p-3 font-semibold text-amber-950 dark:text-amber-100 whitespace-nowrap">
                           {store.produtos.find(p => p.id === m.produto_id)?.nome || m.produto_id}
@@ -257,9 +277,9 @@ export default function MovimentacoesEstoque({ store, isOpen, onClose }: Movimen
                           </span>
                         </td>
                         <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${natureza === 'entrada' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {natureza === 'entrada' ? '+' : '-'}{m.quantidade}
+                          {natureza === 'entrada' ? '+' : '-'}{Math.abs(m.quantidade)}
                         </td>
-                        <td className="p-3 text-right pr-4 text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
+                        <td className="p-3 pr-4 text-right text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                           {m.observacao || '—'}
                         </td>
                       </tr>

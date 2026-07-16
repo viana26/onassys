@@ -556,6 +556,7 @@ export class MiniFactoryStore {
       tipo_id: 3,
       quantidade: delta,
       observacao: observacao || `Ajuste manual: ${antigo} → ${novoDisponivel}`,
+      usuario_id: this.currentUserId ?? undefined,
       criado_em: new Date().toISOString()
     };
 
@@ -797,6 +798,7 @@ export class MiniFactoryStore {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: 4, quantidade: item.quantidade_solicitada,
         pedido_id: pedidoId, observacao: `Entrada por produção — Pedido #${pedidoId?.slice(-6).toUpperCase()}`,
+        usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
       };
       movsProdCriadas.push(movProd);
@@ -938,6 +940,7 @@ export class MiniFactoryStore {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: 5, quantidade: item.quantidade_solicitada,
         pedido_id: pedidoId, observacao: `Saída por entrega — Pedido #${pedidoId.slice(-6).toUpperCase()}`,
+        usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
       };
       movsSaidaCriadas.push(mov);

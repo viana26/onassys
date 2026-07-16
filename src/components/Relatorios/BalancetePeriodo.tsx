@@ -208,7 +208,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
     const resultLabel = resultadoLiquido >= 0 ? 'LUCRO LÍQUIDO' : 'PREJUÍZO LÍQUIDO';
 
     printWindow.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Demonstração do Resultado - ${appName()}</title>
+<html><head><meta charset="utf-8"><title>Balancete por Período - ${appName()}</title>
 <style>
   @page { margin: 1.5cm; size: A4 portrait; }
   * { box-sizing: border-box; }
@@ -228,7 +228,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
       ${cnpjHtml ? `<div style="font-size:8px;color:#a8a29e;margin-top:1px">${store.dadosEmpresa?.cnpj || ''}</div>` : ''}
     </td>
     <td style="width:auto;text-align:right;vertical-align:middle;border:none;padding-left:1rem">
-      <div style="font-size:11px;font-weight:600;color:#1c1917;white-space:nowrap">Demonstração do Resultado</div>
+      <div style="font-size:11px;font-weight:600;color:#1c1917;white-space:nowrap">Balancete por Período</div>
       <div style="font-size:8px;color:#78716c;margin-top:1px;white-space:nowrap">Gerado em: ${now}</div>
     </td>
   </tr></table>
@@ -288,7 +288,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
 
   <div style="margin-top:2.5rem;padding-top:1rem;border-top:1px solid #d6d3d1;font-size:7px;color:#a8a29e;text-align:center">
     <p style="margin:0">${appName()} — ${getSlogan(store)} | Gerado em ${now}</p>
-    <p style="margin:2px 0 0 0">Demonstração do Resultado do Período: ${periodoLabel}</p>
+    <p style="margin:2px 0 0 0">Balancete por Período: ${periodoLabel}</p>
   </div>
 </body></html>`);
     printWindow.document.close();
@@ -304,7 +304,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-amber-100 dark:border-[#2d1e0d]">
           <div>
-            <h2 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">Demonstração do Resultado</h2>
+            <h2 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">Balancete por Período</h2>
             <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Receitas, despesas e resultado líquido por categoria.</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-amber-950 dark:hover:text-amber-200 p-1 cursor-pointer" aria-label="Fechar">

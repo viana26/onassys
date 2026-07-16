@@ -141,6 +141,7 @@ export interface MovimentacaoProduto {
   quantidade: number;
   pedido_id?: string;
   observacao?: string;
+  usuario_id?: string;
   criado_em: string;
 }
 
