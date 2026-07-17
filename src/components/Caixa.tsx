@@ -206,7 +206,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(preselectedPedidoId || null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [formaPagamento, setFormaPagamento] = useState('pix');
-  const [activeForm, setActiveForm] = useState<'receita' | 'despesa' | 'venda' | null>(null);
+  const [activeForm, setActiveForm] = useState<'receber' | 'receita' | 'despesa' | 'venda' | null>('receber');
 
   // Receita livre fields
   const [livreValor, setLivreValor] = useState('');
@@ -421,8 +421,8 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   };
 
   return (
-    <div className="h-full flex flex-col" data-help="caixa">
-      <div className="flex-1 overflow-y-auto space-y-6 p-1">
+    <div className="h-full flex flex-col overflow-y-auto" data-help="caixa">
+      <div className="flex-1 space-y-6 p-1">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -436,34 +436,44 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
           {store.hasPermission('financeiro.lancar') && (
             <>
               <button
-                onClick={() => setActiveForm(activeForm === 'receita' ? null : 'receita')}
+                onClick={() => setActiveForm('receber')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                  activeForm === 'receber'
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white border-blue-600'
+                    : 'border-blue-200 dark:border-[#1d3d4d] text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-[#0d1d2d]'
+                }`}
+              >
+                <DollarSign size={14} /> Receber Pedidos
+              </button>
+              <button
+                onClick={() => setActiveForm('receita')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                   activeForm === 'receita'
-                    ? 'bg-emerald-50 dark:bg-[#0d2215] border-emerald-300 dark:border-[#1d3d25] text-emerald-700 dark:text-emerald-400'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600'
                     : 'border-emerald-200 dark:border-[#1d3d25] text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-[#0d2215]'
                 }`}
               >
                 <TrendingUp size={14} /> Receita Livre
               </button>
               <button
-                onClick={() => setActiveForm(activeForm === 'despesa' ? null : 'despesa')}
+                onClick={() => setActiveForm('despesa')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                   activeForm === 'despesa'
-                    ? 'bg-red-50 dark:bg-[#2d0d0d] border-red-300 dark:border-[#3d1d1d] text-red-700 dark:text-red-400'
+                    ? 'bg-red-600 hover:bg-red-500 text-white border-red-600'
                     : 'border-red-200 dark:border-[#3d1d1d] text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-[#2d0d0d]'
                 }`}
               >
                 <TrendingDown size={14} /> Despesa Rápida
               </button>
               <button
-                onClick={() => { setActiveForm(activeForm === 'venda' ? null : 'venda'); setSelectedPedidoId(null); }}
+                onClick={() => { setActiveForm('venda'); setSelectedPedidoId(null); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                   activeForm === 'venda'
-                    ? 'bg-amber-50 dark:bg-[#22160b] border-amber-300 dark:border-[#3d2d1d] text-amber-700 dark:text-amber-400'
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-600'
                     : 'border-amber-200 dark:border-[#3d2d1d] text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-[#22160b]'
                 }`}
               >
-                <ShoppingBag size={14} /> Venda
+                <ShoppingBag size={14} /> Venda Balcão
               </button>
             </>
           )}
@@ -491,8 +501,8 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 className="w-full p-2 border border-emerald-200 dark:border-[#1d3d25] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
               <button onClick={() => { handleNovaReceita(); setActiveForm(null); }}
                 disabled={!livreValor || !livreDescricao}
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-300 text-white rounded-xl text-xs font-bold transition">
-                Salvar Receita
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold border transition bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+                <TrendingUp size={14} /> Salvar Receita
               </button>
             </div>
           )}
@@ -514,8 +524,8 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 className="w-full p-2 border border-red-200 dark:border-[#3d1d1d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
               <button onClick={() => { handleNovaDespesa(); setActiveForm(null); }}
                 disabled={!despValor || !despDescricao}
-                className="w-full py-2 bg-red-600 hover:bg-red-500 disabled:bg-gray-300 text-white rounded-xl text-xs font-bold transition">
-                Salvar Despesa
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold border transition bg-red-600 hover:bg-red-500 text-white border-red-600 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+                <TrendingDown size={14} /> Salvar Despesa
               </button>
             </div>
           )}
@@ -527,13 +537,14 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 <ShoppingBag size={14} /> Venda de Balcão
               </h3>
 
+              {/* Cliente — vem primeiro */}
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-500">Cliente (opcional)</label>
+                <SelectSearch value={vdClienteId} onChange={v => setVdClienteId(v)} options={[{ value: '', label: 'Sem cliente' }, ...store.clientes.sort((a, b) => a.nome.localeCompare(b.nome)).map(c => ({ value: c.id, label: c.nome }))]} placeholder="Selecione um cliente" />
+              </div>
+
               {/* Produtos Disponiveis */}
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[10px] font-bold uppercase text-gray-500">Produtos com Estoque</label>
-                  <span className="text-[10px] text-gray-400">{vdProdutosDisponiveis.length} disponíveis</span>
-                </div>
-
                 {/* Carrinho */}
                 {vdCarrinho.length > 0 && (
                   <div className="mb-2 space-y-1">
@@ -574,13 +585,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                     if (!prod || !estoque) return prev;
                     return [...prev, { produtoId: v, quantidade: 1, precoUnitario: prod.preco_venda || 0 }];
                   });
-                }} options={vdProdutosDisponiveis.map(e => ({ value: e.produto_id, label: `${e.produtoNome} (estoque: ${e.quantidade_disponivel})` }))} placeholder="Selecione um produto..." />
-              </div>
-
-              {/* Cliente */}
-              <div>
-                <label className="text-[10px] font-bold uppercase text-gray-500">Cliente (opcional)</label>
-                <SelectSearch value={vdClienteId} onChange={v => setVdClienteId(v)} options={[{ value: '', label: 'Sem cliente' }, ...store.clientes.sort((a, b) => a.nome.localeCompare(b.nome)).map(c => ({ value: c.id, label: c.nome }))]} placeholder="Selecione um cliente" />
+                }} options={vdProdutosDisponiveis.map(e => ({ value: e.produto_id, label: `${e.produtoNome} (estoque: ${e.quantidade_disponivel})` }))} placeholder={`Selecione um produto (${vdProdutosDisponiveis.length} disponíveis)...`} />
               </div>
 
               {/* Forma de pagamento + Categoria */}
@@ -600,15 +605,15 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                 <span className="text-xs font-bold">Total: <span className="font-mono text-base">{brl(vdTotal)}</span></span>
                 <button onClick={() => { handleVendaDireta(); setActiveForm(null); }}
                   disabled={vdCarrinho.length === 0}
-                  className="py-2 px-4 bg-amber-700 hover:bg-amber-800 disabled:bg-gray-300 text-white rounded-xl text-xs font-bold transition cursor-pointer">
-                  Confirmar Venda
+                  className="flex items-center justify-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold border transition bg-amber-600 hover:bg-amber-500 text-white border-amber-600 disabled:opacity-40 disabled:pointer-events-none cursor-pointer">
+                  <ShoppingBag size={14} /> Confirmar Venda
                 </button>
               </div>
             </div>
           )}
 
-          {/* Search Orders + Payment Panel (when no form is active) */}
-          {!activeForm && (
+          {/* Search Orders + Payment Panel */}
+          {activeForm === 'receber' && (
             <>
               <div className="bg-white dark:bg-[#120c06] rounded-2xl border border-amber-100 dark:border-[#2d1e0d] p-4 space-y-3">
                 <div className="relative">
@@ -858,17 +863,6 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       )}
 
       </div>{/* fim flex-1 */}
-
-      {/* Footer Bar */}
-      <div className="mt-auto flex items-center justify-between px-6 py-2.5 bg-white dark:bg-[#120c06] border-t border-amber-100 dark:border-[#2d1e0d] text-xs text-[#5c4a37]/60 dark:text-amber-100/40 font-mono">
-        <span>{appName || 'Mini Fábrica'}</span>
-        <span className="flex items-center gap-1.5">
-          <Clock size={12} />
-          {agora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-          {' • '}
-          {agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-        </span>
-      </div>
     </div>
   );
 }
