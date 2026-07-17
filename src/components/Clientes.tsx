@@ -4,6 +4,7 @@ import { Cliente } from '../types';
 import { phoneMask } from '../lib/mask';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 
 function onlyDigits(v: string): string {
   return v.replace(/\D/g, '');
@@ -169,35 +170,32 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
       </div>
 
       {/* Control Filter Bar */}
-      <div className="bg-white dark:bg-[#150f09] p-4 rounded-xl border border-amber-100 dark:border-[#22160b] shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full md:w-80">
-          <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-amber-200/40">
-            <Search size={16} />
-          </span>
-          <input 
-            type="text" 
-            placeholder="Buscar por nome, telefone, endereço..." 
-            value={searchTerm}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            data-help="clientes-busca"
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2b1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
-          />
+      <div className="bg-white dark:bg-[#150f09] p-4 rounded-xl border border-amber-100 dark:border-[#22160b] shadow-sm flex flex-col md:flex-row gap-3 items-end justify-between">
+        <div className="flex-1 min-w-[200px]">
+          <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Buscar</label>
+          <div className="relative">
+            <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 dark:text-amber-200/40">
+              <Search size={16} />
+            </span>
+            <input 
+              type="text" 
+              placeholder="Nome, telefone, endereço..." 
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              data-help="clientes-busca"
+              className="w-full pl-9 pr-4 h-9 text-xs rounded-lg bg-white dark:bg-[#1c140c] border border-amber-200 dark:border-[#2d1e0d] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 transition"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto no-scrollbar py-1">
-          {[{ label: 'Todos', value: 'todos' }, ...store.tiposCliente.map(t => ({ label: t.nome, value: String(t.id) }))].map(filter => (
-            <button
-              key={filter.value}
-              onClick={() => handleFilterChange(filter.value)}
-              className={`px-3 py-1 rounded-full text-[10px] uppercase tracking-wider font-semibold border transition ${
-                typeFilter === filter.value 
-                  ? 'bg-amber-800 dark:bg-amber-700 text-white border-amber-800 dark:border-amber-700' 
-                  : 'bg-white dark:bg-[#1c140c] text-gray-500 dark:text-amber-200/50 border-amber-100 dark:border-[#2b1d10] hover:bg-amber-50 dark:hover:bg-amber-950'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
+        <div className="flex-1 min-w-[160px]">
+          <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40 block mb-1">Tipo</label>
+          <SelectSearch
+            value={typeFilter}
+            onChange={handleFilterChange}
+            options={[{ label: 'Todos', value: 'todos' }, ...store.tiposCliente.map(t => ({ label: t.nome, value: String(t.id) }))]}
+            placeholder="Filtrar por tipo"
+          />
         </div>
       </div>
 
@@ -341,8 +339,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
           </div>
 
           {/* Pagination */}
-          {sortedClientes.length > pageSize && (
-            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+          <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -370,8 +367,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 <option value={20}>20 / pág</option>
                 <option value={50}>50 / pág</option>
               </select>
-            </div>
-          )}
+          </div>
         </>
       )}
 
@@ -408,15 +404,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium">Tipo de Cliente *</label>
-                  <select 
-                    value={tipoId}
-                    onChange={(e) => setTipoId(Number(e.target.value))}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-200"
-                  >
-                    {store.tiposCliente.map(tc => (
-                      <option key={tc.id} value={tc.id}>{tc.nome}</option>
-                    ))}
-                  </select>
+                  <SelectSearch value={String(tipoId)} onChange={v => setTipoId(Number(v))} options={store.tiposCliente.map(tc => ({ value: String(tc.id), label: tc.nome }))} placeholder="Tipo de cliente" />
                 </div>
 
                 <div className="space-y-1">

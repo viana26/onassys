@@ -8,6 +8,7 @@ import {
   Legend
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
+import SelectSearch from '../SelectSearch';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -331,12 +332,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Tipo</label>
-              <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value as typeof filtroTipo)}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                <option value="todos">Todas</option>
-                <option value="receita">Receitas</option>
-                <option value="despesa">Despesas</option>
-              </select>
+              <SelectSearch value={filtroTipo} onChange={v => setFiltroTipo(v as 'todos' | 'receita' | 'despesa')} options={[{ value: 'todos', label: 'Todas' }, { value: 'receita', label: 'Receitas' }, { value: 'despesa', label: 'Despesas' }]} placeholder="Filtrar por tipo" />
             </div>
           </div>
         </div>

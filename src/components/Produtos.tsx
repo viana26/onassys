@@ -432,7 +432,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             placeholder="Buscar por nome do salgado, bolo..." 
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1e150c]/30 border border-amber-100 dark:border-[#2d1e0d] focus:outline-none focus:border-amber-400 text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+            className="w-full pl-9 pr-4 h-9 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1e150c]/30 border border-amber-100 dark:border-[#2d1e0d] focus:outline-none focus:border-amber-400 text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
           />
         </div>
 
@@ -478,13 +478,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-amber-50/40 dark:bg-amber-950/20 text-amber-900 dark:text-amber-100 border-b border-amber-100 dark:border-[#22160b]">
-                  <th className="text-left px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider"><SortButton label="Produto" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Margem</th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-16">Cap.</th>
-                  <th className="text-right px-3 py-2.5 text-[9px] font-bold uppercase tracking-wider w-24">Ações</th>
+                  <th className="text-left px-3 py-2.5 text-[9px] font-bold tracking-wider"><SortButton label="Produto" sortKey="nome" sortConfig={sortConfig} onSort={requestSort} /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-20"><SortButton label="Prep" sortKey="tempo_producao_minutos" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-20"><SortButton label="Custo" sortKey="custo_producao_calculado" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-20"><SortButton label="Preço" sortKey="preco_venda" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-16">Margem</th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-16">Cap.</th>
+                  <th className="text-right px-3 py-2.5 text-[9px] font-bold tracking-wider w-24">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -654,8 +654,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
           </div>
 
           {/* Pagination */}
-          {sortedProdutos.length > pageSize && (
-            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+          <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -683,8 +682,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 <option value={20}>20 / pág</option>
                 <option value={50}>50 / pág</option>
               </select>
-            </div>
-          )}
+          </div>
         </>
       )}
 
@@ -1020,12 +1018,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                 </div>
                 <div>
                   <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Tipo *</label>
-                  <select value={novaUnidadeTipo} onChange={e => setNovaUnidadeTipo(e.target.value as 'massa' | 'volume' | 'unidade')}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100">
-                    <option value="massa" className="dark:bg-[#1c140c]">Massa (peso)</option>
-                    <option value="volume" className="dark:bg-[#1c140c]">Volume (líquido)</option>
-                    <option value="unidade" className="dark:bg-[#1c140c]">Unidade (contável)</option>
-                  </select>
+                  <SelectSearch value={novaUnidadeTipo} onChange={v => setNovaUnidadeTipo(v as 'massa' | 'volume' | 'unidade')} options={[{ value: 'massa', label: 'Massa (peso)' }, { value: 'volume', label: 'Volume (líquido)' }, { value: 'unidade', label: 'Unidade (contável)' }]} placeholder="Tipo" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">

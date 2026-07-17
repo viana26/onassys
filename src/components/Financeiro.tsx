@@ -47,7 +47,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
     return base.sort((a, b) => new Date(b.data_lancamento).getTime() - new Date(a.data_lancamento).getTime());
   }, [store.lancamentos, filtroTipo]);
 
-  const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento');
+  const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento', 'desc');
 
   const totalPages = Math.max(1, Math.ceil(sortedLancamentos.length / pageSize));
   const paginatedLancamentos = sortedLancamentos.slice(
@@ -146,12 +146,12 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         <table className="w-full min-w-[600px]">
           <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Data" sortKey="data_lancamento" sortConfig={sortConfig} onSort={requestSort} /></th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Descrição" sortKey="descricao" sortConfig={sortConfig} onSort={requestSort} /></th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Categoria" sortKey="categoria_id" sortConfig={sortConfig} onSort={requestSort} /></th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Pagamento" sortKey="forma_pagamento" sortConfig={sortConfig} onSort={requestSort} /></th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton label="Valor" sortKey="valor" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider" />
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton label="Data" sortKey="data_lancamento" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton label="Descrição" sortKey="descricao" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton label="Categoria" sortKey="categoria_id" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton label="Pagamento" sortKey="forma_pagamento" sortConfig={sortConfig} onSort={requestSort} /></th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton label="Valor" sortKey="valor" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
+              <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider" />
             </tr>
           </thead>
           <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
@@ -239,8 +239,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
       </div>
 
       {/* Pagination */}
-      {sortedLancamentos.length > pageSize && (
-        <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-2">
           <div className="text-[10px] text-gray-500 dark:text-amber-100/40">
             {sortedLancamentos.length} lançamentos — Pág. {currentPage} de {totalPages}
           </div>
@@ -261,7 +260,6 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
             </select>
           </div>
         </div>
-      )}
 
       {showModalTipo && <NovoLancamentoModal store={store} initialTipo={showModalTipo} onClose={() => setShowModalTipo(null)} onSaved={() => { setShowModalTipo(null); onUpdate(); }} />}
 
@@ -371,16 +369,7 @@ function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: 
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Pagamento</label>
-              <select value={formaPagamento} onChange={e => setFormaPagamento(e.target.value)}
-                className="w-full h-9 px-3 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-sm text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500">
-                <option value="">Selecione</option>
-                <option value="dinheiro">Dinheiro</option>
-                <option value="pix">Pix</option>
-                <option value="cartao_credito">Crédito</option>
-                <option value="cartao_debito">Débito</option>
-                <option value="boleto">Boleto</option>
-                <option value="transferencia">Transferência</option>
-              </select>
+              <SelectSearch value={formaPagamento} onChange={v => setFormaPagamento(v)} options={[{ value: '', label: 'Selecione' }, { value: 'dinheiro', label: 'Dinheiro' }, { value: 'pix', label: 'Pix' }, { value: 'cartao_credito', label: 'Crédito' }, { value: 'cartao_debito', label: 'Débito' }, { value: 'boleto', label: 'Boleto' }, { value: 'transferencia', label: 'Transferência' }]} placeholder="Filtrar por pagamento" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>

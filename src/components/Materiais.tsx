@@ -84,6 +84,9 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [inboundCustoUnitario, setInboundCustoUnitario] = useState<number>(0);
   const [inboundObs, setInboundObs] = useState<string>('');
   const [inboundCriarDespesa, setInboundCriarDespesa] = useState(false);
+  const [inboundFormaPagamento, setInboundFormaPagamento] = useState<string>('');
+
+  const opcoesPagamento = ['Pix', 'Dinheiro', 'Crédito', 'Débito', 'Boleto', 'Outros'];
 
   // Filter materials list
   const filteredMateriais = useMemo(() => {
@@ -289,7 +292,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       alert('O custo unitário não pode ser menor do que zero.');
       return;
     }
-    await store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa);
+    await store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa, inboundFormaPagamento);
     setIsInbounding(false);
     onUpdate();
   };
@@ -524,8 +527,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               </div>
 
               {/* Pagination */}
-              {sortedMateriais.length > pageSize && (
-                <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+              <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
@@ -554,7 +556,6 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     <option value={50}>50 / pág</option>
                   </select>
                 </div>
-              )}
             </div>
           )}
         </>
@@ -587,31 +588,22 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 value={histSearch}
                 onChange={e => { setHistSearch(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
                 placeholder="Buscar ingrediente ou observação..."
-                className="w-full pl-7 pr-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400"
+                className="w-full pl-7 pr-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400"
               />
             </div>
-            <select
-              value={histTipoFilter}
-              onChange={e => { setHistTipoFilter(Number(e.target.value)); setHistPage(1); setHistSelected(new Set()); }}
-              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
-            >
-              <option value={0}>Todos os tipos</option>
-              {store.tiposMovimentacao.filter(t => t.entidade === 'material' || t.entidade === 'ambos').map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
+            <SelectSearch value={String(histTipoFilter)} onChange={v => { setHistTipoFilter(Number(v)); setHistPage(1); setHistSelected(new Set()); }} options={[{ value: '0', label: 'Todos os tipos' }, ...store.tiposMovimentacao.filter(t => t.entidade === 'material' || t.entidade === 'ambos').map(t => ({ value: String(t.id), label: t.nome }))]} placeholder="Filtrar por tipo" />
             <input
               type="date"
               value={histDataInicio}
               onChange={e => { setHistDataInicio(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
-              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
+              className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
               placeholder="Data início"
             />
             <input
               type="date"
               value={histDataFim}
               onChange={e => { setHistDataFim(e.target.value); setHistPage(1); setHistSelected(new Set()); }}
-              className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
+              className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none"
               placeholder="Data fim"
             />
           </div>
@@ -775,7 +767,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               </h3>
               <button 
                 onClick={() => setIsEditing(false)}
-                className="text-gray-400 hover:text-amber-955 dark:hover:text-amber-200 p-1 cursor-pointer"
+                className="text-gray-400 hover:text-amber-950 dark:hover:text-amber-200 p-1 cursor-pointer"
               >
                 <X size={20} />
               </button>
@@ -789,7 +781,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Farinha de trigo especial, Leite condensado"
-                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 dark:focus:border-amber-550 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
                   required
                 />
               </div>
@@ -798,7 +790,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <div className="space-y-1">
                   <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
                   <div className="flex gap-2">
-                    <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: u.nome }))} placeholder="Selecione a unidade" />
+                    <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: `${u.sigla.toUpperCase()} — ${u.nome}` }))} placeholder="Selecione a unidade" />
                     <button type="button" onClick={() => setShowNovaUnidade(true)}
                       className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
                       + Nova
@@ -824,15 +816,15 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 <div className="flex gap-2">
                   <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" />
                   <button type="button" onClick={() => setShowNovoFornecedor(true)}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
                     + Novo
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans font-sans">Qtd Atual</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium">{editId ? 'Qtd Atual' : 'Qtd Inicial'}</label>
                   <input 
                     type="number" 
                     step="any"
@@ -866,7 +858,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-850 dark:hover:bg-amber-800 text-white font-semibold py-2.5 rounded-xl text-center shadow-sm cursor-pointer"
+                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow cursor-pointer"
                 >
                   {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
                 </button>
@@ -958,6 +950,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   <p className="text-[9px] text-[#5c4a37]/60 dark:text-amber-100/50">Registra esta compra como despesa em Matéria-Prima</p>
                 </div>
               </label>
+
+              {inboundCriarDespesa && (
+                <div className="space-y-1">
+                  <label className="text-amber-950 dark:text-amber-100 font-medium">Forma de Pagamento</label>
+                  <SelectSearch value={inboundFormaPagamento} onChange={v => setInboundFormaPagamento(v)} options={[{ value: '', label: 'Selecione a forma de pagamento' }, ...opcoesPagamento.map(op => ({ value: op, label: op }))]} placeholder="Forma de pagamento" />
+                </div>
+              )}
 
               {/* Total estimation preview */}
               <div className="p-3.5 bg-emerald-50/50 dark:bg-[#072410]/30 rounded-xl border border-emerald-100 dark:border-[#123e1d] flex items-center justify-between text-xs font-sans mt-3">
@@ -1057,12 +1056,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </div>
                 <div>
                   <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Tipo *</label>
-                  <select value={novaUnidadeTipo} onChange={e => setNovaUnidadeTipo(e.target.value as 'massa' | 'volume' | 'unidade')}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100">
-                    <option value="massa" className="dark:bg-[#1c140c]">Massa (peso)</option>
-                    <option value="volume" className="dark:bg-[#1c140c]">Volume (líquido)</option>
-                    <option value="unidade" className="dark:bg-[#1c140c]">Unidade (contável)</option>
-                  </select>
+                  <SelectSearch value={novaUnidadeTipo} onChange={v => setNovaUnidadeTipo(v as 'massa' | 'volume' | 'unidade')} options={[{ value: 'massa', label: 'Massa (peso)' }, { value: 'volume', label: 'Volume (líquido)' }, { value: 'unidade', label: 'Unidade (contável)' }]} placeholder="Tipo" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">

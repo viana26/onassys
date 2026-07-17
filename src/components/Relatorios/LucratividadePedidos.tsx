@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, DollarSign, BadgeDollarSign } from 'lucide-react';
 import { normalizarQuantidade } from '../../lib/calculos';
+import SelectSearch from '../SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -255,12 +256,7 @@ export default function LucratividadePedidos({ store, isOpen, onClose }: Lucrati
             </div>
             <div className="space-y-1 sm:col-span-2">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Status dos Pedidos</label>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                {statusOptions.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              <SelectSearch value={statusFilter} onChange={v => setStatusFilter(v)} options={statusOptions} placeholder="Filtrar por status" />
             </div>
           </div>
         </div>

@@ -208,18 +208,12 @@ export default function RelatorioPedidos({ store, isOpen, onClose }: RelatorioPe
                 className="w-full p-2 border border-amber-200 rounded-lg text-xs" />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-bold text-amber-900/60 uppercase">Status</label>
-              <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-                className="w-full p-2 border border-amber-200 rounded-lg text-xs bg-white">
-                <option value="todos">Todos</option>
-                {store.statusPedido.map(s => (
-                  <option key={s.id} value={s.id}>{s.nome}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
               <label className="text-[9px] font-bold text-amber-900/60 uppercase">Cliente</label>
               <SelectSearch value={filtroCliente} onChange={v => setFiltroCliente(v)} options={[{ value: 'todos', label: 'Todos os clientes' }, ...store.clientes.map(c => ({ value: c.id, label: c.nome }))]} placeholder="Filtrar por cliente" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-amber-900/60 uppercase">Status</label>
+              <SelectSearch value={String(filtroStatus)} onChange={v => setFiltroStatus(v === 'todos' ? 'todos' : Number(v))} options={[{ value: 'todos', label: 'Todos' }, ...store.statusPedido.map(s => ({ value: String(s.id), label: s.nome }))]} placeholder="Filtrar por status" />
             </div>
           </div>
           <div className="relative">

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import SelectSearch from '../SelectSearch';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -331,13 +332,7 @@ export default function FluxoCaixa({ store, isOpen, onClose }: FluxoCaixaProps) 
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Pagamento</label>
-              <select value={filtroPagamento} onChange={e => setFiltroPagamento(e.target.value)}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                <option value="todos">Todos</option>
-                {[...new Set(store.lancamentos.map(l => l.forma_pagamento).filter(Boolean))].map(fp => (
-                  <option key={fp} value={fp}>{fp}</option>
-                ))}
-              </select>
+              <SelectSearch value={filtroPagamento} onChange={v => setFiltroPagamento(v)} options={[{ value: 'todos', label: 'Todos' }, ...([...new Set(store.lancamentos.map(l => l.forma_pagamento).filter(Boolean))] as string[]).map(fp => ({ value: fp, label: fp }))]} placeholder="Filtrar por pagamento" />
             </div>
           </div>
         </div>

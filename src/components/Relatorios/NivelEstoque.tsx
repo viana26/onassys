@@ -16,12 +16,9 @@ interface NivelEstoqueProps {
   onClose: () => void;
 }
 
-type StatusEstoque = 'disponivel' | 'baixo' | 'critico' | 'esgotado' | 'vencido';
+type StatusEstoque = 'disponivel' | 'baixo' | 'critico' | 'esgotado';
 
-function getStatus(qtd: number, minima: number, validade?: string): { label: string; status: StatusEstoque; color: string } {
-  if (validade && new Date(validade) < new Date()) {
-    return { label: 'Vencido', status: 'vencido', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-700' };
-  }
+function getStatus(qtd: number, minima: number): { label: string; status: StatusEstoque; color: string } {
   if (qtd <= 0) {
     return { label: 'Esgotado', status: 'esgotado', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-800' };
   }
@@ -34,12 +31,6 @@ function getStatus(qtd: number, minima: number, validade?: string): { label: str
   return { label: 'Disponível', status: 'disponivel', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' };
 }
 
-function getDiasRestantes(validade?: string): number | null {
-  if (!validade) return null;
-  const diff = new Date(validade).getTime() - new Date().getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
 export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoqueProps) {
   const [filtroStatus, setFiltroStatus] = useState<'todos' | StatusEstoque>('todos');
   const [filtroCategoria, setFiltroCategoria] = useState<number | 'todos'>('todos');
@@ -50,17 +41,11 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
       const estoques = store.estoqueProdutos.filter(e => e.produto_id === p.id);
       const qtdTotal = estoques.reduce((s, e) => s + e.quantidade_disponivel, 0);
       const minima = estoques.length > 0 ? estoques[0].quantidade_minima : 0;
-      const validades = estoques.map(e => e.data_validade).filter(Boolean).sort();
-      const proximaValidade = validades[0];
-      const status = getStatus(qtdTotal, minima, proximaValidade);
-      const diasRestantes = getDiasRestantes(proximaValidade);
+      const status = getStatus(qtdTotal, minima);
       return {
         produto: p,
         qtdTotal,
         minima,
-        lotes: estoques.length,
-        proximaValidade,
-        diasRestantes,
         status,
         custoTotal: qtdTotal * p.custo_producao_calculado,
       };
@@ -83,21 +68,17 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
     disponiveis: itensEstoque.filter(i => i.status.status === 'disponivel').length,
     baixos: itensEstoque.filter(i => i.status.status === 'baixo').length,
     criticos: itensEstoque.filter(i => i.status.status === 'critico' || i.status.status === 'esgotado').length,
-    vencidos: itensEstoque.filter(i => i.status.status === 'vencido').length,
     valorTotal: itensEstoque.reduce((s, i) => s + i.custoTotal, 0),
   }), [itensEstoque]);
 
   const exportCSV = () => {
-    const headers = ['Produto', 'Categoria', 'Qtd. Disponível', 'Qtd. Mínima', 'Status', 'Lotes', 'Próx. Validade', 'Dias Rest.', 'Custo Total'];
+    const headers = ['Produto', 'Categoria', 'Qtd. Disponível', 'Qtd. Mínima', 'Status', 'Custo Total'];
     const rows = itensFiltrados.map(i => [
       i.produto.nome,
       store.categoriaNome(i.produto.categoria_id),
       i.qtdTotal,
       i.minima,
       i.status.label,
-      i.lotes,
-      i.proximaValidade ? new Date(i.proximaValidade).toLocaleDateString('pt-BR') : '—',
-      i.diasRestantes !== null ? String(i.diasRestantes) : '—',
       i.custoTotal.toFixed(2),
     ].join(','));
     const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
@@ -119,18 +100,13 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
 
     const rowsHtml = itensFiltrados.map((i, idx) => {
       const bg = idx % 2 === 0 ? '#ffffff' : '#fafaf9';
-      const statusColor = i.status.status === 'disponivel' ? '#059669' : i.status.status === 'vencido' ? '#6b7280' : '#dc2626';
-      const validadeStr = i.proximaValidade ? new Date(i.proximaValidade).toLocaleDateString('pt-BR') : '—';
-      const diasStr = i.diasRestantes !== null ? `${i.diasRestantes}d` : '—';
+      const statusColor = i.status.status === 'disponivel' ? '#059669' : '#dc2626';
       return `<tr>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-weight:600;color:#1c1917;background:${bg}">${i.produto.nome}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;color:#57534e;background:${bg}">${store.categoriaNome(i.produto.categoria_id)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#1c1917;background:${bg}">${i.qtdTotal}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:#57534e;background:${bg}">${i.minima}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;background:${bg}"><span style="color:${statusColor};font-weight:600;font-size:9px;text-transform:uppercase">${i.status.label}</span></td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;color:#57534e;background:${bg}">${i.lotes}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-family:monospace;color:#57534e;background:${bg}">${validadeStr}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;font-family:monospace;color:${i.diasRestantes !== null && i.diasRestantes <= 7 ? '#dc2626' : '#57534e'};background:${bg}">${diasStr}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#1c1917;background:${bg}">${formatCurrency(i.custoTotal)}</td>
       </tr>`;
     }).join('');
@@ -177,8 +153,6 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
       <p style="margin:4px 0 0 0;font-size:18px;font-weight:700;color:#ca8a04">${stats.baixos}</p>
     </td>
     <td style="width:20%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#f9fafb">
-      <p style="margin:0;font-size:8px;font-weight:700;color:#6b7280;text-transform:uppercase">Vencidos</p>
-      <p style="margin:4px 0 0 0;font-size:18px;font-weight:700;color:#6b7280">${stats.vencidos}</p>
     </td>
     <td style="width:20%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#f5f3ff">
       <p style="margin:0;font-size:8px;font-weight:700;color:#7c3aed;text-transform:uppercase">Valor Total</p>
@@ -192,9 +166,6 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Qtd.</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Mínima</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Status</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:center;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Lotes</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:left;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Validade</th>
-      <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:center;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Dias</th>
       <th style="border-bottom:2px solid #d97706;padding:0.5rem 0.75rem;text-align:right;font-weight:700;color:#1c1917;background:#f5f5f4;font-size:8px;text-transform:uppercase">Custo</th>
     </tr></thead>
     <tbody>${rowsHtml}</tbody>
@@ -243,15 +214,7 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Status</label>
-              <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as typeof filtroStatus)}
-                className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400">
-                <option value="todos">Todos</option>
-                <option value="disponivel">Disponível</option>
-                <option value="baixo">Baixo</option>
-                <option value="critico">Crítico</option>
-                <option value="esgotado">Esgotado</option>
-                <option value="vencido">Vencido</option>
-              </select>
+              <SelectSearch value={filtroStatus} onChange={v => setFiltroStatus(v as 'todos' | 'disponivel' | 'baixo' | 'critico' | 'esgotado')} options={[{ value: 'todos', label: 'Todos' }, { value: 'disponivel', label: 'Disponível' }, { value: 'baixo', label: 'Baixo' }, { value: 'critico', label: 'Crítico' }, { value: 'esgotado', label: 'Esgotado' }]} placeholder="Filtrar por status" />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-medium text-gray-500 dark:text-amber-100/40">Categoria</label>
@@ -285,10 +248,6 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
               </div>
               <p className="text-lg font-bold font-mono text-red-800 dark:text-red-300">{stats.criticos}</p>
             </div>
-            <div className="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-800">
-              <span className="text-[10px] font-bold text-gray-700 dark:text-gray-400 uppercase">Vencidos</span>
-              <p className="text-lg font-bold font-mono text-gray-800 dark:text-gray-300">{stats.vencidos}</p>
-            </div>
             <div className="p-3 bg-violet-50 dark:bg-violet-950/20 rounded-xl border border-violet-200 dark:border-violet-800">
               <span className="text-[10px] font-bold text-violet-700 dark:text-violet-400 uppercase">Valor Total</span>
               <p className="text-lg font-bold font-mono text-violet-800 dark:text-violet-300">{formatCurrency(stats.valorTotal)}</p>
@@ -310,9 +269,6 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
                     <th className="p-3 text-right whitespace-nowrap"><SortButton label="Qtd." sortKey="qtdTotal" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                     <th className="p-3 text-right whitespace-nowrap"><SortButton label="Mínima" sortKey="minima" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                     <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="status.status" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 text-center whitespace-nowrap"><SortButton label="Lotes" sortKey="lotes" sortConfig={sortConfig} onSort={requestSort} align="center" /></th>
-                    <th className="p-3 whitespace-nowrap"><SortButton label="Validade" sortKey="proximaValidade" sortConfig={sortConfig} onSort={requestSort} /></th>
-                    <th className="p-3 text-center whitespace-nowrap"><SortButton label="Dias" sortKey="diasRestantes" sortConfig={sortConfig} onSort={requestSort} align="center" /></th>
                     <th className="p-3 text-right pr-4 whitespace-nowrap"><SortButton label="Custo" sortKey="custoTotal" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                   </tr>
                 </thead>
@@ -335,19 +291,6 @@ export default function NivelEstoque({ store, isOpen, onClose }: NivelEstoquePro
                         <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${item.status.color}`}>
                           {item.status.label}
                         </span>
-                      </td>
-                      <td className="p-3 text-center font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                        {item.lotes}
-                      </td>
-                      <td className="p-3 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                        {item.proximaValidade ? new Date(item.proximaValidade).toLocaleDateString('pt-BR') : '—'}
-                      </td>
-                      <td className={`p-3 text-center font-mono whitespace-nowrap ${
-                        item.diasRestantes !== null && item.diasRestantes <= 7
-                          ? 'text-red-600 dark:text-red-400 font-bold'
-                          : 'text-gray-500 dark:text-amber-100/40'
-                      }`}>
-                        {item.diasRestantes !== null ? `${item.diasRestantes}d` : '—'}
                       </td>
                       <td className="p-3 text-right pr-4 font-mono font-bold text-amber-950 dark:text-amber-100 whitespace-nowrap">
                         {formatCurrency(item.custoTotal)}

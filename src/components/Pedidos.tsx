@@ -68,6 +68,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
 
   // Estorno pendente filter
   const [showEstornoPendente, setShowEstornoPendente] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('0');
   
   // Relatorio modal
   const [relatorioOpen, setRelatorioOpen] = useState(false);
@@ -396,6 +397,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     const searchLow = searchTerm.toLowerCase();
     const matchesSearch = cliName.includes(searchLow) || p.id.includes(searchLow);
     if (!matchesSearch) return false;
+    if (statusFilter !== '0' && p.status_id !== Number(statusFilter)) return false;
     if (showEstornoPendente && !store.getEstornoPendente().some(e => e.id === p.id)) return false;
     return true;
   });
@@ -808,8 +810,11 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                 placeholder="Buscar pedido por cliente ou código..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 border border-amber-100 focus:outline-none focus:border-amber-400 transition"
+                className="w-full pl-9 pr-4 h-9 text-xs rounded-xl bg-orange-50/20 border border-amber-100 focus:outline-none focus:border-amber-400 transition"
               />
+            </div>
+            <div className="w-44">
+              <SelectSearch value={statusFilter} onChange={v => setStatusFilter(v)} options={[{ value: '0', label: 'Todos os status' }, ...store.statusPedido.map(s => ({ value: String(s.id), label: s.nome }))]} placeholder="Filtrar por status" />
             </div>
             <button onClick={() => setShowEstornoPendente(!showEstornoPendente)}
               className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 ${
@@ -1002,7 +1007,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                               required
                             />
                             <span className="bg-amber-100 px-2 py-1 text-[9px] text-amber-900 font-bold whitespace-nowrap font-mono border-l border-amber-200">
-                              {store.unidadeNome(prodRef?.unidade_producao_id || 0)}
+                              {store.unidadeSigla(prodRef?.unidade_producao_id || 0)}
                             </span>
                           </div>
                         </div>
@@ -1354,7 +1359,7 @@ ${pagHtml}
                               {it.observacao && <p className="text-[9px] text-gray-400 mt-0.5">{it.observacao}</p>}
                             </div>
                             <div className="text-right">
-                              <p className="font-bold font-mono text-amber-900">{it.quantidade_solicitada} {store.unidadeNome(prod?.unidade_producao_id || 0)}</p>
+                              <p className="font-bold font-mono text-amber-900">{it.quantidade_solicitada} {store.unidadeSigla(prod?.unidade_producao_id || 0)}</p>
                               <p className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(it.preco_unitario)} cada</p>
                             </div>
                           </div>

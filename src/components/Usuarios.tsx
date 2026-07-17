@@ -4,6 +4,7 @@ import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, K
 import { supabase, supabaseAdmin, signOut } from '../lib/supabaseClient';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+import SelectSearch from './SelectSearch';
 
 interface UsuarioRow {
   id: string;
@@ -192,10 +193,10 @@ export default function Usuarios({ store }: UsuariosProps) {
           <table className="w-full">
             <thead className="bg-[#f8f5ee] dark:bg-[#130b04]">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="nome" label="Usuário" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="perfil_id" label="Perfil" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider"><SortButton sortKey="ativo" label="Status" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 uppercase tracking-wider">Ações</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton sortKey="nome" label="Usuário" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton sortKey="perfil_id" label="Perfil" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider"><SortButton sortKey="ativo" label="Status" sortConfig={sortConfig as any} onSort={requestSort as any} /></th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-[#5c4a37] dark:text-amber-100/60 tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#ebdcc9] dark:divide-[#2e1a0a]">
@@ -308,12 +309,7 @@ export default function Usuarios({ store }: UsuariosProps) {
               )}
               <div>
                 <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Perfil de Acesso</label>
-                <select value={perfilId} onChange={e => setPerfilId(Number(e.target.value))} disabled={editUser?.id === store.currentUserId}
-                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed">
-                  {store.perfis.map(p => (
-                    <option key={p.id} value={p.id}>{p.nome} — {p.descricao}</option>
-                  ))}
-                </select>
+                <SelectSearch value={String(perfilId)} onChange={v => { if (editUser?.id !== store.currentUserId) setPerfilId(Number(v)); }} options={store.perfis.map(p => ({ value: String(p.id), label: `${p.nome} — ${p.descricao}` }))} placeholder="Perfil de acesso" />
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => { setShowModal(false); setEditUser(null); setNome(''); setEmail(''); setSenha(''); setPerfilId(1); setError(''); }}

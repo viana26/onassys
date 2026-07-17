@@ -14,9 +14,7 @@ import {
   CheckCircle2, 
   AlertTriangle, 
   Search, 
-  Calendar, 
   PackageCheck,
-  Tag, 
   X,
   Layers,
   Warehouse,
@@ -38,7 +36,7 @@ type ProdutoComEstoque = EstoqueProduto & { produto_nome: string; produto_catego
 
 export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'todos' | 'em_falta' | 'baixo_estoque' | 'lote_validade'>('todos');
+  const [filterType, setFilterType] = useState<'todos' | 'em_falta' | 'baixo_estoque'>('todos');
   const [activeTab, setActiveTab] = useState<'painel' | 'historico'>('painel');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
@@ -58,8 +56,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const [isLoteOpen, setIsLoteOpen] = useState(false);
   const [loteProdutoId, setLoteProdutoId] = useState('');
   const [loteQtd, setLoteQtd] = useState<number>(12);
-  const [loteNumero, setLoteNumero] = useState('');
-  const [loteValidade, setLoteValidade] = useState('');
   const [loteObs, setLoteObs] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -69,8 +65,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const [adjustStockProdutoId, setAdjustStockProdutoId] = useState('');
   const [adjustStockNovoSaldo, setAdjustStockNovoSaldo] = useState<number>(0);
   const [adjustStockQtdMinima, setAdjustStockQtdMinima] = useState<number>(0);
-  const [adjustStockLote, setAdjustStockLote] = useState('');
-  const [adjustStockValidade, setAdjustStockValidade] = useState('');
   const [adjustStockObs, setAdjustStockObs] = useState('');
 
   const getProdutoName = (id: string) => {
@@ -106,7 +100,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
 
       if (filterType === 'em_falta') return matchesSearch && isZero;
       if (filterType === 'baixo_estoque') return matchesSearch && isLow && !isZero;
-      if (filterType === 'lote_validade') return matchesSearch && !!ep.data_validade;
       return matchesSearch;
     });
   }, [store.estoqueProdutos, store.produtos, searchTerm, filterType]);
@@ -186,18 +179,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     setIsLoteOpen(true);
     setLoteProdutoId(produtoId || (store.produtos[0]?.id || ''));
     setLoteQtd(12);
-    const now = new Date();
-    const yy = String(now.getFullYear()).slice(2);
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    const hh = String(now.getHours()).padStart(2, '0');
-    const mi = String(now.getMinutes()).padStart(2, '0');
-    const ss = String(now.getSeconds()).padStart(2, '0');
-    setLoteNumero(`L-${yy}${mm}${dd}${hh}${mi}${ss}`);
-    const expDate = new Date();
-    expDate.setDate(expDate.getDate() + 5);
-    setLoteValidade(expDate.toISOString().split('T')[0]);
-    setLoteObs('Lote de forno regular');
+    setLoteObs('');
   };
 
   const handleSaveLote = async (e: React.FormEvent) => {
@@ -209,7 +191,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     }
 
     try {
-      const result = await store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteValidade, loteNumero, loteObs);
+      const result = await store.lancarLoteProducao(loteProdutoId, Number(loteQtd), loteObs);
       if (result.success) {
         setIsLoteOpen(false);
         onUpdate();
@@ -231,8 +213,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     setAdjustStockProdutoId(ep.produto_id);
     setAdjustStockNovoSaldo(ep.quantidade_disponivel);
     setAdjustStockQtdMinima(ep.quantidade_minima);
-    setAdjustStockLote(ep.lote || '');
-    setAdjustStockValidade(ep.data_validade || '');
     setAdjustStockObs('');
     setErrorMessage(null);
     setIsAdjustStockOpen(true);
@@ -253,8 +233,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
         produto_id: adjustStockProdutoId,
         quantidade_disponivel: Number(adjustStockNovoSaldo),
         quantidade_minima: Number(adjustStockQtdMinima),
-        lote: adjustStockLote || null,
-        data_validade: adjustStockValidade || null,
       });
       estoqueId = novo.id;
     } else {
@@ -265,8 +243,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       }
       await store.updateEstoqueProdutoConfig(estoqueId, {
         quantidade_minima: Number(adjustStockQtdMinima),
-        lote: adjustStockLote || null,
-        data_validade: adjustStockValidade || null,
       });
     }
 
@@ -275,7 +251,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
 
   const unidadeNome = (produtoId: string) => {
     const p = store.produtos.find(prod => prod.id === produtoId);
-    return p ? store.unidadeNome(p.unidade_producao_id) : '';
+    return p ? store.unidadeSigla(p.unidade_producao_id) : '';
   };
 
   const statusInfo = (ep: ProdutoComEstoque) => {
@@ -303,7 +279,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             onClick={() => handleOpenLoteForm()}
             className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center cursor-pointer"
           >
-            <Layers size={15} /> Lançar Lote
+            <Layers size={15} /> Lançar Produção
           </button>
         )}
       </div>
@@ -354,8 +330,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               {[
                 { type: 'todos' as const, label: 'Todos' },
                 { type: 'em_falta' as const, label: 'Sem Estoque' },
-                { type: 'baixo_estoque' as const, label: 'Estoque Baixo' },
-                { type: 'lote_validade' as const, label: 'Validades' }
+                { type: 'baixo_estoque' as const, label: 'Estoque Baixo' }
               ].map(item => (
                 <button
                   key={item.type}
@@ -394,15 +369,12 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       <th className="p-3 whitespace-nowrap"><SortButton label="Status" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} /></th>
                       <th className="p-3 text-right whitespace-nowrap"><SortButton label="Disponível" sortKey="quantidade_disponivel" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
                       <th className="p-3 text-right whitespace-nowrap"><SortButton label="Mínimo" sortKey="quantidade_minima" sortConfig={sortConfig} onSort={requestSort} align="right" /></th>
-                      <th className="p-3 whitespace-nowrap">Lote / Validade</th>
                       <th className="p-3 text-right pr-4 whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedEstoque.map(ep => {
                       const status = statusInfo(ep);
-                      const expDate = ep.data_validade ? new Date(ep.data_validade) : null;
-                      const isExpired = expDate ? expDate.getTime() < new Date().getTime() : false;
                       return (
                         <tr key={ep.produto_id} className="border-b border-amber-50/50 dark:border-[#22160b]/40 hover:bg-amber-50/20 dark:hover:bg-amber-950/10 transition">
                           <td className="p-3 pl-4">
@@ -421,26 +393,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                           </td>
                           <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
                             {ep.quantidade_minima} <span className="text-[10px]">{unidadeNome(ep.produto_id)}</span>
-                          </td>
-                          <td className="p-3 whitespace-nowrap">
-                            {ep.lote || ep.data_validade ? (
-                              <div className="flex flex-wrap gap-1">
-                                {ep.lote && (
-                                  <span className="inline-flex items-center gap-0.5 bg-amber-50/60 dark:bg-amber-950/20 px-1.5 py-0.5 rounded text-[9px] font-mono text-amber-900 dark:text-amber-200">
-                                    <Tag size={9} /> {ep.lote}
-                                  </span>
-                                )}
-                                {ep.data_validade && (
-                                  <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono ${
-                                    isExpired ? 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 font-bold' : 'bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200'
-                                  }`}>
-                                    <Calendar size={9} /> {new Date(ep.data_validade).toLocaleDateString('pt-BR')}
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 dark:text-amber-100/30">—</span>
-                            )}
                           </td>
                           <td className="p-3 text-right pr-4 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1">
@@ -475,8 +427,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               <div className="md:hidden grid grid-cols-1 gap-3">
                 {paginatedEstoque.map(ep => {
                   const status = statusInfo(ep);
-                  const expDate = ep.data_validade ? new Date(ep.data_validade) : null;
-                  const isExpired = expDate ? expDate.getTime() < new Date().getTime() : false;
                   return (
                     <div 
                       key={ep.produto_id}
@@ -507,21 +457,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                         </div>
                       </div>
 
-                      {ep.lote && (
-                        <div className="flex flex-wrap gap-1.5 text-[10px]">
-                          <span className="inline-flex items-center gap-1 bg-amber-50/60 dark:bg-amber-950/20 px-1.5 py-0.5 rounded font-mono text-amber-900 dark:text-amber-200">
-                            <Tag size={9} /> {ep.lote}
-                          </span>
-                          {ep.data_validade && (
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono ${
-                              isExpired ? 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-300 font-bold' : 'bg-amber-50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200'
-                            }`}>
-                              <Calendar size={9} /> {new Date(ep.data_validade).toLocaleDateString('pt-BR')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
                       <div className="flex items-center justify-between border-t border-amber-50/50 dark:border-[#22160b]/40 pt-2">
                         <div className="flex items-center gap-1">
                           {store.hasPermission('estoque.editar') && (
@@ -548,8 +483,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               </div>
 
               {/* Pagination */}
-              {sortedEstoque.length > pageSize && (
-                <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+              <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
@@ -578,8 +512,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                     <option value={50}>50 / pág</option>
                   </select>
                 </div>
-              )}
-            </>
+              </>
           )}
         </>
       ) : (
@@ -605,17 +538,12 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
             <div className="relative">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" value={histSearch} onChange={e => { setHistSearch(e.target.value); setHistPage(1); }} placeholder="Buscar produto ou observação..." className="w-full pl-7 pr-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
+              <input type="text" value={histSearch} onChange={e => { setHistSearch(e.target.value); setHistPage(1); }} placeholder="Buscar produto ou observação..." className="w-full pl-7 pr-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400" />
             </div>
-            <select value={histTipoFilter} onChange={e => { setHistTipoFilter(Number(e.target.value)); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none">
-              <option value={0}>Todos os tipos</option>
-              {store.tiposMovimentacao.filter(t => t.entidade === 'produto' || t.entidade === 'ambos').map(t => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
-            </select>
+            <SelectSearch value={String(histTipoFilter)} onChange={v => { setHistTipoFilter(Number(v)); setHistPage(1); }} options={[{ value: '0', label: 'Todos os tipos' }, ...store.tiposMovimentacao.filter(t => t.entidade === 'produto' || t.entidade === 'ambos').map(t => ({ value: String(t.id), label: t.nome }))]} placeholder="Filtrar por tipo" />
             <SelectSearch value={histProdutoFilter} onChange={v => { setHistProdutoFilter(v); setHistPage(1); }} options={[{ value: 'todos', label: 'Todos os produtos' }, ...store.produtos.filter(p => p.ativo).map(p => ({ value: p.id, label: p.nome }))]} placeholder="Filtrar por produto" />
-            <input type="date" value={histDataInicio} onChange={e => { setHistDataInicio(e.target.value); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data início" />
-            <input type="date" value={histDataFim} onChange={e => { setHistDataFim(e.target.value); setHistPage(1); }} className="px-2 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data fim" />
+            <input type="date" value={histDataInicio} onChange={e => { setHistDataInicio(e.target.value); setHistPage(1); }} className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data início" />
+            <input type="date" value={histDataFim} onChange={e => { setHistDataFim(e.target.value); setHistPage(1); }} className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none" placeholder="Data fim" />
           </div>
 
           {histFiltered.length === 0 ? (
@@ -724,14 +652,14 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">
-                  Lançar Lote de Produção
+                  Lançar Produção
                 </h3>
                 <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Assar salgado, preparar brigadeiro e estocar pronto. Descontará automaticamente os insumos necessários.</p>
               </div>
               <button 
                 onClick={() => setIsLoteOpen(false)}
                 className="text-gray-400 hover:text-amber-950 dark:hover:text-amber-200 p-1 cursor-pointer"
-                aria-label="Fechar modal de lote"
+                aria-label="Fechar modal de produção"
               >
                 <X size={20} />
               </button>
@@ -767,33 +695,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       required
                     />
                     <span className="bg-amber-50 dark:bg-amber-950/30 px-2.5 py-2 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                      {store.unidadeNome(store.produtos.find(p => p.id === loteProdutoId)?.unidade_producao_id || 0)}
+                      {store.unidadeSigla(store.produtos.find(p => p.id === loteProdutoId)?.unidade_producao_id || 0)}
                     </span>
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Lote N.º *</label>
-                  <input 
-                    type="text" 
-                    value={loteNumero}
-                    onChange={(e) => setLoteNumero(e.target.value)}
-                    placeholder="Ex: L-0504A"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Data de Validade</label>
-                  <input 
-                    type="date" 
-                    value={loteValidade}
-                    onChange={(e) => setLoteValidade(e.target.value)}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
-                  />
                 </div>
 
                 <div className="space-y-1 col-span-1">
@@ -924,44 +828,6 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium block">Lote (opcional)</label>
-                  <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
-                    <input 
-                      type="text" 
-                      value={adjustStockLote}
-                      onChange={(e) => setAdjustStockLote(e.target.value)}
-                      placeholder="Ex: L-260710143522"
-                      className="flex-1 p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                    />
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        const now = new Date();
-                        const yy = String(now.getFullYear()).slice(2);
-                        const mm = String(now.getMonth() + 1).padStart(2, '0');
-                        const dd = String(now.getDate()).padStart(2, '0');
-                        const hh = String(now.getHours()).padStart(2, '0');
-                        const mi = String(now.getMinutes()).padStart(2, '0');
-                        const ss = String(now.getSeconds()).padStart(2, '0');
-                        setAdjustStockLote(`L-${yy}${mm}${dd}${hh}${mi}${ss}`);
-                      }}
-                      className="bg-amber-50 dark:bg-amber-950/35 hover:bg-amber-100 dark:hover:bg-amber-950/50 px-2 py-2 text-[10px] font-bold text-amber-700 dark:text-amber-300 cursor-pointer whitespace-nowrap transition"
-                    >
-                      Gerar
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium block">Validade (opcional)</label>
-                  <input 
-                    type="date" 
-                    value={adjustStockValidade}
-                    onChange={(e) => setAdjustStockValidade(e.target.value)}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] text-xs rounded-lg focus:outline-none focus:border-amber-400 bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
-                  />
-                </div>
               </div>
 
               <div className="space-y-1">
