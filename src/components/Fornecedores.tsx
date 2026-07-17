@@ -157,7 +157,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
             placeholder="Buscar por nome, contato ou telefone..."
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2b1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
+            className="w-full pl-9 pr-4 h-9 text-xs rounded-xl bg-orange-50/20 dark:bg-[#1c140c] border border-amber-100 dark:border-[#2b1d10] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 dark:focus:border-amber-700 transition"
           />
         </div>
         <button
@@ -327,8 +327,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
           </div>
 
           {/* Pagination */}
-          {sortedFornecedores.length > pageSize && (
-            <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
+          <div className="flex items-center justify-center gap-3 py-2 flex-wrap">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -356,8 +355,7 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
                 <option value={20}>20 / pág</option>
                 <option value={50}>50 / pág</option>
               </select>
-            </div>
-          )}
+          </div>
         </>
       )}
 

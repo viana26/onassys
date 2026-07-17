@@ -18,3 +18,8 @@ View your app in AI Studio: https://ai.studio/apps/733d15f3-6adc-4fe9-9edf-97422
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+## Migrações consolidada
+
+- **Nota:** O arquivo de migração inicial `000_init_consolidated.sql` deve ser o primeiro a ser executado.
+- Para resetar o banco local use: `supabase db reset && supabase db push`.
+- Após o merge, crie a tag `v2.0-migration-consolidated`.

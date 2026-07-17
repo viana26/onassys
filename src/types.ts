@@ -130,8 +130,7 @@ export interface EstoqueProduto {
   produto_id: string;
   quantidade_disponivel: number;
   quantidade_minima: number;
-  data_validade?: string;
-  lote?: string;
+
   data_atualizacao: string;
 }
 

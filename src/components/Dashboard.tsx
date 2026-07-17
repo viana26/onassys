@@ -111,21 +111,6 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
     })
     .sort((a,b) => a.data_entrega_prevista.localeCompare(b.data_entrega_prevista));
 
-  const produtosComValidadeProxima = store.estoqueProdutos.filter(ep => {
-    if (!ep.data_validade || ep.quantidade_disponivel <= 0) return false;
-    const validade = new Date(ep.data_validade);
-    const diffMs = validade.getTime() - hoje.getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays >= -1 && diffDays <= 3;
-  }).map(ep => {
-    const prod = store.produtos.find(p => p.id === ep.produto_id);
-    return {
-      ...ep,
-      nome: prod?.nome || 'Desconhecido',
-      validadeFormatada: ep.data_validade ? new Date(ep.data_validade).toLocaleDateString('pt-BR') : 'N/A'
-    };
-  });
-
   const statusLabels = ['Confirmado', 'Em Produção', 'Pronto'];
   const statusColors = ['#2563eb', '#d97706', '#059669'];
   const statusCounts = [
@@ -492,33 +477,6 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
             )}
           </div>
 
-          {/* VALIDADES */}
-          <div className="bg-white dark:bg-[#150f09] rounded-2xl p-5 border border-amber-100 dark:border-[#22160b] shadow-sm">
-            <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100 mb-3 flex items-center gap-2">
-              <Clock className="text-amber-600 dark:text-amber-400" size={18} />
-              Validades Próximas ({produtosComValidadeProxima.length})
-            </h3>
-            {produtosComValidadeProxima.length === 0 ? (
-              <div className="text-xs text-gray-400 dark:text-[#a08f80] py-3 text-center font-medium">Nenhum lote com validade expirando nos próximos 3 dias.</div>
-            ) : (
-              <div className="space-y-2">
-                {produtosComValidadeProxima.map((ep, idx) => (
-                  <div key={idx} className="p-3 bg-amber-50/30 dark:bg-amber-950/10 rounded-xl border border-amber-100 dark:border-[#2a1d10]/40 flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-semibold text-amber-950 dark:text-amber-200">{ep.nome}</p>
-                      <p className="text-[10px] text-amber-900/60 dark:text-amber-100/40 font-mono mt-0.5">Lote: {ep.lote || 'N/A'}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className="bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-350 border border-red-100 dark:border-[#4c1e13] px-2 py-0.5 rounded text-[10px] font-bold font-sans">
-                        Até {ep.validadeFormatada}
-                      </span>
-                      <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-1 font-mono">{ep.quantidade_disponivel} un</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* STATUS DOS PEDIDOS ATIVOS */}
           <div className="bg-white dark:bg-[#150f09] rounded-2xl p-5 border border-amber-100 dark:border-[#22160b] shadow-sm">

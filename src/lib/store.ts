@@ -408,7 +408,7 @@ export class MiniFactoryStore {
     }
   }
 
-  async lancarEntradaMaterial(id: string, quantidade: number, custoUnitario?: number, observacao?: string, criarDespesa?: boolean) {
+  async lancarEntradaMaterial(id: string, quantidade: number, custoUnitario?: number, observacao?: string, criarDespesa?: boolean, formaPagamento?: string) {
     const mat = this.materiais.find(m => m.id === id);
     if (!mat) return;
 
@@ -438,7 +438,7 @@ export class MiniFactoryStore {
       mat.quantidade_atual = dadosMat.quantidade_atual;
       mat.custo_unitario = dadosMat.custo_unitario;
       mat.data_ultima_atualizacao = dadosMat.data_ultima_atualizacao;
-      this.movMateriais.unshift(mov);
+      this.movMateriais = [mov, ...this.movMateriais];
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
         const despesa: LancamentoFinanceiro = {
@@ -447,10 +447,11 @@ export class MiniFactoryStore {
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
           descricao: `Compra de ${mat.nome}${fornecedor ? ` - ${fornecedor.nome_fantasia}` : ''}`,
+          forma_pagamento: formaPagamento || undefined,
           movimentacao_id: mov.id,
         };
         await this.supabaseInsert('lancamentos_financeiros', despesa as unknown as Record<string, unknown>);
-        this.lancamentos.unshift(despesa);
+        this.lancamentos = [despesa, ...this.lancamentos];
       }
       this.saveToLocalStorage(); this.notify();
     }
@@ -555,7 +556,7 @@ export class MiniFactoryStore {
     const delta = novoDisponivel - antigo;
     if (delta === 0) return { success: true };
 
-    let tipoId = 3;
+    let tipoId = 3; // Fallback se não encontrar por nome
     let qtdMov = delta;
     if (delta < 0) {
       const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
@@ -563,6 +564,11 @@ export class MiniFactoryStore {
         tipoId = tipoSaida.id;
       }
       qtdMov = Math.abs(delta);
+    } else {
+      const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
+      if (tipoEntrada) {
+        tipoId = tipoEntrada.id;
+      }
     }
 
     const mov: MovimentacaoProduto = {
@@ -598,16 +604,14 @@ export class MiniFactoryStore {
     if (ok) { this.estoqueProdutos = this.estoqueProdutos.filter(e => e.id !== id); this.saveToLocalStorage(); this.notify(); }
   }
 
-  async lancarLoteProducao(produtoId: string, quantidade: number, dataValidade?: string, lote?: string, observacao?: string): Promise<{ success: boolean; error?: string }> {
-    const result = await this.lancarProducao([{ produto_id: produtoId, quantidade_solicitada: quantidade }], undefined);
+  async lancarLoteProducao(produtoId: string, quantidade: number, observacao?: string): Promise<{ success: boolean; error?: string }> {
+    const result = await this.lancarProducao([{ produto_id: produtoId, quantidade_solicitada: quantidade }], undefined, observacao);
     if (!result.success) return result;
 
     const idx = this.estoqueProdutos.findIndex(e => e.produto_id === produtoId);
     if (idx !== -1) {
       const atualizado = {
         ...this.estoqueProdutos[idx],
-        data_validade: dataValidade || null,
-        lote: lote || null,
         data_atualizacao: new Date().toISOString()
       };
       const ok = await this.supabaseUpdate('estoque_produtos', atualizado.id, atualizado as unknown as Record<string, unknown>);
@@ -615,7 +619,7 @@ export class MiniFactoryStore {
         this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? atualizado : e);
         this.saveToLocalStorage(); this.notify();
       } else {
-        return { success: false, error: 'Erro ao salvar lote/validade no servidor.' };
+        return { success: false, error: 'Erro ao salvar no servidor.' };
       }
     }
     return { success: true };
@@ -715,7 +719,7 @@ export class MiniFactoryStore {
     return { success: true };
   }
 
-  async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string): Promise<{ success: boolean; error?: string }> {
+  async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string, observacao?: string): Promise<{ success: boolean; error?: string }> {
     const materiaisUsados: Record<string, { material: Material; ficha: FichaTecnicaItem; qtdNeeded: number }[]> = {};
 
     for (const item of itens) {
@@ -813,7 +817,7 @@ export class MiniFactoryStore {
       const movProd: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: 4, quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId, observacao: `Entrada por produção — Pedido #${pedidoId?.slice(-6).toUpperCase()}`,
+        pedido_id: pedidoId, observacao: observacao || (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
         usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
       };

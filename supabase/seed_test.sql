@@ -80,10 +80,10 @@ VALUES
   ('movm_test_03', 'mat_test_05', 1, 120, 0.80, 96.00);
 
 -- 9) ESTOQUE PRODUTOS (prontos)
-INSERT INTO estoque_produtos (id, produto_id, quantidade_disponivel, quantidade_minima, lote, data_validade)
+INSERT INTO estoque_produtos (id, produto_id, quantidade_disponivel, quantidade_minima)
 VALUES
-  ('est_test_01', 'prod_test_01', 30, 10, 'LOTE-T1', NOW() + INTERVAL '3 days'),
-  ('est_test_02', 'prod_test_02', 15, 5,  'LOTE-T2', NOW() + INTERVAL '5 days');
+  ('est_test_01', 'prod_test_01', 30, 10),
+  ('est_test_02', 'prod_test_02', 15, 5);
 
 SELECT 'TEST DATA INSERTED' AS status;
 
