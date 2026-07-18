@@ -1,13 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { MiniFactoryStore } from '../lib/store';
+import React, { useState, useMemo, useEffect } from 'react';
+import { MiniFactoryStore, dataLocal } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Filter, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt, Wallet, CreditCard } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Search, Filter, FilterX, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt, Wallet, CreditCard } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
-import BalancetePeriodo from './Relatorios/BalancetePeriodo';
+import MovimentacoesFinanceiras from './Relatorios/MovimentacoesFinanceiras';
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtDate = (d: string) => d ? d.substring(0, 10).split('-').reverse().join('/') : '—';
 
 const pagamentoIcons: Record<string, React.ReactNode> = {
   dinheiro: <Wallet size={12} />,
@@ -36,16 +37,37 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   const [filtroTipo, setFiltroTipo] = useState<'todas' | 'receita' | 'despesa'>('todas');
   const [showModalTipo, setShowModalTipo] = useState<'receita' | 'despesa' | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<LancamentoFinanceiro | null>(null);
-  const [showBalancete, setShowBalancete] = useState(false);
+  const [editingLancamento, setEditingLancamento] = useState<LancamentoFinanceiro | null>(null);
+  const [showMovFinanceiras, setShowMovFinanceiras] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('0');
+  const [filtroDataInicio, setFiltroDataInicio] = useState('');
+  const [filtroDataFim, setFiltroDataFim] = useState('');
+
+  const categoriasFinanceiro = useMemo(() => store.categoriasFinanceiro.filter(c => c.tipo === 'receita' || c.tipo === 'despesa'), [store.categoriasFinanceiro]);
 
   const lancamentosFiltrados = useMemo(() => {
     const base = filtroTipo === 'todas'
       ? [...store.lancamentos]
       : store.lancamentos.filter(l => l.tipo === filtroTipo);
-    return base.sort((a, b) => new Date(b.data_lancamento).getTime() - new Date(a.data_lancamento).getTime());
-  }, [store.lancamentos, filtroTipo]);
+    return base
+      .filter(l => filtroCategoria === '0' || l.categoria_id === Number(filtroCategoria))
+      .filter(l => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        const catNome = store.categoriaFinanceiroNome(l.categoria_id).toLowerCase();
+        return l.descricao?.toLowerCase().includes(term)
+          || l.forma_pagamento?.toLowerCase().includes(term)
+          || (l.pedido_id && l.pedido_id.toLowerCase().includes(term))
+          || catNome.includes(term)
+          || l.valor.toString().includes(term.replace(',', '.').replace('r$', '').trim());
+      })
+      .filter(l => !filtroDataInicio || l.data_lancamento >= filtroDataInicio)
+      .filter(l => !filtroDataFim || l.data_lancamento <= filtroDataFim)
+      .sort((a, b) => new Date(b.data_lancamento).getTime() - new Date(a.data_lancamento).getTime());
+  }, [store.lancamentos, store, filtroTipo, searchTerm, filtroCategoria, filtroDataInicio, filtroDataFim]);
 
   const { sortedItems: sortedLancamentos, requestSort, sortConfig } = useSortableData(lancamentosFiltrados as (LancamentoFinanceiro & Record<string, unknown>)[], 'data_lancamento', 'desc');
 
@@ -55,9 +77,19 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
     currentPage * pageSize
   );
 
-  const receitas = store.lancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
-  const despesas = store.lancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
+  const receitas = sortedLancamentos.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
+  const despesas = sortedLancamentos.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
   const saldo = receitas - despesas;
+
+  const hasFilters = filtroTipo !== 'todas' || filtroCategoria !== '0' || !!filtroDataInicio || !!filtroDataFim || !!searchTerm;
+  const clearFilters = () => {
+    setFiltroTipo('todas');
+    setFiltroCategoria('0');
+    setFiltroDataInicio('');
+    setFiltroDataFim('');
+    setSearchTerm('');
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -71,7 +103,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         </div>
         {store.hasPermission('financeiro.lancar') && (
       <div className="flex items-center gap-2" data-help="financeiro-filtro">
-            <button onClick={() => setShowBalancete(true)}
+            <button onClick={() => setShowMovFinanceiras(true)}
               className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-[#1a1208] border border-[#ebdcc9] dark:border-[#2e1a0a] text-[#5c4a37] dark:text-amber-100 font-semibold rounded-xl hover:bg-[#f0eade] dark:hover:bg-[#22160b] transition text-xs font-sans">
               <BarChart3 size={15} /> Relatório
             </button>
@@ -127,11 +159,29 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Filter size={14} className="text-[#5c4a37]/60 dark:text-amber-100/50" />
+      <div className="flex flex-wrap items-center gap-2">
+        <button onClick={clearFilters} title="Limpar filtros"
+          className={`p-1.5 rounded-lg transition ${hasFilters ? 'bg-red-500 text-white hover:bg-red-600' : 'text-[#5c4a37]/40 dark:text-amber-100/30 hover:bg-[#f0eade] dark:hover:bg-[#130b04]'}`}>
+          {hasFilters ? <FilterX size={14} /> : <Filter size={14} />}
+        </button>
+        <input type="date" value={filtroDataInicio} onChange={e => { setFiltroDataInicio(e.target.value); setCurrentPage(1); }}
+          className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 w-36" />
+        <input type="date" value={filtroDataFim} onChange={e => { setFiltroDataFim(e.target.value); setCurrentPage(1); }}
+          className="px-2 h-9 rounded-lg text-xs border border-amber-200 dark:border-[#2d1e0d] bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 w-36" />
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            placeholder="Buscar descrição, pagamento ou pedido..."
+            className="w-full pl-9 pr-3 h-9 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+        </div>
+        <SelectSearch
+          value={filtroCategoria} onChange={v => { setFiltroCategoria(v); setCurrentPage(1); }}
+          options={[{ value: '0', label: 'Todas categorias' }, ...categoriasFinanceiro.map(c => ({ value: c.id!.toString(), label: c.nome }))]}
+          placeholder="Todas categorias"
+          className="w-44 h-9" />
         {(['todas', 'receita', 'despesa'] as const).map(t => (
           <button key={t} onClick={() => { setFiltroTipo(t); setCurrentPage(1); }}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+            className={`h-9 px-3 rounded-lg text-xs font-semibold transition ${
               filtroTipo === t
                 ? 'bg-amber-600 text-white'
                 : 'bg-[#f0eade] dark:bg-[#130b04] text-[#5c4a37] dark:text-amber-100/70 hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b]'
@@ -158,13 +208,11 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
             {paginatedLancamentos.map(l => (
               <tr key={l.id} className="hover:bg-[#f8f5ee]/50 dark:hover:bg-[#130b04]/50 transition">
                 <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 font-mono">
-                  {new Date(l.data_lancamento).toLocaleDateString('pt-BR')}
+                    {fmtDate(l.data_lancamento)}
                 </td>
-                <td className="px-4 py-3 font-medium text-[#2e2315] dark:text-amber-50">{l.descricao || '—'}</td>
-                <td className="px-4 py-3">
-                  <span className="text-xs px-2 py-1 rounded-lg bg-[#f0eade] dark:bg-[#130b04] text-[#5c4a37] dark:text-amber-100/70">
-                    {store.categoriaFinanceiroNome(l.categoria_id)}
-                  </span>
+                <td className="px-4 py-3 text-xs font-medium text-[#2e2315] dark:text-amber-50">{l.descricao || '—'}</td>
+                <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70">
+                  {store.categoriaFinanceiroNome(l.categoria_id)}
                 </td>
                 <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 flex items-center gap-1.5">
                   {pagamentoIcons[l.forma_pagamento || ''] || null}
@@ -175,10 +223,16 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 </td>
                 {store.hasPermission('financeiro.lancar') && (
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setDeleteConfirm(l)}
-                      className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-red-600 dark:hover:text-red-400 transition">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => setEditingLancamento(l)}
+                        className="p-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-amber-600 dark:hover:text-amber-400 transition">
+                        <Edit2 size={14} />
+                      </button>
+                      <button onClick={() => setDeleteConfirm(l)}
+                        className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-[#5c4a37]/40 dark:text-amber-100/30 hover:text-red-600 dark:hover:text-red-400 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 )}
               </tr>
@@ -207,9 +261,9 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
             <div key={l.id} className="bg-white dark:bg-[#1a1208] rounded-xl border border-[#ebdcc9] dark:border-[#2e1a0a] p-4 shadow-sm space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-[#2e2315] dark:text-amber-50 truncate">{l.descricao || 'Sem descrição'}</p>
+                  <p className="font-semibold text-xs text-[#2e2315] dark:text-amber-50 truncate">{l.descricao || 'Sem descrição'}</p>
                   <p className="text-[10px] text-[#5c4a37]/50 dark:text-amber-100/30 mt-0.5 font-mono">
-                    {new Date(l.data_lancamento).toLocaleDateString('pt-BR')}
+                  {fmtDate(l.data_lancamento)}
                   </p>
                 </div>
                 <span className={`text-base font-bold font-mono ${l.tipo === 'receita' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -226,7 +280,11 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 </span>
               </div>
               {store.hasPermission('financeiro.lancar') && (
-                <div className="flex justify-end pt-1 border-t border-[#ebdcc9]/50 dark:border-[#2e1a0a]/50">
+                <div className="flex justify-end gap-3 pt-1 border-t border-[#ebdcc9]/50 dark:border-[#2e1a0a]/50">
+                  <button onClick={() => setEditingLancamento(l)}
+                    className="text-[10px] text-amber-600/60 dark:text-amber-400/60 hover:text-amber-600 dark:hover:text-amber-400 font-medium flex items-center gap-1 transition">
+                    <Edit2 size={10} /> Editar
+                  </button>
                   <button onClick={() => setDeleteConfirm(l)}
                     className="text-[10px] text-red-600/60 dark:text-red-400/60 hover:text-red-600 dark:hover:text-red-400 font-medium flex items-center gap-1 transition">
                     <Trash2 size={10} /> Excluir
@@ -263,7 +321,9 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
 
       {showModalTipo && <NovoLancamentoModal store={store} initialTipo={showModalTipo} onClose={() => setShowModalTipo(null)} onSaved={() => { setShowModalTipo(null); onUpdate(); }} />}
 
-      {showBalancete && <BalancetePeriodo store={store} isOpen={true} onClose={() => setShowBalancete(false)} />}
+      {editingLancamento && <NovoLancamentoModal store={store} initialTipo={editingLancamento.tipo} initialData={editingLancamento} onClose={() => setEditingLancamento(null)} onSaved={() => { setEditingLancamento(null); onUpdate(); }} />}
+
+      {showMovFinanceiras && <MovimentacoesFinanceiras store={store} isOpen={true} onClose={() => setShowMovFinanceiras(false)} />}
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -299,13 +359,28 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
   );
 }
 
-function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: MiniFactoryStore; initialTipo: 'receita' | 'despesa'; onClose: () => void; onSaved: () => void }) {
-  const [tipo, setTipo] = useState<'receita' | 'despesa'>(initialTipo);
-  const [categoriaId, setCategoriaId] = useState(1);
-  const [valor, setValor] = useState('');
-  const [descricao, setDescricao] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState('');
-  const [dataLancamento, setDataLancamento] = useState(new Date().toISOString().split('T')[0]);
+function NovoLancamentoModal({ store, initialTipo, initialData, onClose, onSaved }: { store: MiniFactoryStore; initialTipo: 'receita' | 'despesa'; initialData?: LancamentoFinanceiro; onClose: () => void; onSaved: () => void }) {
+  const editMode = !!initialData;
+  const [tipo, setTipo] = useState<'receita' | 'despesa'>(initialData?.tipo || initialTipo);
+  const [categoriaId, setCategoriaId] = useState(initialData?.categoria_id || 1);
+  const [valor, setValor] = useState(initialData ? String(initialData.valor).replace('.', ',') : '');
+  const [descricao, setDescricao] = useState(initialData?.descricao || '');
+  const [formaPagamento, setFormaPagamento] = useState(initialData?.forma_pagamento || '');
+  const raw = initialData?.data_lancamento;
+  const initialDate = typeof raw === 'string' ? raw.substring(0, 10) : raw ? new Date(raw).toISOString().split('T')[0] : dataLocal();
+  const [dataLancamento, setDataLancamento] = useState(initialDate);
+
+  useEffect(() => {
+    if (initialData) {
+      const r = initialData.data_lancamento;
+      setDataLancamento(typeof r === 'string' ? r.substring(0, 10) : r ? new Date(r).toISOString().split('T')[0] : dataLocal());
+      setTipo(initialData.tipo);
+      setCategoriaId(initialData.categoria_id);
+      setValor(String(initialData.valor).replace('.', ','));
+      setDescricao(initialData.descricao || '');
+      setFormaPagamento(initialData.forma_pagamento || '');
+    }
+  }, [initialData?.id]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [showCategorias, setShowCategorias] = useState(false);
@@ -324,16 +399,35 @@ function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: 
     const valorNum = parseFloat(valor.replace(',', '.'));
     if (!valorNum || valorNum <= 0) { setError('Valor inválido'); return; }
     setSaving(true);
-    await store.addLancamentoFinanceiro({
-      data_lancamento: dataLancamento,
-      valor: valorNum,
-      tipo,
-      categoria_id: categoriaId,
-      descricao: descricao || undefined,
-      forma_pagamento: formaPagamento || undefined,
-    });
-    setSaving(false);
-    onSaved();
+    let ok = true;
+    try {
+      if (editMode && initialData) {
+        const result = await store.updateLancamentoFinanceiro(initialData.id, {
+          data_lancamento: dataLancamento,
+          valor: valorNum,
+          tipo,
+          categoria_id: categoriaId,
+          descricao: descricao || undefined,
+          forma_pagamento: formaPagamento || undefined,
+        });
+        if (!result) { setError('Erro ao salvar no servidor.'); ok = false; }
+      } else {
+        await store.addLancamentoFinanceiro({
+          data_lancamento: dataLancamento,
+          valor: valorNum,
+          tipo,
+          categoria_id: categoriaId,
+          descricao: descricao || undefined,
+          forma_pagamento: formaPagamento || undefined,
+        });
+      }
+    } catch {
+      setError('Erro ao salvar. Tente novamente.');
+      ok = false;
+    } finally {
+      setSaving(false);
+    }
+    if (ok) onSaved();
   };
 
   return (
@@ -341,7 +435,7 @@ function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: 
       <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a]">
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-lg font-bold ${tipo === 'receita' ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400'}`}>
-            {tipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
+            {editMode ? 'Editar Lançamento' : tipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
           </h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-[#f0eade] dark:hover:bg-[#130b04] text-[#5c4a37] dark:text-amber-100/70">
             <X size={18} />
@@ -456,7 +550,7 @@ function NovoLancamentoModal({ store, initialTipo, onClose, onSaved }: { store: 
             </button>
             <button type="submit" disabled={saving}
               className={`flex-1 py-2 px-4 font-semibold rounded-xl transition disabled:cursor-not-allowed text-white ${tipo === 'receita' ? 'bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-400' : 'bg-red-600 hover:bg-red-500 disabled:bg-red-400'}`}>
-              {saving ? 'Salvando...' : tipo === 'receita' ? 'Salvar Receita' : 'Salvar Despesa'}
+              {saving ? 'Salvando...' : editMode ? 'Salvar Alterações' : tipo === 'receita' ? 'Salvar Receita' : 'Salvar Despesa'}
             </button>
           </div>
         </form>

@@ -3,6 +3,11 @@ import { calcularCustoProducao, normalizarQuantidade } from './calculos';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { deleteProdutoImage, isStorageUrl } from './imageUpload';
 
+export const dataLocal = (d?: Date) => {
+  const dt = d || new Date();
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+};
+
 export class MiniFactoryStore {
   materiais: Material[] = [];
   produtos: Produto[] = [];
@@ -443,7 +448,7 @@ export class MiniFactoryStore {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
         const despesa: LancamentoFinanceiro = {
           id: crypto.randomUUID(), criado_em: new Date().toISOString(),
-          data_lancamento: new Date().toISOString().split('T')[0],
+          data_lancamento: dataLocal(),
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
           descricao: `Compra de ${mat.nome}${fornecedor ? ` - ${fornecedor.nome_fantasia}` : ''}`,
@@ -1196,11 +1201,25 @@ export class MiniFactoryStore {
     const novo = { ...data, id: crypto.randomUUID(), criado_em: new Date().toISOString() };
     const ok = await this.supabaseInsert('lancamentos_financeiros', novo as unknown as Record<string, unknown>);
     if (ok) {
-      this.lancamentos.unshift(novo);
+      this.lancamentos = [novo, ...this.lancamentos];
       this.saveToLocalStorage();
       this.notify();
     }
     return novo;
+  }
+
+  async updateLancamentoFinanceiro(id: string, updates: Partial<LancamentoFinanceiro>) {
+    try {
+      const idx = this.lancamentos.findIndex(l => l.id === id);
+      if (idx === -1) return false;
+      const ok = await this.supabaseUpdate('lancamentos_financeiros', id, updates as unknown as Record<string, unknown>);
+      this.lancamentos = this.lancamentos.map(l => l.id === id ? { ...l, ...updates } : l);
+      this.saveToLocalStorage();
+      this.notify();
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async deleteLancamentoFinanceiro(id: string) {
@@ -1307,7 +1326,7 @@ export class MiniFactoryStore {
       catId = cat?.id || 1;
     }
     return await this.addLancamentoFinanceiro({
-      data_lancamento: dataLancamento || new Date().toISOString().split('T')[0],
+      data_lancamento: dataLancamento || dataLocal(),
       valor,
       tipo: 'receita',
       categoria_id: catId,
@@ -1336,7 +1355,7 @@ export class MiniFactoryStore {
 
       const estorno = {
         id: crypto.randomUUID(),
-        data_lancamento: new Date().toISOString().split('T')[0],
+        data_lancamento: dataLocal(),
         valor: rec.valor,
         tipo: 'despesa' as const,
         categoria_id: catEstornoId,
@@ -1347,7 +1366,7 @@ export class MiniFactoryStore {
       };
       let ok = false;
       try { ok = await this.supabaseInsert('lancamentos_financeiros', estorno as unknown as Record<string, unknown>); } catch { ok = false; }
-      this.lancamentos.unshift(estorno);
+      this.lancamentos = [estorno, ...this.lancamentos];
     }
 
     this.error = null;
@@ -1414,7 +1433,7 @@ export class MiniFactoryStore {
     }).join(', ');
 
     const lanc = await this.addLancamentoFinanceiro({
-      data_lancamento: new Date().toISOString().split('T')[0],
+      data_lancamento: dataLocal(),
       valor: params.valorPago ?? total,
       tipo: 'receita',
       categoria_id: params.categoriaId,

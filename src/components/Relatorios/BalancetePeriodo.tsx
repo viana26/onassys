@@ -197,7 +197,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (printWindow) {
     const periodoLabel = `${dataInicio ? new Date(dataInicio).toLocaleDateString('pt-BR') : '—'} a ${dataFim ? new Date(dataFim).toLocaleDateString('pt-BR') : '—'}`;
     const now = new Date().toLocaleString('pt-BR');
     const logoUrl = getLogoUrl(store);
@@ -294,6 +294,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    }
     onClose();
   };
 

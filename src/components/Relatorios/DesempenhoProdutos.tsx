@@ -93,7 +93,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (printWindow) {
     const now = new Date().toLocaleString('pt-BR');
     const logoUrl = getLogoUrl(store);
     const cnpjHtml = store.dadosEmpresa?.cnpj ? `<p style="margin:0;font-size:9px;color:#a8a29e">CNPJ: ${store.dadosEmpresa.cnpj}</p>` : '';
@@ -175,6 +175,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
 </body></html>`);
     printWindow.document.close();
     printWindow.print();
+    }
     onClose();
   };
 

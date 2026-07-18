@@ -9,6 +9,7 @@ import DesempenhoProdutos from './DesempenhoProdutos';
 import ConsumoInsumos from './ConsumoInsumos';
 import ReceitasPagamento from './ReceitasPagamento';
 import MovimentacoesEstoque from './MovimentacoesEstoque';
+import MovimentacoesFinanceiras from './MovimentacoesFinanceiras';
 import LucratividadePedidos from './LucratividadePedidos';
 
 interface RelatoriosProps {
@@ -88,6 +89,14 @@ const relatorios = [
     cor: 'emerald',
     modulo: 'financeiro',
   },
+  {
+    id: 'movimentacoes_financeiras',
+    titulo: 'Movimentações Financeiras',
+    descricao: 'Todas as receitas e despesas com filtros por período, categoria, tipo e pagamento',
+    icon: DollarSign,
+    cor: 'violet',
+    modulo: 'financeiro',
+  },
 ];
 
 const corMap: Record<string, { bg: string; text: string; border: string }> = {
@@ -111,6 +120,7 @@ const relatorioComponents: Record<string, React.FC<{ store: MiniFactoryStore; is
   receitas_pagamento: ReceitasPagamento,
   movimentacoes_estoque: MovimentacoesEstoque,
   lucratividade_pedidos: LucratividadePedidos,
+  movimentacoes_financeiras: MovimentacoesFinanceiras,
 };
 
 export default function Relatorios({ store }: RelatoriosProps) {
