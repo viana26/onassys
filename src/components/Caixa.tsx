@@ -8,6 +8,17 @@ const dataLocal = (d?: Date) => {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 };
 
+const getLancamentoLocalDate = (s: string) => {
+  if (!s) return '';
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    }
+  }
+  return s.substring(0, 10);
+};
+
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Formata string ISO/YYYY-MM-DD para DD/MM/AAAA HH:MM (sem timezone shift)
@@ -278,6 +289,8 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       })
     : pedidos.slice(0, 20);
 
+  const [dataCaixa, setDataCaixa] = useState(dataLocal());
+
   const selectedPedido = selectedPedidoId ? store.pedidos.find(p => p.id === selectedPedidoId) : null;
   const selectedCliente = selectedPedido ? store.clientes.find(c => c.id === selectedPedido.cliente_id) : null;
   const recebimentos = selectedPedido
@@ -291,8 +304,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   const troco = formaPagamento === 'dinheiro' && valorNumerico > saldoRestante ? valorNumerico - saldoRestante : 0;
   const valorRegistrar = troco > 0 ? saldoRestante : (valorNumerico > saldoRestante ? saldoRestante : valorNumerico);
 
-  const hoje = dataLocal();
-  const lancamentosHoje = store.lancamentos.filter(l => l.data_lancamento.startsWith(hoje));
+  const lancamentosHoje = store.lancamentos.filter(l => getLancamentoLocalDate(l.data_lancamento) === dataCaixa);
   const receitasHoje = lancamentosHoje.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
   const despesasHoje = lancamentosHoje.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
 
@@ -311,7 +323,12 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     if (!store.hasPermission('financeiro.lancar')) return;
     if (!selectedPedidoId || valorNumerico <= 0) return;
     const validaValor = valorNumerico > saldoRestante ? saldoRestante : valorNumerico;
-    await store.registrarPagamentoPedido(selectedPedidoId, validaValor, formaPagamento, new Date().toISOString());
+    const now = new Date();
+    const isToday = dataCaixa === dataLocal();
+    const dataLancamento = isToday
+      ? now.toISOString()
+      : `${dataCaixa}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    await store.registrarPagamentoPedido(selectedPedidoId, validaValor, formaPagamento, dataLancamento);
     setComprovanteData({
       tipo: 'pagamento',
       pedidoId: selectedPedidoId,
@@ -321,7 +338,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       valorRecebido: troco > 0 ? valorNumerico : undefined,
       troco: troco > 0 ? troco : undefined,
       formaPagamento,
-      dataLancamento: new Date().toISOString(),
+      dataLancamento: dataLancamento,
       saldoRestante: saldoRestante - validaValor,
     });
     setPaymentAmount('');
@@ -333,8 +350,11 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     const val = parseFloat((livreValor || '0').replace(',', '.'));
     if (!val || val <= 0 || !livreDescricao) return;
     const catReceita = store.categoriasFinanceiro.find(c => c.tipo === 'receita');
+    const now = new Date();
+    const timeStr = `T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const dataLancamento = dataCaixa + timeStr;
     await store.addLancamentoFinanceiro({
-      data_lancamento: dataLocal(),
+      data_lancamento: dataLancamento,
       valor: val,
       tipo: 'receita',
       categoria_id: catReceita?.id || 1,
@@ -346,7 +366,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       descricao: livreDescricao,
       valor: val,
       formaPagamento: livreForma,
-      dataLancamento: dataLocal() + 'T12:00',
+      dataLancamento: dataLancamento,
     });
     setLivreValor('');
     setLivreDescricao('');
@@ -381,8 +401,11 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     const val = parseFloat((despValor || '0').replace(',', '.'));
     if (!val || val <= 0 || !despDescricao) return;
     const catDespesa = store.categoriasFinanceiro.find(c => c.tipo === 'despesa');
+    const now = new Date();
+    const timeStr = `T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const dataLancamento = dataCaixa + timeStr;
     await store.addLancamentoFinanceiro({
-      data_lancamento: dataLocal(),
+      data_lancamento: dataLancamento,
       valor: val,
       tipo: 'despesa',
       categoria_id: catDespesa?.id || 2,
@@ -394,7 +417,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       descricao: despDescricao,
       valor: val,
       formaPagamento: despForma,
-      dataLancamento: dataLocal() + 'T12:00',
+      dataLancamento: dataLancamento,
     });
     setDespValor('');
     setDespDescricao('');
@@ -407,11 +430,16 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     if (vdCarrinho.length === 0) return;
     if (!vdCategoriaId) return;
 
+    const now = new Date();
+    const timeStr = `T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    const dataLancamento = dataCaixa + timeStr;
+
     const result = await store.registrarVendaDireta({
       itens: vdCarrinho,
       clienteId: vdClienteId || undefined,
       formaPagamento: vdForma,
       categoriaId: vdCategoriaId,
+      dataLancamento: dataLancamento,
     });
 
     if (!result.success) {
@@ -427,7 +455,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       }).join(', ')}`,
       valor: vdTotal,
       formaPagamento: vdForma,
-      dataLancamento: new Date().toISOString(),
+      dataLancamento: dataLancamento,
     });
     setActiveForm(null);
     setVdCarrinho([]);
@@ -805,13 +833,21 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
         {/* RIGHT COLUMN: Extrato do Dia */}
         <div className="lg:col-span-2">
           <div className="bg-white dark:bg-[#120c06] rounded-2xl border border-amber-100 dark:border-[#2d1e0d] p-4 space-y-3 h-full flex flex-col">
-            <h3 className="font-bold text-xs uppercase tracking-wider text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
-              <Clock size={14} /> Extrato do Dia
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                <Clock size={14} /> Extrato do Dia
+              </h3>
+              <input
+                type="date"
+                value={dataCaixa}
+                onChange={e => setDataCaixa(e.target.value || dataLocal())}
+                className="text-xs p-1 px-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
 
             <div className="flex-1 space-y-1 max-h-[calc(100vh-280px)] overflow-y-auto">
               {lancamentosHoje.length === 0 ? (
-                <p className="text-[10px] text-gray-400 italic text-center py-4">Nenhuma movimentação hoje</p>
+                <p className="text-[10px] text-gray-400 italic text-center py-4">Nenhuma movimentação nesta data</p>
               ) : (
                 lancamentosHoje.map(l => {
                   const cat = store.categoriasFinanceiro.find(c => c.id === l.categoria_id);

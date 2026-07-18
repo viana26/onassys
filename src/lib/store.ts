@@ -1375,6 +1375,7 @@ export class MiniFactoryStore {
     this.notify();
     return { success: true };
   }
+
   // ================================================
   // VENDA DIRETA (Caixa, sem pedido)
   // ================================================
@@ -1384,6 +1385,7 @@ export class MiniFactoryStore {
     formaPagamento?: string;
     categoriaId: number;
     valorPago?: number;
+    dataLancamento?: string;
   }): Promise<{ success: boolean; error?: string }> {
     this.error = null;
     this.errorType = null;
@@ -1420,7 +1422,7 @@ export class MiniFactoryStore {
         quantidade: item.quantidade,
         observacao: params.clienteId ? `Venda direta — ${this.clientes.find(c => c.id === params.clienteId)?.nome || ''}` : 'Venda direta (balcão)',
         usuario_id: this.currentUserId ?? undefined,
-        criado_em: new Date().toISOString()
+        criado_em: params.dataLancamento ? (params.dataLancamento.includes('T') ? params.dataLancamento : params.dataLancamento + 'T' + new Date().toISOString().split('T')[1]) : new Date().toISOString()
       };
       movsCriadas.push(mov);
       promises.push(this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>));
@@ -1433,7 +1435,7 @@ export class MiniFactoryStore {
     }).join(', ');
 
     const lanc = await this.addLancamentoFinanceiro({
-      data_lancamento: dataLocal(),
+      data_lancamento: params.dataLancamento || dataLocal(),
       valor: params.valorPago ?? total,
       tipo: 'receita',
       categoria_id: params.categoriaId,
