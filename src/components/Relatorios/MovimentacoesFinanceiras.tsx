@@ -4,19 +4,12 @@ import { X, Download, Printer, Filter, TrendingUp, TrendingDown, DollarSign } fr
 import SelectSearch from '../SelectSearch';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import { pagamentoLabel } from '../../lib/pagamento';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
 const getLogoUrl = (store: MiniFactoryStore) => store.dadosEmpresa?.logo_url || '';
 const getSlogan = (store: MiniFactoryStore) => store.dadosEmpresa?.slogan || 'Sistema de Gestão de Produção e Pedidos';
-
-const pagamentoLabel: Record<string, string> = {
-  Dinheiro: 'Dinheiro', Pix: 'Pix', Crédito: 'Crédito',
-  Débito: 'Débito', Boleto: 'Boleto', Transferência: 'Transferência',
-  // fallback para dados antigos (se existirem)
-  dinheiro: 'Dinheiro', pix: 'Pix', cartao_credito: 'Crédito',
-  cartao_debito: 'Débito', boleto: 'Boleto', transferencia: 'Transferência',
-};
 
 interface MovimentacoesFinanceirasProps {
   store: MiniFactoryStore;

@@ -444,8 +444,6 @@ export class MiniFactoryStore {
       criado_em: new Date().toISOString()
     };
 
-    const fornecedor = mat.fornecedor_id ? this.fornecedores.find(f => f.id === mat.fornecedor_id) : undefined;
-
     const dadosMat = {
       ...mat,
       quantidade_atual: mat.quantidade_atual + quantidade,
@@ -461,12 +459,13 @@ export class MiniFactoryStore {
       this.movMateriais = [mov, ...this.movMateriais];
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
+        const baseDesc = `+Compra/${mat.nome}${observacao?.trim() ? ` - !Obs/${observacao.trim()}` : ''}`;
         const despesa: LancamentoFinanceiro = {
           id: crypto.randomUUID(), criado_em: new Date().toISOString(),
           data_lancamento: dataLocal(),
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
-          descricao: `Compra de ${mat.nome}${fornecedor ? ` - ${fornecedor.nome_fantasia}` : ''}`,
+          descricao: `${baseDesc} #compra`,
           forma_pagamento: formaPagamento || undefined,
           movimentacao_id: mov.id,
         };
@@ -495,12 +494,14 @@ export class MiniFactoryStore {
       if (tipoEntrada) tipoId = tipoEntrada.id;
     }
 
+    const custoUnit = this.materiais[idx].custo_unitario;
     const mov: MovimentacaoMaterial = {
       id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
       material_id: materialId,
       tipo_id: tipoId,
       quantidade: qtdMov,
-      custo_unitario: this.materiais[idx].custo_unitario,
+      custo_unitario: custoUnit,
+      valor_pago: custoUnit * qtdMov,
       observacao: observacao || `Ajuste manual: ${antigo} → ${novoSaldo}`,
       criado_em: new Date().toISOString()
     };
@@ -1422,7 +1423,7 @@ export class MiniFactoryStore {
       valor,
       tipo: 'receita',
       categoria_id: catId,
-      descricao: `Pagamento pedido #${pedidoId.slice(-6)} - ${cliente?.nome || 'Cliente'}`,
+      descricao: `Pgto. pedido #${pedidoId.slice(-6)} - ${cliente?.nome || 'Cliente'}`,
       pedido_id: pedidoId,
       forma_pagamento: formaPagamento,
     });
@@ -1451,7 +1452,7 @@ export class MiniFactoryStore {
         valor: rec.valor,
         tipo: 'despesa' as const,
         categoria_id: catEstornoId,
-        descricao: `Estorno pedido #${pedidoId.slice(-6)} - ${rec.forma_pagamento || 'pagamento'}`,
+        descricao: `Estorno pedido #${pedidoId.slice(-6)} - ${rec.forma_pagamento || 'pgto'} #estorno`,
         pedido_id: pedidoId,
         forma_pagamento: rec.forma_pagamento,
         criado_em: new Date().toISOString(),

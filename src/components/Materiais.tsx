@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../lib/store';
 import { Material } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
 import { useSortableData } from '../lib/hooks/useSortableData';
+import { formasPagamentoSelectOptions } from '../lib/pagamento';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
 import ConfirmarLimpezaHistorico from './ConfirmarLimpezaHistorico';
@@ -85,8 +86,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const [inboundObs, setInboundObs] = useState<string>('');
   const [inboundCriarDespesa, setInboundCriarDespesa] = useState(false);
   const [inboundFormaPagamento, setInboundFormaPagamento] = useState<string>('');
+  const [inboundPagamentoError, setInboundPagamentoError] = useState(false);
 
-  const opcoesPagamento = ['Pix', 'Dinheiro', 'Crédito', 'Débito', 'Boleto', 'Outros'];
+  const [adjustMaterialId, setAdjustMaterialId] = useState<string | null>(null);
+  const [adjustNovoSaldo, setAdjustNovoSaldo] = useState<number>(0);
+  const [adjustObservacao, setAdjustObservacao] = useState('');
+
+  const opcoesPagamento = formasPagamentoSelectOptions;
 
   // Filter materials list
   const filteredMateriais = (() => {
@@ -292,6 +298,11 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       alert('O custo unitário não pode ser menor do que zero.');
       return;
     }
+    if (inboundCriarDespesa && !inboundFormaPagamento) {
+      setInboundPagamentoError(true);
+      return;
+    }
+    setInboundPagamentoError(false);
     await store.lancarEntradaMaterial(inboundMaterialId, Number(inboundQtd), Number(inboundCustoUnitario), inboundObs, inboundCriarDespesa, inboundFormaPagamento);
     setIsInbounding(false);
     onUpdate();
@@ -432,13 +443,21 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                                   className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
                                   data-help="materiais-mov"
                                 >
-                                  + Compra/Entrada
+                                  + Compra
+                                </button>
+                              )}
+                              {store.hasPermission('materiais.editar') && (
+                                <button 
+                                  onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustObservacao(''); }}
+                                  className="bg-amber-50 dark:bg-[#2d1e0d] hover:bg-amber-100 dark:hover:bg-[#3d2e1d] text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-[#3d2e1d] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
+                                >
+                                  📦 Ajustar
                                 </button>
                               )}
                               {store.hasPermission('materiais.editar') && (
                                 <button 
                                   onClick={() => handleOpenEdit(m)}
-                                  className="hover:bg-amber-100 dark:hover:bg-amber-950 p-1.5 rounded-lg text-amber-900 dark:text-amber-200 transition cursor-pointer"
+                                  className="hover:bg-amber-100 dark:hover:bg-amber-950 p-1 rounded-lg text-amber-900 dark:text-amber-200 transition cursor-pointer"
                                 >
                                   <Edit3 size={14} />
                                 </button>
@@ -446,7 +465,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                               {store.hasPermission('materiais.excluir') && (
                                 <button 
                                   onClick={() => setDeleteConfirm({ id: m.id, name: m.nome })}
-                                  className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1.5 rounded-lg text-red-650 dark:text-red-400 transition cursor-pointer"
+                                  className="hover:bg-red-100 dark:hover:bg-red-950/30 p-1 rounded-lg text-red-650 dark:text-red-400 transition cursor-pointer"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -501,7 +520,15 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                             onClick={() => handleOpenInbound(m)}
                             className="flex-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-800 dark:hover:bg-emerald-750 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg text-center cursor-pointer font-sans"
                           >
-                            + Entrada/Compra
+                            + Compra
+                          </button>
+                        )}
+                        {store.hasPermission('materiais.editar') && (
+                          <button 
+                            onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustObservacao(''); }}
+                            className="flex-1 bg-amber-600 hover:bg-amber-700 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg text-center cursor-pointer font-sans"
+                          >
+                            📦 Ajustar
                           </button>
                         )}
                         {store.hasPermission('materiais.editar') && (
@@ -673,8 +700,10 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                           <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
                             {isEntrada ? '+' : '-'}{mov.quantidade} {store.unidadeSigla(mat?.unidade_id || 0) || ''}
                           </td>
-                          <td className="p-3 text-right font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                            {isEntrada ? valPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                          <td className="p-3 text-right font-mono whitespace-nowrap">
+                            <span className={isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}>
+                              {isEntrada ? '+' : '-'}{valPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                            </span>
                           </td>
                           <td className="p-3 text-gray-500 dark:text-amber-100/40 whitespace-nowrap max-w-[200px] truncate">{mov.observacao || '—'}</td>
                         </tr>
@@ -715,6 +744,9 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       <div className="text-right">
                         <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
                           {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
+                        </p>
+                        <p className={`font-bold font-mono text-xs mt-0.5 ${isEntrada ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-500 dark:text-red-400'}`}>
+                          {isEntrada ? '+' : '-'}{(mov.valor_pago ?? (mov.custo_unitario ?? mat?.custo_unitario ?? 0) * mov.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                         </p>
                         {isDateValid && (
                           <p className="text-[10px] text-gray-400 dark:text-amber-100/30 mt-0.5">
@@ -950,9 +982,14 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               </label>
 
               {inboundCriarDespesa && (
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <label className="text-amber-950 dark:text-amber-100 font-medium">Forma de Pagamento</label>
-                  <SelectSearch value={inboundFormaPagamento} onChange={v => setInboundFormaPagamento(v)} options={[{ value: '', label: 'Selecione a forma de pagamento' }, ...opcoesPagamento.map(op => ({ value: op, label: op }))]} placeholder="Forma de pagamento" />
+                  <SelectSearch value={inboundFormaPagamento} onChange={v => { setInboundFormaPagamento(v); setInboundPagamentoError(false); }} options={[{ value: '', label: 'Selecione a forma de pagamento' }, ...opcoesPagamento]} placeholder="Forma de pagamento" />
+                  {inboundPagamentoError && (
+                    <div className="absolute -top-1 right-0 flex items-center gap-1 px-2 py-1 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-lg shadow-sm">
+                      <span className="text-[9px] font-bold text-red-600 dark:text-red-400 whitespace-nowrap">Escolha a forma de pagamento</span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1098,6 +1135,53 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
           </div>
         </div>
       )}
+
+      {/* Ajustar Estoque Modal */}
+      {adjustMaterialId && (() => {
+        const mat = store.materiais.find(m => m.id === adjustMaterialId);
+        if (!mat) return null;
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 border border-amber-100 dark:border-[#2e1a0a] space-y-4">
+              <h3 className="font-bold text-amber-950 dark:text-amber-100 flex items-center gap-2">
+                📦 Ajustar Estoque — {mat.nome}
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Saldo Atual</label>
+                  <div className="w-full p-2 bg-gray-100 dark:bg-[#130b04] border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-sm font-mono font-bold text-amber-950 dark:text-amber-100 mt-1">
+                    {mat.quantidade_atual} {store.unidadeSigla(mat.unidade_id)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Novo Saldo</label>
+                  <input type="number" step="any" min="0" value={adjustNovoSaldo} onChange={e => setAdjustNovoSaldo(Number(e.target.value))}
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-xl text-sm font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Observação (opcional)</label>
+                  <input type="text" value={adjustObservacao} onChange={e => setAdjustObservacao(e.target.value)} placeholder="Ex: Ajuste por quebra"
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => setAdjustMaterialId(null)}
+                  className="flex-1 py-2 px-3 border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-xs font-medium text-gray-600 dark:text-amber-100 hover:bg-gray-50 dark:hover:bg-[#130b04]">
+                  Voltar
+                </button>
+                <button onClick={async () => {
+                  await store.ajustarEstoqueMaterial(adjustMaterialId, adjustNovoSaldo, adjustObservacao);
+                  setAdjustMaterialId(null);
+                  onUpdate();
+                }}
+                  className="flex-1 py-2 px-3 bg-amber-700 hover:bg-amber-600 text-white rounded-xl text-xs font-bold">
+                  Confirmar Ajuste
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <ConfirmarLimpezaHistorico
         open={showLimparConfirm}

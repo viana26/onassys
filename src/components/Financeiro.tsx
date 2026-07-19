@@ -1,36 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { MiniFactoryStore, dataLocal } from '../lib/store';
 import { LancamentoFinanceiro } from '../types';
-import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Search, Filter, FilterX, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt, Wallet, CreditCard } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Search, Filter, FilterX, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
-
-
 import SelectSearch from './SelectSearch';
 import MovimentacoesFinanceiras from './Relatorios/MovimentacoesFinanceiras';
+import { pagamentoIcons, pagamentoLabel, formasPagamentoSelectOptions } from '../lib/pagamento';
 
 // Helpers
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d: string) => d ? d.substring(0, 10).split('-').reverse().join('/') : '—';
-
-// Icons and labels for payment methods (chaves = rótulos legíveis salvos no banco)
-const pagamentoIcons: Record<string, React.ReactNode> = {
-  Dinheiro: <Wallet size={12} />,
-  Pix: <DollarSign size={12} />,
-  Crédito: <CreditCard size={12} />,
-  Débito: <CreditCard size={12} />,
-  Boleto: <Receipt size={12} />,
-  Transferência: <TrendingUp size={12} />,
-};
-
-const pagamentoLabel: Record<string, string> = {
-  Dinheiro: 'Dinheiro',
-  Pix: 'Pix',
-  Crédito: 'Crédito',
-  Débito: 'Débito',
-  Boleto: 'Boleto',
-  Transferência: 'Transferência',
-};
 
 interface FinanceiroProps {
   store: MiniFactoryStore;
@@ -402,6 +382,7 @@ function NovoLancamentoModal({ store, initialTipo, initialData, onClose, onSaved
     setError('');
     const valorNum = parseFloat(valor.replace(',', '.'));
     if (!valorNum || valorNum <= 0) { setError('Valor inválido'); return; }
+    if (!formaPagamento) { setError('Selecione a forma de pagamento'); return; }
     setSaving(true);
     let ok = true;
     try {
@@ -467,7 +448,7 @@ function NovoLancamentoModal({ store, initialTipo, initialData, onClose, onSaved
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Pagamento</label>
-              <SelectSearch value={formaPagamento} onChange={v => setFormaPagamento(v)} options={[{ value: '', label: 'Selecione' }, { value: 'Dinheiro', label: 'Dinheiro' }, { value: 'Pix', label: 'Pix' }, { value: 'Débito', label: 'Débito' }, { value: 'Crédito', label: 'Crédito' }, { value: 'Boleto', label: 'Boleto' }, { value: 'Transferência', label: 'Transferência' }]} placeholder="Forma de pagamento" />
+              <SelectSearch value={formaPagamento} onChange={v => setFormaPagamento(v)} options={[{ value: '', label: 'Selecione' }, ...formasPagamentoSelectOptions]} placeholder="Forma de pagamento" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>

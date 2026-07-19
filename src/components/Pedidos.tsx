@@ -175,11 +175,15 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   };
 
   const handleAddItemRow = () => {
-    const prod = store.produtos[0];
-    if (!prod) return;
+    const usedIds = itensPedido.map(it => it.produto_id).filter(Boolean);
+    const unused = store.produtos.find(p => !usedIds.includes(p.id));
+    if (!unused) {
+      setCustomAlert({ title: 'Limite atingido', message: 'Todos os produtos disponíveis já foram adicionados ao pedido.' });
+      return;
+    }
     setItensPedido([
-      { produto_id: prod.id, quantidade_solicitada: 5, preco_unitario: prod.preco_venda || 0 },
-      ...itensPedido
+      ...itensPedido,
+      { produto_id: unused.id, quantidade_solicitada: 1, preco_unitario: unused.preco_venda || 0 }
     ]);
   };
 
@@ -222,7 +226,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       setCustomAlert({ title: 'Cliente necessário', message: 'Por favor cadastre ou selecione um cliente.' });
       return;
     }
-    if (itensPedido.length === 0) {
+    const validItens = itensPedido.filter(it => it.produto_id);
+    if (validItens.length === 0) {
       setCustomAlert({ title: 'Produto necessário', message: 'Adicione pelo menos 1 produto no pedido.' });
       return;
     }
@@ -244,7 +249,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       }
 
       const existingItens = store.itensPedido.filter(it => it.pedido_id === editingPedidoId);
-      const newItemKeys = itensPedido.map(item => `${item.produto_id}_${item.preco_unitario}_${item.observacao || ''}`);
+      const newItemKeys = validItens.map(item => `${item.produto_id}_${item.preco_unitario}_${item.observacao || ''}`);
 
       // Remove items that are no longer in the list
       for (const existingItem of existingItens) {
@@ -255,8 +260,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       }
 
       // Add or update items
-      for (let idx = 0; idx < itensPedido.length; idx++) {
-        const item = itensPedido[idx];
+      for (let idx = 0; idx < validItens.length; idx++) {
+        const item = validItens[idx];
         const existing = existingItens[idx];
         if (existing) {
           await store.updateItemPedido(existing.id, {
@@ -296,7 +301,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
 
     if (!savedPedido) return;
 
-    for (const item of itensPedido) {
+    for (const item of validItens) {
       await store.addItemPedido({
         pedido_id: savedPedido.id,
         produto_id: item.produto_id,
@@ -1075,7 +1080,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                                 <SelectSearch
                                   value={item.produto_id}
                                   onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })}
-                                  options={store.produtos.filter(p => !itensPedido.some((it, i) => it.produto_id === p.id && i !== idx)).map(p => ({ value: p.id, label: p.nome }))}
+                                  options={store.produtos.filter(p => !itensPedido.some((it, i) => i !== idx && it.produto_id && it.produto_id === p.id)).map(p => ({ value: p.id, label: p.nome }))}
                                   placeholder="Selecione o produto"
                                 />
                               </td>
@@ -1134,7 +1139,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                             <SelectSearch
                               value={item.produto_id}
                               onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })}
-                              options={store.produtos.filter(p => !itensPedido.some((it, i) => it.produto_id === p.id && i !== idx)).map(p => ({ value: p.id, label: p.nome }))}
+                              options={store.produtos.filter(p => !itensPedido.some((it, i) => i !== idx && it.produto_id && it.produto_id === p.id)).map(p => ({ value: p.id, label: p.nome }))}
                               placeholder="Selecione o produto"
                             />
                           </div>
@@ -1408,20 +1413,19 @@ ${pagHtml}
 
                   {/* Items list detail panel */}
                   <div className="space-y-3">
-                    <p className="font-display font-semibold text-amber-900 uppercase tracking-wider text-[10px] border-b border-amber-100 pb-1">Ingredientes & Produtos da Encomenda</p>
+                    <p className="font-display font-semibold text-amber-900 uppercase tracking-wider text-[10px] border-b border-amber-100 pb-1">Itens do Pedido</p>
                     <div className="space-y-2">
                       {itens.map((it, idx) => {
                         const prod = store.produtos.find(prd => prd.id === it.produto_id);
                         return (
-                          <div key={idx} className="p-2.5 rounded-lg bg-orange-50/10 border border-amber-100/50 flex justify-between items-center text-[11px]">
-                            <div>
-                              <p className="font-semibold text-amber-950">{prod?.nome}</p>
-                              {it.observacao && <p className="text-[9px] text-gray-400 mt-0.5">{it.observacao}</p>}
+                          <div key={idx} className="p-2.5 rounded-lg bg-orange-50/10 border border-amber-100/50 text-[11px]">
+                            <div className="grid grid-cols-12 gap-2 items-center">
+                              <div className="col-span-5 font-semibold text-amber-950 truncate">{prod?.nome || '—'}</div>
+                              <div className="col-span-2 text-center font-mono text-amber-900">{it.quantidade_solicitada} {store.unidadeSigla(prod?.unidade_producao_id || 0)}</div>
+                              <div className="col-span-2 text-right font-mono text-gray-500">{formatCurrency(it.preco_unitario)}</div>
+                              <div className="col-span-3 text-right font-bold font-mono text-amber-900">{formatCurrency(it.quantidade_solicitada * it.preco_unitario)}</div>
                             </div>
-                            <div className="text-right">
-                              <p className="font-bold font-mono text-amber-900">{it.quantidade_solicitada} {store.unidadeSigla(prod?.unidade_producao_id || 0)}</p>
-                              <p className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(it.preco_unitario)} cada</p>
-                            </div>
+                            {it.observacao && <p className="text-[9px] text-gray-400 mt-1 ml-0.5">{it.observacao}</p>}
                           </div>
                         );
                       })}
@@ -1459,11 +1463,11 @@ ${pagHtml}
                   {/* Flow control status controls rows inside details */}
                   <div className="space-y-2">
                     <label className="text-[9px] font-bold uppercase text-amber-900/60 block">Mudança de Fase Operacional</label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {store.hasPermission('pedidos.editar') && (p.status_id === 1 || p.status_id === 2) && (
                         <button
                           onClick={() => handleOpenEditOrder(p.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg"
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
                           ✏️ Editar Pedido
                         </button>
@@ -1472,9 +1476,9 @@ ${pagHtml}
                       {store.hasPermission('pedidos.aprovar') && p.status_id === 1 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 2)}
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1 px-3 rounded-lg"
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
-                          Confirmar Encomenda ✔️
+                          ✔️ Confirmar Encomenda
                         </button>
                       )}
                       
@@ -1482,7 +1486,7 @@ ${pagHtml}
                         <button
                           onClick={() => handleTransitionStatus(p.id, 3)}
                           disabled={!analise.tudoDisponivelEmEstoquePronto && !analise.podeProduzirRestante}
-                          className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                          className="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
                           🥘 Iniciar Produção
                         </button>
@@ -1495,7 +1499,7 @@ ${pagHtml}
                             if (!result.success) { setCustomAlert({ title: 'Erro', message: result.error || 'Erro ao entregar do estoque' }); return; }
                             onUpdate();
                           }}
-                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1 text-[10px]"
+                          className="bg-sky-600 hover:bg-sky-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
                           🚚 Entregar do Estoque
                         </button>
@@ -1504,7 +1508,7 @@ ${pagHtml}
                       {store.hasPermission('pedidos.editar') && p.status_id === 3 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 4)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
                           🍳 Finalizar e Gerar Estoque
                         </button>
@@ -1513,7 +1517,7 @@ ${pagHtml}
                       {store.hasPermission('pedidos.editar') && p.status_id === 4 && (
                         <button
                           onClick={() => handleTransitionStatus(p.id, 5)}
-                          className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-1.5 px-3 rounded-lg flex items-center gap-1"
+                          className="bg-gray-800 hover:bg-gray-900 text-white font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
                           🚚 Entregar
                         </button>
@@ -1522,9 +1526,9 @@ ${pagHtml}
                       {store.hasPermission('pedidos.cancelar') && p.status_id !== 5 && p.status_id !== 6 && (
                         <button
                           onClick={() => setReverseConfirm({ pedidoId: p.id, targetStatus: 6, fromStatus: p.status_id })}
-                          className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-lg"
+                          className="bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 text-[10px]"
                         >
-                          Cancelar Pedido ❌
+                          ❌ Cancelar Pedido
                         </button>
                       )}
                     </div>

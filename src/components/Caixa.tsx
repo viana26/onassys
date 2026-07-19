@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Wallet, Search, DollarSign, TrendingUp, TrendingDown, Printer, X, CheckCircle2, AlertTriangle, Clock, User, CreditCard, Banknote, Smartphone, Landmark, ArrowLeftRight, ShoppingBag } from 'lucide-react';
+import { Wallet, Search, DollarSign, TrendingUp, TrendingDown, Printer, X, CheckCircle2, AlertTriangle, Clock, User, CreditCard, ArrowLeftRight, ShoppingBag } from 'lucide-react';
 import SelectSearch from './SelectSearch';
+import { FORMAS_PAGAMENTO } from '../lib/pagamento';
 
 const dataLocal = (d?: Date) => {
   const dt = d || new Date();
@@ -52,15 +53,6 @@ interface CaixaProps {
   onClearPreselected?: () => void;
   appName?: string;
 }
-
-const FORMAS_PAGAMENTO = [
-  { value: 'Dinheiro', label: 'Dinheiro', icon: <Banknote size={20} />, color: 'bg-emerald-600 hover:bg-emerald-500' },
-  { value: 'Pix', label: 'Pix', icon: <Smartphone size={20} />, color: 'bg-blue-600 hover:bg-blue-500' },
-  { value: 'Débito', label: 'Débito', icon: <CreditCard size={20} />, color: 'bg-indigo-600 hover:bg-indigo-500' },
-  { value: 'Crédito', label: 'Crédito', icon: <CreditCard size={20} />, color: 'bg-violet-600 hover:bg-violet-500' },
-  { value: 'Boleto', label: 'Boleto', icon: <CreditCard size={20} />, color: 'bg-orange-600 hover:bg-orange-500' },
-  { value: 'Transferência', label: 'Transferência', icon: <Landmark size={20} />, color: 'bg-slate-600 hover:bg-slate-500' },
-];
 
 function ComprovanteModal({ data, appName, onClose }: {
   data: ComprovanteData;
@@ -268,6 +260,10 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   // Comprovante
   const [comprovanteData, setComprovanteData] = useState<ComprovanteData | null>(null);
 
+  // Info modal de data
+  const [showDateInfo, setShowDateInfo] = useState(false);
+  const [dateInfoData, setDateInfoData] = useState('');
+
   // Relógio
   const [agora, setAgora] = useState(new Date());
   useEffect(() => {
@@ -334,7 +330,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       tipo: 'pagamento',
       pedidoId: selectedPedidoId,
       clienteNome: selectedCliente?.nome,
-      descricao: `Pagamento pedido #${selectedPedidoId.slice(-6)} - ${selectedCliente?.nome || ''}`,
+      descricao: `Pgto. pedido #${selectedPedidoId.slice(-6)} - ${selectedCliente?.nome || ''}`,
       valor: validaValor,
       valorRecebido: troco > 0 ? valorNumerico : undefined,
       troco: troco > 0 ? troco : undefined,
@@ -860,7 +856,15 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
               <input
                 type="date"
                 value={dataCaixa}
-                onChange={e => setDataCaixa(e.target.value || dataLocal())}
+                max={dataLocal()}
+                onChange={e => {
+                  const nova = e.target.value || dataLocal();
+                  setDataCaixa(nova);
+                  if (nova !== dataLocal()) {
+                    setDateInfoData(nova);
+                    setShowDateInfo(true);
+                  }
+                }}
                 className="text-xs p-1 px-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono focus:outline-none focus:ring-1 focus:ring-amber-500"
               />
             </div>
@@ -918,6 +922,31 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
           </div>
         </div>
       </div>
+
+      {/* Info Data Modal */}
+      {showDateInfo && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 border border-amber-100 dark:border-[#2e1a0a] space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-[#2d1e0d] flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-amber-700 dark:text-amber-400" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-amber-950 dark:text-amber-100">Data Alterada</h3>
+                <p className="text-[10px] text-gray-500">Extrato do Dia</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-amber-100/70 leading-relaxed">
+              Você selecionou o dia <strong className="text-amber-950 dark:text-amber-100">{fmtDataBR(dateInfoData)}</strong>.
+              Todas as movimentações lançadas no Caixa usarão <strong>esta data</strong> como referência em <strong>data_lancamento</strong>, independentemente da data atual.
+            </p>
+            <button onClick={() => setShowDateInfo(false)}
+              className="w-full py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-bold transition shadow-sm">
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Comprovante Modal */}
       {comprovanteData && (
