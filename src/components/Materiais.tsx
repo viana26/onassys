@@ -1082,7 +1082,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   placeholder="Ex: Quilograma, Litro, Dúzia"
                   className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-[30%_70%] gap-3">
                 <div>
                   <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Sigla *</label>
                   <input type="text" value={novaUnidadeSigla} onChange={e => setNovaUnidadeSigla(e.target.value)} required

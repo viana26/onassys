@@ -78,6 +78,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const [novaUnidadeTipo, setNovaUnidadeTipo] = useState<'massa' | 'volume' | 'unidade'>('massa');
   const [savingUnidade, setSavingUnidade] = useState(false);
 
+  // Custom alert modal
+  const [customAlert, setCustomAlert] = useState<{ title?: string; message: string } | null>(null);
+
   // Ficha técnica temporary builder list in the form
   const [recipeItems, setRecipeItems] = useState<{ material_id: string; quantidade_necessaria: number; unidade_id: number }[]>([]);
 
@@ -127,7 +130,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       setImagem(previewUrl);
     } catch (err) {
       console.error('Erro ao processar imagem:', err);
-      alert('Erro ao comprimir imagem. Tente outro arquivo.');
+      setCustomAlert({ title: 'Erro na imagem', message: 'Erro ao comprimir imagem. Tente outro arquivo.' });
     } finally {
       setImageCompressing(false);
     }
@@ -238,13 +241,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
   const handleAddRecipeRow = () => {
     if (store.materiais.length === 0) {
-      alert('Por favor, cadastre matérias-primas primeiro!');
+      setCustomAlert({ title: 'Nenhum insumo', message: 'Por favor, cadastre matérias-primas primeiro!' });
       return;
     }
     const usedIds = recipeItems.map(r => r.material_id);
     const unused = store.materiais.find(m => !usedIds.includes(m.id));
     if (!unused) {
-      alert('Todos os ingredientes disponíveis já foram adicionados à receita.');
+      setCustomAlert({ title: 'Limite atingido', message: 'Todos os ingredientes disponíveis já foram adicionados à receita.' });
       return;
     }
     setRecipeItems([
@@ -299,14 +302,19 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) {
-      alert('Favor preencher o nome do produto e a unidade de produção.');
+      setCustomAlert({ title: 'Campos obrigatórios', message: 'Favor preencher o nome do produto e a unidade de produção.' });
+      return;
+    }
+
+    if (recipeItems.length === 0) {
+      setCustomAlert({ title: 'Ficha técnica vazia', message: 'Adicione pelo menos 1 ingrediente na composição da receita.' });
       return;
     }
 
     const matIds = recipeItems.map(r => r.material_id);
     const hasDuplicate = matIds.some((val, i) => matIds.indexOf(val) !== i);
     if (hasDuplicate) {
-      alert('Atenção: Você incluiu o mesmo ingrediente mais de uma vez na receita do produto. Junte as quantidades para salvar em linha única.');
+      setCustomAlert({ title: 'Ingrediente duplicado', message: 'Você incluiu o mesmo ingrediente mais de uma vez na receita do produto. Junte as quantidades para salvar em linha única.' });
       return;
     }
 
@@ -718,8 +726,8 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   data-help={tab.key === 'receita' ? 'produtos-ficha' : undefined}
                   className={`flex-1 py-2.5 text-[9px] font-bold uppercase tracking-wider transition cursor-pointer ${
                     formTab === tab.key
-                      ? 'border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100'
-                      : 'text-gray-400 dark:text-amber-100/30 hover:text-amber-950 dark:hover:text-amber-200'
+                      ? 'bg-amber-50/80 dark:bg-amber-950/40 border-b-2 border-amber-700 dark:border-amber-400 text-amber-950 dark:text-amber-100'
+                      : 'text-gray-400 dark:text-amber-100/30 hover:text-amber-950 dark:hover:text-amber-200 hover:bg-amber-50/40 dark:hover:bg-amber-950/10'
                   }`}
                 >
                   {tab.label}
@@ -737,11 +745,11 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Nome *</label>
-                        <input type="text" value={nome} onChange={(e) => setNome(e.target.value)}
+                        <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} data-help="produtos-nome"
                           placeholder="Ex: Coxinha de Frango"
                           className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400" required />
                       </div>
-                      <div className="space-y-1">
+                      <div className="space-y-1" data-help="produtos-categoria">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Categoria *</label>
                         <SelectSearch value={String(categoriaId)} onChange={v => setCategoriaId(Number(v))}
                           options={store.categorias.map(cat => ({value: String(cat.id), label: cat.nome}))}
@@ -751,7 +759,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex-1 space-y-1 min-w-0" data-help="produtos-unidade">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Unidade *</label>
                         <div className="flex gap-2">
                           <SelectSearch value={String(unidadeProducaoId)} onChange={v => setUnidadeProducaoId(Number(v))}
@@ -762,7 +770,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                             className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-semibold rounded-lg transition shrink-0">+ Nova</button>
                         </div>
                       </div>
-                      <div className="w-full sm:w-28 space-y-1 shrink-0">
+                      <div className="w-full sm:w-28 space-y-1 shrink-0" data-help="produtos-tempo">
                         <label className="text-amber-900 dark:text-amber-100 font-medium">Tempo (min)</label>
                         <input type="number" value={tempoProducao} onChange={(e) => setTempoProducao(Number(e.target.value))}
                           {...useSmartArrowKeys(tempoProducao, setTempoProducao)}
@@ -824,50 +832,6 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       </button>
                     </div>
 
-                    <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20 space-y-2">
-                      <h5 className="font-bold text-emerald-800 dark:text-emerald-450 uppercase tracking-widest text-[9px]">💸 Precificação</h5>
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="space-y-0.5">
-                          <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
-                          <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Markup / % s/ custo</label>
-                          <div className="relative">
-                            <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
-                            <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
-                          </div>
-                        </div>
-                        <div className="space-y-0.5">
-                          <span className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem de Lucro</span>
-                          <p className={`p-2 border border-dashed rounded-lg font-mono text-xs h-8 flex items-center justify-center font-bold ${
-                            liveCustoProducao > 0 && precoVenda > 0
-                              ? precoVenda > liveCustoProducao
-                                ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                                : 'bg-red-50/60 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
-                              : 'bg-amber-50/10 dark:bg-amber-950/5 border-amber-100 dark:border-amber-950/50 text-gray-400 dark:text-amber-100/30'
-                          }`}>
-                            {liveCustoProducao > 0 && precoVenda > 0
-                              ? precoVenda > liveCustoProducao
-                                ? ((1 - liveCustoProducao / precoVenda) * 100).toFixed(1) + '%'
-                                : 'prejuízo'
-                              : '—'}
-                          </p>
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
-                          <div className="relative">
-                            <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
-                            <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
-                              {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
-                              className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
                     {recipeItems.length === 0 ? (
                       <div className="bg-amber-50/10 dark:bg-amber-950/5 rounded-xl p-4 border border-amber-50 dark:border-[#2d1e0d] text-center text-gray-400 dark:text-amber-100/30">
                         <p className="text-xs">Nenhum ingrediente adicionado.</p>
@@ -905,10 +869,10 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                     </td>
                                     <td className="px-2 py-1.5">
                                       <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
-                                        <input type="number" step="any" min="0.0001" placeholder="0.5"
+                                        <input type="number" step="0.001" min="0.001" placeholder="0,500"
                                           value={item.quantidade_necessaria}
                                           onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
-                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.0001)}
+                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
                                           className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
                                         <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[9px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
                                           {store.unidadeSigla(item.unidade_id)}
@@ -949,15 +913,15 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                   className="w-full" />
                                 <div className="flex items-center gap-2">
                                   <div className="flex-1 flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
-                                    <input type="number" step="any" min="0.0001" placeholder="0.5"
-                                      value={item.quantidade_necessaria}
-                                      onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
-                                      {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.0001)}
-                                      className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
-                                    <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                                      {store.unidadeSigla(item.unidade_id)}
-                                    </span>
-                                  </div>
+                                      <input type="number" step="0.001" min="0.001" placeholder="0,500"
+                                          value={item.quantidade_necessaria}
+                                          onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
+                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
+                                          className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
+                                        <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
+                                          {store.unidadeSigla(item.unidade_id)}
+                                        </span>
+                                      </div>
                                   <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100 whitespace-nowrap">
                                     {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
                                   </span>
@@ -979,19 +943,86 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
             </form>
 
               {/* Footer */}
-              <div className="flex items-center gap-3 px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0">
-                <button type="button" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }}
-                  className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
-                  Cancelar
-                </button>
-                <button type="submit" form="modal-product-form"
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
-                  {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
-                </button>
+              <div className="px-5 py-3 border-t border-amber-100 dark:border-[#2d1e0d] flex-shrink-0 space-y-2">
+                <div className="p-3 bg-gradient-to-br from-emerald-50/10 to-teal-50/5 dark:from-emerald-950/5 dark:to-teal-950/5 rounded-xl border border-emerald-100/30 dark:border-emerald-950/20">
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="space-y-0.5">
+                      <span className="text-gray-400 dark:text-amber-100/40 text-[10px] block">Custo Unit.</span>
+                      <p className="p-2 border border-dashed border-amber-100 dark:border-amber-950/50 rounded-lg bg-amber-50/10 dark:bg-amber-950/5 text-gray-500 dark:text-amber-200/50 font-mono text-xs h-8 flex items-center">{formatCurrency(liveCustoProducao)}</p>
+                    </div>
+                    <div className="space-y-0.5" data-help="produtos-markup">
+                      <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Markup / % s/ custo</label>
+                      <div className="relative">
+                        <input type="number" value={margemLucro} onChange={(e) => handleMargemChange(Math.max(0, Number(e.target.value)))}
+                          {...useSmartArrowKeys(margemLucro, (v) => handleMargemChange(Math.max(0, v)), 0)}
+                          className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 pr-6" min="0" />
+                        <span className="absolute right-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-amber-900 dark:text-amber-100 text-[10px] block">Margem de Lucro</span>
+                      <p className={`p-2 border border-dashed rounded-lg font-mono text-xs h-8 flex items-center justify-center font-bold ${
+                        liveCustoProducao > 0 && precoVenda > 0
+                          ? precoVenda > liveCustoProducao
+                            ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                            : 'bg-red-50/60 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+                          : 'bg-amber-50/10 dark:bg-amber-950/5 border-amber-100 dark:border-amber-950/50 text-gray-400 dark:text-amber-100/30'
+                      }`}>
+                        {liveCustoProducao > 0 && precoVenda > 0
+                          ? precoVenda > liveCustoProducao
+                            ? ((1 - liveCustoProducao / precoVenda) * 100).toFixed(1) + '%'
+                            : 'prejuízo'
+                          : '—'}
+                      </p>
+                    </div>
+                    <div className="space-y-0.5" data-help="produtos-preco">
+                      <label className="text-amber-900 dark:text-amber-100 text-[10px] block">Preço Venda</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-2 text-gray-400 dark:text-amber-100/30 text-[10px]">R$</span>
+                        <input type="number" step="0.01" value={precoVenda} onChange={(e) => handlePrecoVendaChange(Math.max(0, Number(e.target.value)))}
+                          {...useSmartArrowKeys(precoVenda, (v) => handlePrecoVendaChange(Math.max(0, v)), 0)}
+                          className="w-full p-2 pl-6 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-emerald-800 dark:text-emerald-450 font-bold" min="0" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => { cleanupImagePreview(); setIsFormOpen(false); }}
+                    className="flex-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold py-2.5 rounded-xl text-center cursor-pointer text-xs">
+                    Cancelar
+                  </button>
+                  <button type="submit" form="modal-product-form"
+                    className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold py-2.5 rounded-xl text-center shadow-md text-xs cursor-pointer">
+                    {editId ? 'Salvar Alterações' : 'Confirmar Cadastro'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </>
+      )}
+
+      {/* Custom alert modal */}
+      {customAlert && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-amber-100 dark:border-[#2e1a0a]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-amber-950 dark:text-amber-50">{customAlert.title || 'Atenção'}</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-amber-100/70 mb-2">
+              {customAlert.message}
+            </p>
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setCustomAlert(null)}
+                className="py-2 px-6 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold transition">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* MODAL: Quick-add unidade */}
@@ -1009,7 +1040,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                   placeholder="Ex: Quilograma, Litro, Dúzia"
                   className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-[30%_70%] gap-3">
                 <div>
                   <label className="text-xs text-amber-950 dark:text-amber-100 font-medium">Sigla *</label>
                   <input type="text" value={novaUnidadeSigla} onChange={e => setNovaUnidadeSigla(e.target.value)} required

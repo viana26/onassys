@@ -706,6 +706,8 @@ CREATE POLICY "perfis_usuario_all" ON public.perfis_usuario FOR ALL TO authentic
 -- Lookup tables: SELECT policies
 DROP POLICY IF EXISTS "unidades_select" ON public.unidades;
 CREATE POLICY "unidades_select" ON public.unidades FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "unidades_insert" ON public.unidades;
+CREATE POLICY "unidades_insert" ON public.unidades FOR INSERT TO authenticated WITH CHECK (true);
 DROP POLICY IF EXISTS "categorias_select" ON public.categorias;
 CREATE POLICY "categorias_select" ON public.categorias FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "status_pedido_select" ON public.status_pedido;
