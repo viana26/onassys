@@ -11,6 +11,9 @@ const getLogoUrl = (store: MiniFactoryStore) => store.dadosEmpresa?.logo_url || 
 const getSlogan = (store: MiniFactoryStore) => store.dadosEmpresa?.slogan || 'Sistema de Gestão de Produção e Pedidos';
 
 const pagamentoLabel: Record<string, string> = {
+  Dinheiro: 'Dinheiro', Pix: 'Pix', Crédito: 'Crédito',
+  Débito: 'Débito', Boleto: 'Boleto', Transferência: 'Transferência',
+  // fallback para dados antigos (se existirem)
   dinheiro: 'Dinheiro', pix: 'Pix', cartao_credito: 'Crédito',
   cartao_debito: 'Débito', boleto: 'Boleto', transferencia: 'Transferência',
 };

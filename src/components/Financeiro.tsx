@@ -4,28 +4,32 @@ import { LancamentoFinanceiro } from '../types';
 import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, Search, Filter, FilterX, X, AlertTriangle, BarChart3, Tag, Edit2, Check, ChevronDown, ChevronRight, ChevronLeft, Receipt, Wallet, CreditCard } from 'lucide-react';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
+
+
 import SelectSearch from './SelectSearch';
 import MovimentacoesFinanceiras from './Relatorios/MovimentacoesFinanceiras';
 
+// Helpers
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d: string) => d ? d.substring(0, 10).split('-').reverse().join('/') : '—';
 
+// Icons and labels for payment methods (chaves = rótulos legíveis salvos no banco)
 const pagamentoIcons: Record<string, React.ReactNode> = {
-  dinheiro: <Wallet size={12} />,
-  pix: <DollarSign size={12} />,
-  cartao_credito: <CreditCard size={12} />,
-  cartao_debito: <CreditCard size={12} />,
-  boleto: <Receipt size={12} />,
-  transferencia: <TrendingUp size={12} />,
+  Dinheiro: <Wallet size={12} />,
+  Pix: <DollarSign size={12} />,
+  Crédito: <CreditCard size={12} />,
+  Débito: <CreditCard size={12} />,
+  Boleto: <Receipt size={12} />,
+  Transferência: <TrendingUp size={12} />,
 };
 
 const pagamentoLabel: Record<string, string> = {
-  dinheiro: 'Dinheiro',
-  pix: 'Pix',
-  cartao_credito: 'Crédito',
-  cartao_debito: 'Débito',
-  boleto: 'Boleto',
-  transferencia: 'Transferência',
+  Dinheiro: 'Dinheiro',
+  Pix: 'Pix',
+  Crédito: 'Crédito',
+  Débito: 'Débito',
+  Boleto: 'Boleto',
+  Transferência: 'Transferência',
 };
 
 interface FinanceiroProps {
@@ -216,7 +220,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 </td>
                 <td className="px-4 py-3 text-xs text-[#5c4a37] dark:text-amber-100/70 flex items-center gap-1.5">
                   {pagamentoIcons[l.forma_pagamento || ''] || null}
-                  {pagamentoLabel[l.forma_pagamento || ''] || '—'}
+                  {pagamentoLabel[l.forma_pagamento || ''] || l.forma_pagamento || '—'}
                 </td>
                 <td className={`px-4 py-3 text-right text-sm font-bold font-mono ${l.tipo === 'receita' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                   {l.tipo === 'receita' ? '+' : '-'}{brl(l.valor)}
@@ -276,7 +280,7 @@ export default function Financeiro({ store, onUpdate }: FinanceiroProps) {
                 </span>
                 <span className="flex items-center gap-1 text-[#5c4a37]/60 dark:text-amber-100/40">
                   {pagamentoIcons[l.forma_pagamento || ''] || null}
-                  {pagamentoLabel[l.forma_pagamento || ''] || '—'}
+                  {pagamentoLabel[l.forma_pagamento || ''] || l.forma_pagamento || '—'}
                 </span>
               </div>
               {store.hasPermission('financeiro.lancar') && (
@@ -463,7 +467,7 @@ function NovoLancamentoModal({ store, initialTipo, initialData, onClose, onSaved
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Pagamento</label>
-              <SelectSearch value={formaPagamento} onChange={v => setFormaPagamento(v)} options={[{ value: '', label: 'Selecione' }, { value: 'dinheiro', label: 'Dinheiro' }, { value: 'pix', label: 'Pix' }, { value: 'cartao_credito', label: 'Crédito' }, { value: 'cartao_debito', label: 'Débito' }, { value: 'boleto', label: 'Boleto' }, { value: 'transferencia', label: 'Transferência' }]} placeholder="Filtrar por pagamento" />
+              <SelectSearch value={formaPagamento} onChange={v => setFormaPagamento(v)} options={[{ value: '', label: 'Selecione' }, { value: 'Dinheiro', label: 'Dinheiro' }, { value: 'Pix', label: 'Pix' }, { value: 'Débito', label: 'Débito' }, { value: 'Crédito', label: 'Crédito' }, { value: 'Boleto', label: 'Boleto' }, { value: 'Transferência', label: 'Transferência' }]} placeholder="Forma de pagamento" />
             </div>
             <div>
               <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Valor</label>

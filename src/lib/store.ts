@@ -430,12 +430,15 @@ export class MiniFactoryStore {
     if (!mat) return;
 
     const unitPrice = custoUnitario !== undefined && custoUnitario >= 0 ? custoUnitario : mat.custo_unitario;
+    const tipoEntradaCompra = this.tiposMovimentacao.find(t => t.nome === 'Entrada Compra');
+    const tipoId = tipoEntradaCompra ? tipoEntradaCompra.id : 1;
+
     const mov: MovimentacaoMaterial = {
       id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
       material_id: id,
-      tipo_id: 1,
+      tipo_id: tipoId,
       quantidade,
-      observacao,
+      observacao: observacao?.trim() || 'Entrada Compra',
       valor_pago: unitPrice * quantidade,
       custo_unitario: unitPrice,
       criado_em: new Date().toISOString()
@@ -472,6 +475,57 @@ export class MiniFactoryStore {
       }
       this.saveToLocalStorage(); this.notify();
     }
+  }
+
+  async ajustarEstoqueMaterial(materialId: string, novoSaldo: number, observacao?: string): Promise<{ success: boolean; error?: string }> {
+    const idx = this.materiais.findIndex(m => m.id === materialId);
+    if (idx === -1) return { success: false, error: 'Insumo não encontrado.' };
+    const antigo = this.materiais[idx].quantidade_atual;
+    if (novoSaldo === antigo) return { success: true };
+
+    const delta = novoSaldo - antigo;
+    let tipoId = 3;
+    let qtdMov = delta;
+    if (delta < 0) {
+      const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
+      if (tipoSaida) tipoId = tipoSaida.id;
+      qtdMov = Math.abs(delta);
+    } else {
+      const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
+      if (tipoEntrada) tipoId = tipoEntrada.id;
+    }
+
+    const mov: MovimentacaoMaterial = {
+      id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
+      material_id: materialId,
+      tipo_id: tipoId,
+      quantidade: qtdMov,
+      custo_unitario: this.materiais[idx].custo_unitario,
+      observacao: observacao || `Ajuste manual: ${antigo} → ${novoSaldo}`,
+      criado_em: new Date().toISOString()
+    };
+
+    const atualizado = {
+      ...this.materiais[idx],
+      quantidade_atual: novoSaldo,
+      data_ultima_atualizacao: new Date().toISOString()
+    };
+
+    const okMat = await this.supabaseUpdate('materiais', materialId, atualizado as unknown as Record<string, unknown>);
+    if (!okMat) return { success: false, error: this.error || 'Erro ao atualizar estoque no servidor.' };
+
+    const okMov = await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>);
+    if (!okMov) {
+      const revertido = { ...atualizado, quantidade_atual: antigo };
+      await this.supabaseUpdate('materiais', materialId, revertido as unknown as Record<string, unknown>);
+      return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+    }
+
+    this.materiais = this.materiais.map((m, i) => i === idx ? atualizado : m);
+    this.movMateriais = [mov, ...this.movMateriais];
+    this.saveToLocalStorage();
+    this.notify();
+    return { success: true };
   }
 
   // ================================================
@@ -787,9 +841,12 @@ export class MiniFactoryStore {
       updatesMatLocal.push({ idx: this.materiais.indexOf(mat), dados: dadosMat });
       matPromises.push(this.supabaseUpdate('materiais', matId, dadosMat as unknown as Record<string, unknown>));
 
+      const tipoSaidaProducao = this.tiposMovimentacao.find(t => t.nome === 'Saída Produção');
+      const tipoIdMat = tipoSaidaProducao ? tipoSaidaProducao.id : 2;
+
       const mov: MovimentacaoMaterial = {
         id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
-        material_id: matId, tipo_id: 2, quantidade: totalQtd,
+        material_id: matId, tipo_id: tipoIdMat, quantidade: totalQtd,
         observacao: pedidoId ? `Consumo por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Produção avulsa',
         criado_em: new Date().toISOString()
       };
@@ -832,9 +889,12 @@ export class MiniFactoryStore {
         prodPromises.push(this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>));
       }
 
+      const tipoEntradaProducao = this.tiposMovimentacao.find(t => t.nome === 'Entrada Produção');
+      const tipoIdProd = tipoEntradaProducao ? tipoEntradaProducao.id : 5;
+
       const movProd: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
-        produto_id: item.produto_id, tipo_id: 4, quantidade: item.quantidade_solicitada,
+        produto_id: item.produto_id, tipo_id: tipoIdProd, quantidade: item.quantidade_solicitada,
         pedido_id: pedidoId, observacao: observacao || (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
         usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
@@ -984,9 +1044,12 @@ export class MiniFactoryStore {
         updatesEstoqueSaida.push({ idx, dados: updated });
         saidaPromises.push(this.supabaseUpdate('estoque_produtos', updated.id, updated as unknown as Record<string, unknown>));
       }
+      const tipoSaidaPedido = this.tiposMovimentacao.find(t => t.nome === 'Saída Pedido');
+      const tipoIdSaida = tipoSaidaPedido ? tipoSaidaPedido.id : 6;
+
       const mov: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
-        produto_id: item.produto_id, tipo_id: 5, quantidade: item.quantidade_solicitada,
+        produto_id: item.produto_id, tipo_id: tipoIdSaida, quantidade: item.quantidade_solicitada,
         pedido_id: pedidoId, observacao: `Saída por entrega — Pedido #${pedidoId.slice(-6).toUpperCase()}`,
         usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
@@ -1015,8 +1078,10 @@ export class MiniFactoryStore {
 
       if (opts.restaurarInsumos) {
         const shortId = pedidoId.slice(-6).toUpperCase();
+        const tipoSaidaProducao = this.tiposMovimentacao.find(t => t.nome === 'Saída Produção');
+        const tipoSaidaProducaoId = tipoSaidaProducao ? tipoSaidaProducao.id : 2;
         const movsMateriais = this.movMateriais.filter(m =>
-          m.observacao?.includes(shortId) && m.tipo_id === 2
+          m.observacao?.includes(shortId) && m.tipo_id === tipoSaidaProducaoId
         );
         for (const mov of movsMateriais) {
           const mat = this.materiais.find(m => m.id === mov.material_id);
@@ -1034,7 +1099,9 @@ export class MiniFactoryStore {
       }
 
       if (opts.removerProdutos) {
-        const movsEntrada = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 4);
+        const tipoEntradaProducao = this.tiposMovimentacao.find(t => t.nome === 'Entrada Produção');
+        const tipoEntradaId = tipoEntradaProducao ? tipoEntradaProducao.id : 5;
+        const movsEntrada = this.movProdutos.filter(m => m.pedido_id === pedidoId && (m.tipo_id === tipoEntradaId || m.tipo_id === 4));
         for (const mov of movsEntrada) {
           const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
           if (estoque) {
@@ -1049,7 +1116,9 @@ export class MiniFactoryStore {
       }
 
       if (opts.reporEstoque) {
-        const movsSaida = this.movProdutos.filter(m => m.pedido_id === pedidoId && m.tipo_id === 5);
+        const tipoSaidaPedido = this.tiposMovimentacao.find(t => t.nome === 'Saída Pedido');
+        const tipoSaidaId = tipoSaidaPedido ? tipoSaidaPedido.id : 6;
+        const movsSaida = this.movProdutos.filter(m => m.pedido_id === pedidoId && (m.tipo_id === tipoSaidaId || m.tipo_id === 5));
         for (const mov of movsSaida) {
           const estoque = this.estoqueProdutos.find(e => e.produto_id === mov.produto_id);
           if (estoque) {

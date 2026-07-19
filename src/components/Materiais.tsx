@@ -642,7 +642,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                       const isEntrada = tipo?.natureza === 'entrada';
                       const dateObj = mov.criado_em ? new Date(mov.criado_em) : null;
                       const isDateValid = dateObj && !isNaN(dateObj.getTime());
-                      const valPago = (mov.valor_pago ?? mov.custo_unitario ?? mat?.custo_unitario ?? 0) * mov.quantidade;
+                      const valPago = mov.valor_pago ?? (mov.custo_unitario ?? mat?.custo_unitario ?? 0) * mov.quantidade;
 
                       return (
                         <tr key={mov.id} className={`border-b border-amber-50/50 dark:border-[#22160b]/40 transition ${histSelected.has(mov.id) ? 'bg-amber-100/30 dark:bg-amber-950/20' : 'hover:bg-amber-50/20 dark:hover:bg-amber-950/10'}`}>

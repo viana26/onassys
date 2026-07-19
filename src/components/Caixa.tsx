@@ -54,12 +54,12 @@ interface CaixaProps {
 }
 
 const FORMAS_PAGAMENTO = [
-  { value: 'dinheiro', label: 'Dinheiro', icon: <Banknote size={20} />, color: 'bg-emerald-600 hover:bg-emerald-500' },
-  { value: 'pix', label: 'Pix', icon: <Smartphone size={20} />, color: 'bg-blue-600 hover:bg-blue-500' },
-  { value: 'cartao_credito', label: 'Crédito', icon: <CreditCard size={20} />, color: 'bg-violet-600 hover:bg-violet-500' },
-  { value: 'cartao_debito', label: 'Débito', icon: <CreditCard size={20} />, color: 'bg-indigo-600 hover:bg-indigo-500' },
-  { value: 'boleto', label: 'Boleto', icon: <CreditCard size={20} />, color: 'bg-orange-600 hover:bg-orange-500' },
-  { value: 'transferencia', label: 'Transferência', icon: <Landmark size={20} />, color: 'bg-slate-600 hover:bg-slate-500' },
+  { value: 'Dinheiro', label: 'Dinheiro', icon: <Banknote size={20} />, color: 'bg-emerald-600 hover:bg-emerald-500' },
+  { value: 'Pix', label: 'Pix', icon: <Smartphone size={20} />, color: 'bg-blue-600 hover:bg-blue-500' },
+  { value: 'Débito', label: 'Débito', icon: <CreditCard size={20} />, color: 'bg-indigo-600 hover:bg-indigo-500' },
+  { value: 'Crédito', label: 'Crédito', icon: <CreditCard size={20} />, color: 'bg-violet-600 hover:bg-violet-500' },
+  { value: 'Boleto', label: 'Boleto', icon: <CreditCard size={20} />, color: 'bg-orange-600 hover:bg-orange-500' },
+  { value: 'Transferência', label: 'Transferência', icon: <Landmark size={20} />, color: 'bg-slate-600 hover:bg-slate-500' },
 ];
 
 function ComprovanteModal({ data, appName, onClose }: {
@@ -233,22 +233,22 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPedidoId, setSelectedPedidoId] = useState<string | null>(preselectedPedidoId || null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState('pix');
+  const [formaPagamento, setFormaPagamento] = useState('Pix');
   const [activeForm, setActiveForm] = useState<'receber' | 'receita' | 'despesa' | 'venda' | null>('receber');
 
   // Receita livre fields
   const [livreValor, setLivreValor] = useState('');
   const [livreDescricao, setLivreDescricao] = useState('');
-  const [livreForma, setLivreForma] = useState('pix');
+  const [livreForma, setLivreForma] = useState('Pix');
 
   // Despesa fields
   const [despValor, setDespValor] = useState('');
   const [despDescricao, setDespDescricao] = useState('');
-  const [despForma, setDespForma] = useState('pix');
+  const [despForma, setDespForma] = useState('Pix');
 
   // Venda Direta (controlled by activeForm)
   const [vdClienteId, setVdClienteId] = useState('');
-  const [vdForma, setVdForma] = useState('pix');
+  const [vdForma, setVdForma] = useState('Pix');
   const [vdCategoriaId, setVdCategoriaId] = useState<number>(() => {
     const cat = store.categoriasFinanceiro.find(c => c.nome === 'Venda de Produtos');
     return cat?.id || 0;
@@ -302,7 +302,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
   const isPago = saldoRestante <= 0;
 
   const valorNumerico = parseFloat((paymentAmount || '0').replace(',', '.'));
-  const troco = formaPagamento === 'dinheiro' && valorNumerico > saldoRestante ? valorNumerico - saldoRestante : 0;
+  const troco = formaPagamento === 'Dinheiro' && valorNumerico > saldoRestante ? valorNumerico - saldoRestante : 0;
   const valorRegistrar = troco > 0 ? saldoRestante : (valorNumerico > saldoRestante ? saldoRestante : valorNumerico);
 
   const lancamentosHoje = store.lancamentos.filter(l => getLancamentoLocalDate(l.data_lancamento) === dataCaixa);
@@ -316,7 +316,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
       ? store.lancamentos.filter(l => l.pedido_id === id && l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
       : 0;
     setPaymentAmount((p ? p.valor_total - recebido : 0).toFixed(2));
-    setFormaPagamento('pix');
+    setFormaPagamento('Pix');
     if (onClearPreselected) onClearPreselected();
   };
 
@@ -772,7 +772,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                           {FORMAS_PAGAMENTO.map(f => (
                             <button
                               key={f.value}
-                              onClick={() => { setFormaPagamento(f.value); if (f.value !== 'dinheiro' && troco > 0) setPaymentAmount(saldoRestante.toFixed(2)); }}
+                              onClick={() => { setFormaPagamento(f.value); if (f.value !== 'Dinheiro' && troco > 0) setPaymentAmount(saldoRestante.toFixed(2)); }}
                               className={`flex flex-col items-center py-1.5 rounded-xl text-[9px] font-bold text-white transition shadow-sm ${
                                 formaPagamento === f.value
                                   ? f.color + ' ring-2 ring-offset-1 ring-amber-500 scale-105'
@@ -824,7 +824,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                         )}
                       </div>
 
-                      {valorNumerico > saldoRestante && formaPagamento !== 'dinheiro' && (
+                      {valorNumerico > saldoRestante && formaPagamento !== 'Dinheiro' && (
                         <div className="p-1.5 bg-amber-50 dark:bg-[#2d1e0d] border border-amber-200 dark:border-[#3d2e1d] rounded-xl flex items-center gap-1 text-[9px] text-amber-800 dark:text-amber-300">
                           <AlertTriangle size={10} />
                           Valor maior que o saldo. Será registrado apenas {brl(saldoRestante)}.

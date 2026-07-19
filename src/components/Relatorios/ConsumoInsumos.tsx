@@ -22,7 +22,9 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
 
   const ranking = useMemo(() => {
     const movProducao = store.movMateriais.filter(m => {
-      if (m.tipo_id !== 2) return false;
+      const tipoSaidaProducao = store.tiposMovimentacao.find(t => t.nome === 'Saída Produção');
+      const tipoId = tipoSaidaProducao ? tipoSaidaProducao.id : 2;
+      if (m.tipo_id !== tipoId) return false;
       if (dataInicio && new Date(m.criado_em) < new Date(dataInicio)) return false;
       if (dataFim) {
         const fim = new Date(dataFim);

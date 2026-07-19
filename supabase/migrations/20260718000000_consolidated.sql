@@ -55,15 +55,18 @@ CREATE TABLE IF NOT EXISTS public.unidades (
     fator_base DECIMAL(12, 6) DEFAULT 1
 );
 
-INSERT INTO public.unidades (sigla, nome, tipo) VALUES
-    ('kg', 'Quilograma', 'massa'),
-    ('g', 'Grama', 'massa'),
-    ('L', 'Litro', 'volume'),
-    ('mL', 'Mililitro', 'volume'),
-    ('un', 'Unidade', 'unidade'),
-    ('cx', 'Caixa', 'unidade'),
-    ('pc', 'Pacote', 'unidade')
+INSERT INTO public.unidades (id, sigla, nome, tipo) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'kg', 'Quilograma', 'massa'),
+    (2, 'g', 'Grama', 'massa'),
+    (3, 'L', 'Litro', 'volume'),
+    (4, 'mL', 'Mililitro', 'volume'),
+    (5, 'un', 'Unidade', 'unidade'),
+    (6, 'cx', 'Caixa', 'unidade'),
+    (7, 'pc', 'Pacote', 'unidade')
 ON CONFLICT (sigla) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.unidades', 'id'), COALESCE((SELECT MAX(id) FROM public.unidades), 1));
 
 -- =====================================================
 -- LOOKUP: CATEGORIAS DE PRODUTO
@@ -74,13 +77,16 @@ CREATE TABLE IF NOT EXISTS public.categorias (
     cor VARCHAR(7) DEFAULT '#d97706'
 );
 
-INSERT INTO public.categorias (nome, cor) VALUES
-    ('Salgado', '#d97706'),
-    ('Doce', '#dc2626'),
-    ('Bolo', '#7c3aed'),
-    ('Bebida', '#2563eb'),
-    ('Outro', '#6b7280')
+INSERT INTO public.categorias (id, nome, cor) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Salgado', '#d97706'),
+    (2, 'Doce', '#dc2626'),
+    (3, 'Bolo', '#7c3aed'),
+    (4, 'Bebida', '#2563eb'),
+    (5, 'Outro', '#6b7280')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.categorias', 'id'), COALESCE((SELECT MAX(id) FROM public.categorias), 1));
 
 -- =====================================================
 -- LOOKUP: STATUS PEDIDO
@@ -92,14 +98,17 @@ CREATE TABLE IF NOT EXISTS public.status_pedido (
     cor VARCHAR(7) DEFAULT '#6b7280'
 );
 
-INSERT INTO public.status_pedido (nome, ordem, cor) VALUES
-    ('Rascunho', 0, '#9ca3af'),
-    ('Confirmado', 1, '#2563eb'),
-    ('Em Produção', 2, '#d97706'),
-    ('Pronto', 3, '#059669'),
-    ('Entregue', 4, '#16a34a'),
-    ('Cancelado', 5, '#dc2626')
+INSERT INTO public.status_pedido (id, nome, ordem, cor) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Rascunho', 0, '#9ca3af'),
+    (2, 'Confirmado', 1, '#2563eb'),
+    (3, 'Em Produção', 2, '#d97706'),
+    (4, 'Pronto', 3, '#059669'),
+    (5, 'Entregue', 4, '#16a34a'),
+    (6, 'Cancelado', 5, '#dc2626')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.status_pedido', 'id'), COALESCE((SELECT MAX(id) FROM public.status_pedido), 1));
 
 -- =====================================================
 -- LOOKUP: TIPOS DE MOVIMENTAÇÃO
@@ -111,15 +120,19 @@ CREATE TABLE IF NOT EXISTS public.tipos_movimentacao (
     entidade VARCHAR(20) NOT NULL CHECK (entidade IN ('produto', 'material', 'ambos'))
 );
 
-INSERT INTO public.tipos_movimentacao (nome, natureza, entidade) VALUES
-    ('Entrada Compra', 'entrada', 'material'),
-    ('Saída Produção', 'saida', 'material'),
-    ('Ajuste Estoque (Entrada)', 'entrada', 'ambos'),
-    ('Ajuste Estoque (Saída)', 'saida', 'ambos'),
-    ('Entrada Produção', 'entrada', 'produto'),
-    ('Saída Pedido', 'saida', 'produto'),
-    ('Venda Direta', 'saida', 'produto')
+INSERT INTO public.tipos_movimentacao (id, nome, natureza, entidade) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Entrada Compra', 'entrada', 'material'),
+    (2, 'Saída Produção', 'saida', 'material'),
+    (3, 'Ajuste Estoque (Entrada)', 'entrada', 'ambos'),
+    (4, 'Ajuste Estoque (Saída)', 'saida', 'ambos'),
+    (5, 'Entrada Produção', 'entrada', 'produto'),
+    (6, 'Saída Pedido', 'saida', 'produto'),
+    (7, 'Venda Direta', 'saida', 'produto')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.tipos_movimentacao', 'id'), COALESCE((SELECT MAX(id) FROM public.tipos_movimentacao), 1));
+
 
 -- =====================================================
 -- LOOKUP: TIPOS DE CLIENTE (sem FK ainda, adiciona depois)
@@ -129,12 +142,15 @@ CREATE TABLE IF NOT EXISTS public.tipos_cliente (
     nome VARCHAR(100) NOT NULL UNIQUE
 );
 
-INSERT INTO public.tipos_cliente (nome) VALUES
-    ('Lanchonete / Revenda'),
-    ('Buffet / Festas'),
-    ('Pessoa Particular'),
-    ('Outros Convênios')
+INSERT INTO public.tipos_cliente (id, nome) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Lanchonete / Revenda'),
+    (2, 'Buffet / Festas'),
+    (3, 'Pessoa Particular'),
+    (4, 'Outros Convênios')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.tipos_cliente', 'id'), COALESCE((SELECT MAX(id) FROM public.tipos_cliente), 1));
 
 -- =====================================================
 -- LOOKUP: NÍVEIS DE ACESSO
@@ -144,12 +160,15 @@ CREATE TABLE IF NOT EXISTS public.niveis_acesso (
     nome VARCHAR(50) NOT NULL UNIQUE
 );
 
-INSERT INTO public.niveis_acesso (nome) VALUES
-    ('admin'),
-    ('gerente'),
-    ('operador'),
-    ('visualizador')
+INSERT INTO public.niveis_acesso (id, nome) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'admin'),
+    (2, 'gerente'),
+    (3, 'operador'),
+    (4, 'visualizador')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.niveis_acesso', 'id'), COALESCE((SELECT MAX(id) FROM public.niveis_acesso), 1));
 
 -- =====================================================
 -- FORNECEDORES
@@ -174,23 +193,26 @@ CREATE TABLE IF NOT EXISTS public.categorias_financeiro (
     cor VARCHAR(7) DEFAULT '#6b7280'
 );
 
-INSERT INTO public.categorias_financeiro (nome, tipo, cor) VALUES
-    ('Venda de Produtos', 'receita', '#16a34a'),
-    ('Encomendas Personalizadas', 'receita', '#0d9488'),
-    ('Buffet / Eventos', 'receita', '#7c3aed'),
-    ('Taxa de Entrega', 'receita', '#ea580c'),
-    ('Outras Receitas', 'receita', '#6b7280'),
-    ('Matéria-Prima', 'despesa', '#dc2626'),
-    ('Embalagens', 'despesa', '#ea580c'),
-    ('Gás / Energia', 'despesa', '#d97706'),
-    ('Aluguel', 'despesa', '#9333ea'),
-    ('Salários', 'despesa', '#2563eb'),
-    ('Água', 'despesa', '#0891b2'),
-    ('Manutenção', 'despesa', '#6b7280'),
-    ('Marketing', 'despesa', '#db2777'),
-    ('Outras Despesas', 'despesa', '#4b5563'),
-    ('Estorno', 'despesa', '#7c3aed')
+INSERT INTO public.categorias_financeiro (id, nome, tipo, cor) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Venda de Produtos', 'receita', '#16a34a'),
+    (2, 'Encomendas Personalizadas', 'receita', '#0d9488'),
+    (3, 'Buffet / Eventos', 'receita', '#7c3aed'),
+    (4, 'Taxa de Entrega', 'receita', '#ea580c'),
+    (5, 'Outras Receitas', 'receita', '#6b7280'),
+    (6, 'Matéria-Prima', 'despesa', '#dc2626'),
+    (7, 'Embalagens', 'despesa', '#ea580c'),
+    (8, 'Gás / Energia', 'despesa', '#d97706'),
+    (9, 'Aluguel', 'despesa', '#9333ea'),
+    (10, 'Salários', 'despesa', '#2563eb'),
+    (11, 'Água', 'despesa', '#0891b2'),
+    (12, 'Manutenção', 'despesa', '#6b7280'),
+    (13, 'Marketing', 'despesa', '#db2777'),
+    (14, 'Outras Despesas', 'despesa', '#4b5563'),
+    (15, 'Estorno', 'despesa', '#7c3aed')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.categorias_financeiro', 'id'), COALESCE((SELECT MAX(id) FROM public.categorias_financeiro), 1));
 
 -- Adicionar FK depois que categorias_financeiro já existe
 ALTER TABLE public.tipos_cliente ADD COLUMN IF NOT EXISTS categoria_receita_id INTEGER REFERENCES public.categorias_financeiro(id);
@@ -222,42 +244,45 @@ CREATE TABLE IF NOT EXISTS public.permissoes (
     grupo VARCHAR(50) NOT NULL
 );
 
-INSERT INTO public.permissoes (chave, nome, grupo) VALUES
-    ('materiais.ver', 'Ver Materiais', 'Materiais'),
-    ('materiais.criar', 'Criar Materiais', 'Materiais'),
-    ('materiais.editar', 'Editar Materiais', 'Materiais'),
-    ('materiais.excluir', 'Excluir Materiais', 'Materiais'),
-    ('produtos.ver', 'Ver Produtos', 'Produtos'),
-    ('produtos.criar', 'Criar Produtos', 'Produtos'),
-    ('produtos.editar', 'Editar Produtos', 'Produtos'),
-    ('produtos.excluir', 'Excluir Produtos', 'Produtos'),
-    ('estoque.ver', 'Ver Estoque', 'Estoque'),
-    ('estoque.criar', 'Lançar Produção', 'Estoque'),
-    ('estoque.editar', 'Editar Estoque', 'Estoque'),
-    ('estoque.limpar_historico', 'Limpar Histórico de Movimentações', 'Estoque'),
-    ('clientes.ver', 'Ver Clientes', 'Clientes'),
-    ('clientes.criar', 'Criar Clientes', 'Clientes'),
-    ('clientes.editar', 'Editar Clientes', 'Clientes'),
-    ('clientes.excluir', 'Excluir Clientes', 'Clientes'),
-    ('pedidos.ver', 'Ver Pedidos', 'Pedidos'),
-    ('pedidos.criar', 'Criar Pedidos', 'Pedidos'),
-    ('pedidos.editar', 'Editar Pedidos', 'Pedidos'),
-    ('pedidos.excluir', 'Excluir Pedidos', 'Pedidos'),
-    ('pedidos.aprovar', 'Aprovar Pedidos', 'Pedidos'),
-    ('pedidos.cancelar', 'Cancelar Pedidos', 'Pedidos'),
-    ('financeiro.ver', 'Ver Financeiro', 'Financeiro'),
-    ('financeiro.lancar', 'Lançar Despesas', 'Financeiro'),
-    ('usuarios.ver', 'Ver Usuários', 'Usuários'),
-    ('usuarios.criar', 'Criar Usuários', 'Usuários'),
-    ('usuarios.editar', 'Editar Usuários', 'Usuários'),
-    ('usuarios.excluir', 'Excluir Usuários', 'Usuários'),
-    ('relatorios.ver', 'Ver Relatórios', 'Relatórios'),
-    ('config.editar', 'Editar Configurações', 'Sistema'),
-    ('fornecedores.ver', 'Ver Fornecedores', 'Fornecedores'),
-    ('fornecedores.criar', 'Criar Fornecedores', 'Fornecedores'),
-    ('fornecedores.editar', 'Editar Fornecedores', 'Fornecedores'),
-    ('fornecedores.excluir', 'Excluir Fornecedores', 'Fornecedores')
+INSERT INTO public.permissoes (id, chave, nome, grupo) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'materiais.ver', 'Ver Materiais', 'Materiais'),
+    (2, 'materiais.criar', 'Criar Materiais', 'Materiais'),
+    (3, 'materiais.editar', 'Editar Materiais', 'Materiais'),
+    (4, 'materiais.excluir', 'Excluir Materiais', 'Materiais'),
+    (5, 'produtos.ver', 'Ver Produtos', 'Produtos'),
+    (6, 'produtos.criar', 'Criar Produtos', 'Produtos'),
+    (7, 'produtos.editar', 'Editar Produtos', 'Produtos'),
+    (8, 'produtos.excluir', 'Excluir Produtos', 'Produtos'),
+    (9, 'estoque.ver', 'Ver Estoque', 'Estoque'),
+    (10, 'estoque.criar', 'Lançar Produção', 'Estoque'),
+    (11, 'estoque.editar', 'Editar Estoque', 'Estoque'),
+    (12, 'estoque.limpar_historico', 'Limpar Histórico de Movimentações', 'Estoque'),
+    (13, 'clientes.ver', 'Ver Clientes', 'Clientes'),
+    (14, 'clientes.criar', 'Criar Clientes', 'Clientes'),
+    (15, 'clientes.editar', 'Editar Clientes', 'Clientes'),
+    (16, 'clientes.excluir', 'Excluir Clientes', 'Clientes'),
+    (17, 'pedidos.ver', 'Ver Pedidos', 'Pedidos'),
+    (18, 'pedidos.criar', 'Criar Pedidos', 'Pedidos'),
+    (19, 'pedidos.editar', 'Editar Pedidos', 'Pedidos'),
+    (20, 'pedidos.excluir', 'Excluir Pedidos', 'Pedidos'),
+    (21, 'pedidos.aprovar', 'Aprovar Pedidos', 'Pedidos'),
+    (22, 'pedidos.cancelar', 'Cancelar Pedidos', 'Pedidos'),
+    (23, 'financeiro.ver', 'Ver Financeiro', 'Financeiro'),
+    (24, 'financeiro.lancar', 'Lançar Despesas', 'Financeiro'),
+    (25, 'usuarios.ver', 'Ver Usuários', 'Usuários'),
+    (26, 'usuarios.criar', 'Criar Usuários', 'Usuários'),
+    (27, 'usuarios.editar', 'Editar Usuários', 'Usuários'),
+    (28, 'usuarios.excluir', 'Excluir Usuários', 'Usuários'),
+    (29, 'relatorios.ver', 'Ver Relatórios', 'Relatórios'),
+    (30, 'config.editar', 'Editar Configurações', 'Sistema'),
+    (31, 'fornecedores.ver', 'Ver Fornecedores', 'Fornecedores'),
+    (32, 'fornecedores.criar', 'Criar Fornecedores', 'Fornecedores'),
+    (33, 'fornecedores.editar', 'Editar Fornecedores', 'Fornecedores'),
+    (34, 'fornecedores.excluir', 'Excluir Fornecedores', 'Fornecedores')
 ON CONFLICT (chave) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.permissoes', 'id'), COALESCE((SELECT MAX(id) FROM public.permissoes), 1));
 
 -- =====================================================
 -- RBAC: PERFIS
@@ -268,12 +293,15 @@ CREATE TABLE IF NOT EXISTS public.perfis (
     descricao TEXT
 );
 
-INSERT INTO public.perfis (nome, descricao) VALUES
-    ('Admin', 'Acesso total ao sistema'),
-    ('Gerente', 'Gerencia operações e financeiro'),
-    ('Operador', 'Operação do dia a dia'),
-    ('Visualizador', 'Apenas consulta')
+INSERT INTO public.perfis (id, nome, descricao) OVERRIDING SYSTEM VALUE VALUES
+    (1, 'Admin', 'Acesso total ao sistema'),
+    (2, 'Gerente', 'Gerencia operações e financeiro'),
+    (3, 'Operador', 'Operação do dia a dia'),
+    (4, 'Visualizador', 'Apenas consulta')
 ON CONFLICT (nome) DO NOTHING;
+
+-- Reset sequence to avoid conflict on future inserts
+SELECT setval(pg_get_serial_sequence('public.perfis', 'id'), COALESCE((SELECT MAX(id) FROM public.perfis), 1));
 
 -- =====================================================
 -- RBAC: PERFIS × PERMISSÕES
@@ -517,6 +545,74 @@ DROP TRIGGER IF EXISTS trigger_perfis_updated ON public.perfis_usuario;
 CREATE TRIGGER trigger_perfis_updated
     BEFORE UPDATE ON public.perfis_usuario
     FOR EACH ROW EXECUTE FUNCTION atualizar_data_update();
+
+-- =====================================================
+-- IMMUTABLE SYSTEM LOOKUPS
+-- =====================================================
+CREATE OR REPLACE FUNCTION public.prevent_system_lookup_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'This system lookup record is immutable and cannot be updated or deleted.';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply to unidades
+DROP TRIGGER IF EXISTS trigger_prevent_unidades_mutation ON public.unidades;
+CREATE TRIGGER trigger_prevent_unidades_mutation
+    BEFORE UPDATE OR DELETE ON public.unidades
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to status_pedido
+DROP TRIGGER IF EXISTS trigger_prevent_status_pedido_mutation ON public.status_pedido;
+CREATE TRIGGER trigger_prevent_status_pedido_mutation
+    BEFORE UPDATE OR DELETE ON public.status_pedido
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to tipos_movimentacao
+DROP TRIGGER IF EXISTS trigger_prevent_tipos_movimentacao_mutation ON public.tipos_movimentacao;
+CREATE TRIGGER trigger_prevent_tipos_movimentacao_mutation
+    BEFORE UPDATE OR DELETE ON public.tipos_movimentacao
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to niveis_acesso
+DROP TRIGGER IF EXISTS trigger_prevent_niveis_acesso_mutation ON public.niveis_acesso;
+CREATE TRIGGER trigger_prevent_niveis_acesso_mutation
+    BEFORE UPDATE OR DELETE ON public.niveis_acesso
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to permissoes
+DROP TRIGGER IF EXISTS trigger_prevent_permissoes_mutation ON public.permissoes;
+CREATE TRIGGER trigger_prevent_permissoes_mutation
+    BEFORE UPDATE OR DELETE ON public.permissoes
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to perfis
+DROP TRIGGER IF EXISTS trigger_prevent_perfis_mutation ON public.perfis;
+CREATE TRIGGER trigger_prevent_perfis_mutation
+    BEFORE UPDATE OR DELETE ON public.perfis
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Apply to tipos_cliente
+DROP TRIGGER IF EXISTS trigger_prevent_tipos_cliente_mutation ON public.tipos_cliente;
+CREATE TRIGGER trigger_prevent_tipos_cliente_mutation
+    BEFORE UPDATE OR DELETE ON public.tipos_cliente
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_system_lookup_mutation();
+
+-- Prevent mutation of system-seeded financial categories (IDs 1 to 15)
+CREATE OR REPLACE FUNCTION public.prevent_seeded_finance_categories_mutation()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.id <= 15 THEN
+        RAISE EXCEPTION 'System-seeded financial categories (ID <= 15) are immutable and cannot be updated or deleted.';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_prevent_seeded_finance_categories_mutation ON public.categorias_financeiro;
+CREATE TRIGGER trigger_prevent_seeded_finance_categories_mutation
+    BEFORE UPDATE OR DELETE ON public.categorias_financeiro
+    FOR EACH ROW EXECUTE FUNCTION public.prevent_seeded_finance_categories_mutation();
 
 -- =====================================================
 -- RECOVERY CODES
