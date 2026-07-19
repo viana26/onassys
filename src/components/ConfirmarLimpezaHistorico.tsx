@@ -42,10 +42,12 @@ export default function ConfirmarLimpezaHistorico({ open, onClose, onConfirm, to
         </p>
 
         <div className="bg-red-50/50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 rounded-xl p-3">
-          <p className="text-xs text-red-700 dark:text-red-300 font-medium flex items-start gap-2">
+          <div className="flex items-start gap-2">
             <Trash2 size={14} className="mt-0.5 shrink-0" />
-            Esta ação é <strong>irreversível</strong>. Os registros serão removidos permanentemente do banco de dados.
-          </p>
+            <p className="text-xs text-red-700 dark:text-red-300 font-medium break-words min-w-0">
+              Esta ação é <strong>irreversível</strong>. Os registros serão removidos permanentemente do banco de dados.
+            </p>
+          </div>
         </div>
 
         <label className="flex items-center gap-2 p-2 rounded-lg bg-amber-50/30 dark:bg-amber-950/10 cursor-pointer">

@@ -15,7 +15,8 @@
     "db:clear": "node supabase/clear-movements.mjs",
     "db:seed:test": "node run-seed.mjs seed_test.sql",
     "db:seed:dashboard": "node run-seed.mjs seed_simulacao_dashboard.sql",
-    "db:seed:cleanup": "node run-seed.mjs seed_cleanup.sql"
+    "db:seed:cleanup": "node run-seed.mjs seed_cleanup.sql",
+    "db:del": "node run-seed.mjs del_db.sql"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

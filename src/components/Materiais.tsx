@@ -89,7 +89,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
   const opcoesPagamento = ['Pix', 'Dinheiro', 'Crédito', 'Débito', 'Boleto', 'Outros'];
 
   // Filter materials list
-  const filteredMateriais = useMemo(() => {
+  const filteredMateriais = (() => {
     return store.materiais.filter(m => {
       const batchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -104,7 +104,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
       }
       return batchesSearch;
     });
-  }, [store.materiais, searchTerm, filterType]);
+  })();
 
   const { sortedItems: sortedMateriais, requestSort, sortConfig } = useSortableData(filteredMateriais, 'nome');
 
@@ -202,8 +202,8 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
 
   const handleSaveMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim() || fornecedorId === 0) {
-      alert('Favor preencher o nome e o fornecedor.');
+    if (!nome.trim()) {
+      alert('Favor preencher o nome do ingrediente.');
       return;
     }
 
@@ -214,7 +214,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
         quantidade_atual: Number(quantidadeAtual),
         quantidade_minima: Number(quantidadeMinima),
         custo_unitario: Number(custoUnitario),
-        fornecedor_id: fornecedorId
+        fornecedor_id: fornecedorId || undefined
       });
     } else {
       await store.addMaterial({
@@ -223,7 +223,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
         quantidade_atual: Number(quantidadeAtual),
         quantidade_minima: Number(quantidadeMinima),
         custo_unitario: Number(custoUnitario),
-        fornecedor_id: fornecedorId
+        fornecedor_id: fornecedorId || undefined
       });
     }
 
@@ -781,43 +781,41 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Ex: Farinha de trigo especial, Leite condensado"
-                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                  className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
-                  <div className="flex gap-2">
-                    <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: `${u.sigla.toUpperCase()} — ${u.nome}` }))} placeholder="Selecione a unidade" />
-                    <button type="button" onClick={() => setShowNovaUnidade(true)}
-                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
-                      + Nova
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Custo (R$ / {store.unidadeSigla(unidadeId)})</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    value={custoUnitario}
-                    onChange={(e) => setCustoUnitario(Number(e.target.value))}
-                    {...useSmartArrowKeys(custoUnitario, setCustoUnitario)}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
-                  />
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
+                <div className="flex items-center gap-2">
+                  <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: `${u.sigla.toUpperCase()} — ${u.nome}` }))} placeholder="Selecione a unidade" className="flex-1" />
+                  <button type="button" onClick={() => setShowNovaUnidade(true)}
+                    className="px-3 h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    + Nova Unidade
+                  </button>
                 </div>
               </div>
 
               <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Custo (R$ / {store.unidadeSigla(unidadeId)})</label>
+                <input 
+                  type="number" 
+                  step="any"
+                  value={custoUnitario}
+                  onChange={(e) => setCustoUnitario(Number(e.target.value))}
+                  {...useSmartArrowKeys(custoUnitario, setCustoUnitario)}
+                  className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
-                <div className="flex gap-2">
-                  <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" />
+                <div className="flex items-center gap-2">
+                  <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" className="flex-1" />
                   <button type="button" onClick={() => setShowNovoFornecedor(true)}
-                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
-                    + Novo
+                    className="px-3 h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    + Novo Fornecedor
                   </button>
                 </div>
               </div>
@@ -831,19 +829,19 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                     value={quantidadeAtual}
                     onChange={(e) => setQuantidadeAtual(Number(e.target.value))}
                     {...useSmartArrowKeys(quantidadeAtual, setQuantidadeAtual)}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                    className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans font-sans">Qtd Mínima</label>
+                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Qtd Mínima</label>
                   <input 
                     type="number" 
                     step="any"
                     value={quantidadeMinima}
                     onChange={(e) => setQuantidadeMinima(Number(e.target.value))}
                     {...useSmartArrowKeys(quantidadeMinima, setQuantidadeMinima)}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                    className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                   />
                 </div>
               </div>

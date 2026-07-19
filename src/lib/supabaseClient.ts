@@ -32,9 +32,9 @@ export function isSupabaseConfigured(): boolean {
 
 export async function verificarAdminExiste(): Promise<boolean> {
     try {
-        const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+        const { data, error } = await supabase.rpc('verificar_admin_ativo_existe');
         if (error) throw error;
-        return (users?.length ?? 0) > 0;
+        return data === true;
     } catch {
         return false;
     }

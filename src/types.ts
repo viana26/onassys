@@ -174,6 +174,7 @@ export interface Pedido {
   status_id: number;
   observacoes?: string;
   valor_total: number;
+  desconto_valor?: number;
   criado_by: string;
   categoria_receita_id?: number;
   atualizado_em: string;

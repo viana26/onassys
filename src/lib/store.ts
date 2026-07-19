@@ -114,38 +114,50 @@ export class MiniFactoryStore {
   }
 
   async ensureUserProfile(userId: string, nome: string, perfilId?: number) {
-    const cached = this.perfisUsuarios.find(u => u.id === userId);
-    if (cached) {
-      this.currentUserId = userId;
-      if (!this.loading) this.setCurrentUser(userId);
-      return;
-    }
-    const { data: existing } = await supabase
+    const { data: existing, error: selectError } = await supabase
       .from('perfis_usuario')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+
     if (existing) {
-      this.perfisUsuarios.push(existing as PerfilUsuario);
-      this.saveToLocalStorage();
       this.currentUserId = userId;
+      if (!this.perfisUsuarios.some(u => u.id === userId)) {
+        this.perfisUsuarios.push(existing as PerfilUsuario);
+      }
+      this.saveToLocalStorage();
       if (!this.loading) this.setCurrentUser(userId);
       return;
     }
+
+    let finalPerfilId = perfilId;
+    if (finalPerfilId === undefined) {
+      const { count } = await supabase
+        .from('perfis_usuario')
+        .select('*', { count: 'exact', head: true });
+      const totalPerfis = count !== null ? count : this.perfisUsuarios.length;
+      finalPerfilId = totalPerfis === 0 ? 1 : 3;
+    }
+
     const { error } = await supabase.from('perfis_usuario').insert({
       id: userId,
       nome,
-      perfil_id: perfilId ?? 3,
+      perfil_id: finalPerfilId,
       ativo: true,
     });
     if (!error) {
-      this.perfisUsuarios.push({
+      const newProfile = {
         id: userId,
         nome,
-        perfil_id: perfilId ?? 3,
+        perfil_id: finalPerfilId,
         ativo: true,
-      });
+      };
+      if (!this.perfisUsuarios.some(u => u.id === userId)) {
+        this.perfisUsuarios.push(newProfile);
+      }
       this.saveToLocalStorage();
+    } else {
+      console.error('Erro ao inserir perfil_usuario no Supabase:', error);
     }
     this.currentUserId = userId;
     if (!this.loading) this.setCurrentUser(userId);
@@ -392,7 +404,7 @@ export class MiniFactoryStore {
       data_ultima_atualizacao: new Date().toISOString()
     };
     const ok = await this.supabaseInsert('materiais', novo as unknown as Record<string, unknown>);
-    if (ok) { this.materiais.push(novo); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.materiais = [...this.materiais, novo]; this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
@@ -480,7 +492,7 @@ export class MiniFactoryStore {
       id: 'prod_' + Math.random().toString(36).substring(2, 9)
     };
     const ok = await this.supabaseInsert('produtos', novo as unknown as Record<string, unknown>);
-    if (ok) { this.produtos.push(novo); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.produtos = [...this.produtos, novo]; this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
@@ -510,7 +522,7 @@ export class MiniFactoryStore {
   async addFichaTecnica(ficha: Omit<FichaTecnicaItem, 'id'>) {
     const nova: FichaTecnicaItem = { ...ficha, id: 'ficha_' + Math.random().toString(36).substring(2, 9) };
     const ok = await this.supabaseInsert('fichas_tecnicas', nova as unknown as Record<string, unknown>);
-    if (ok) { this.fichas.push(nova); this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.fichas = [...this.fichas, nova]; this.recalcularCustosProdutos(); this.saveToLocalStorage(); this.notify(); }
     return nova;
   }
 
@@ -639,7 +651,7 @@ export class MiniFactoryStore {
       id: 'cli_' + Math.random().toString(36).substring(2, 9)
     };
     const ok = await this.supabaseInsert('clientes', novo as unknown as Record<string, unknown>);
-    if (ok) { this.clientes.push(novo); this.saveToLocalStorage(); this.notify(); }
+    if (ok) { this.clientes = [...this.clientes, novo]; this.saveToLocalStorage(); this.notify(); }
     return novo;
   }
 
@@ -659,19 +671,20 @@ export class MiniFactoryStore {
   // ================================================
   // CRUD — PEDIDOS
   // ================================================
-  async addPedido(data: Partial<Pedido>) {
+  async addPedido(data: Partial<Pedido>): Promise<Pedido | null> {
     const novo: Pedido = {
       cliente_id: data.cliente_id || '',
       status_id: data.status_id || 1,
       data_entrega_prevista: data.data_entrega_prevista || new Date().toISOString(),
       observacoes: data.observacoes, criado_by: data.criado_by || '', valor_total: data.valor_total ?? 0,
+      desconto_valor: data.desconto_valor ?? 0,
       categoria_receita_id: data.categoria_receita_id,
       id: 'ped_' + Math.random().toString(36).substring(2, 9),
       data_pedido: new Date().toISOString(), atualizado_em: new Date().toISOString()
     };
     const ok = await this.supabaseInsert('pedidos', novo as unknown as Record<string, unknown>);
-    if (ok) { this.pedidos.push(novo); this.saveToLocalStorage(); this.notify(); }
-    return novo;
+    if (ok) { this.pedidos.push(novo); this.saveToLocalStorage(); this.notify(); return novo; }
+    return null;
   }
 
   async updatePedido(id: string, updates: Partial<Pedido>): Promise<boolean> {
@@ -862,14 +875,17 @@ export class MiniFactoryStore {
   // ================================================
   // CRUD — ITENS PEDIDO
   // ================================================
-  async addItemPedido(item: Omit<ItemPedido, 'id'>) {
+  async addItemPedido(item: Omit<ItemPedido, 'id'>): Promise<ItemPedido | null> {
     const novo: ItemPedido = { ...item, id: 'item_' + Math.random().toString(36).substring(2, 9) };
     const ok = await this.supabaseInsert('itens_pedido', novo as unknown as Record<string, unknown>);
     if (ok) {
       this.itensPedido = [...this.itensPedido, novo];
       this.pedidos = this.pedidos.map(p => p.id === item.pedido_id ? {
         ...p,
-        valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+        valor_total: (() => {
+          const subtotal = this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+          return Math.max(0, subtotal - (p.desconto_valor ?? 0));
+        })(),
         atualizado_em: new Date().toISOString()
       } : p);
       const pedidoAtualizado = this.pedidos.find(p => p.id === item.pedido_id);
@@ -877,8 +893,9 @@ export class MiniFactoryStore {
         await this.supabaseUpdate('pedidos', pedidoAtualizado.id, { valor_total: pedidoAtualizado.valor_total, atualizado_em: pedidoAtualizado.atualizado_em } as unknown as Record<string, unknown>);
       }
       this.saveToLocalStorage(); this.notify();
+      return novo;
     }
-    return novo;
+    return null;
   }
 
   async updateItemPedido(id: string, updates: Partial<ItemPedido>) {
@@ -890,7 +907,10 @@ export class MiniFactoryStore {
       this.itensPedido = this.itensPedido.map((it, i) => i === idx ? updated : it);
       this.pedidos = this.pedidos.map(p => p.id === updated.pedido_id ? {
         ...p,
-        valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+        valor_total: (() => {
+          const subtotal = this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+          return Math.max(0, subtotal - (p.desconto_valor ?? 0));
+        })(),
         atualizado_em: new Date().toISOString()
       } : p);
       const pedidoAtualizado = this.pedidos.find(p => p.id === updated.pedido_id);
@@ -909,7 +929,10 @@ export class MiniFactoryStore {
       if (item) {
         this.pedidos = this.pedidos.map(p => p.id === item.pedido_id ? {
           ...p,
-          valor_total: this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0),
+          valor_total: (() => {
+            const subtotal = this.itensPedido.filter(i => i.pedido_id === p.id).reduce((s, i) => s + (i.quantidade_solicitada * i.preco_unitario), 0);
+            return Math.max(0, subtotal - (p.desconto_valor ?? 0));
+          })(),
           atualizado_em: new Date().toISOString()
         } : p);
         const pedidoAtualizado = this.pedidos.find(p => p.id === item.pedido_id);
@@ -1159,7 +1182,7 @@ export class MiniFactoryStore {
     const { data: inserted, error } = await supabase.from('fornecedores').insert(data).select().single();
     if (error || !inserted) { this.setError(error?.message || 'Erro ao criar fornecedor', 'server'); return null; }
     const f = inserted as Fornecedor;
-    this.fornecedores.push(f);
+    this.fornecedores = [...this.fornecedores, f];
     this.saveToLocalStorage(); this.notify();
     return f;
   }

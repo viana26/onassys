@@ -58,7 +58,8 @@ const FORMAS_PAGAMENTO = [
   { value: 'pix', label: 'Pix', icon: <Smartphone size={20} />, color: 'bg-blue-600 hover:bg-blue-500' },
   { value: 'cartao_credito', label: 'Crédito', icon: <CreditCard size={20} />, color: 'bg-violet-600 hover:bg-violet-500' },
   { value: 'cartao_debito', label: 'Débito', icon: <CreditCard size={20} />, color: 'bg-indigo-600 hover:bg-indigo-500' },
-  { value: 'transferencia', label: 'Transf.', icon: <Landmark size={20} />, color: 'bg-slate-600 hover:bg-slate-500' },
+  { value: 'boleto', label: 'Boleto', icon: <CreditCard size={20} />, color: 'bg-orange-600 hover:bg-orange-500' },
+  { value: 'transferencia', label: 'Transferência', icon: <Landmark size={20} />, color: 'bg-slate-600 hover:bg-slate-500' },
 ];
 
 function ComprovanteModal({ data, appName, onClose }: {
@@ -391,6 +392,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     })());
     const amanha = new Date(); amanha.setDate(amanha.getDate() + 1);
     const pedido = await store.addPedido({ cliente_id: clienteId, status_id: 2, data_entrega_prevista: amanha.toISOString().split('T')[0] + 'T16:00', observacoes: 'Pedido de teste para caixa', criado_by: 'Caixa' });
+    if (!pedido) return;
     await store.addItemPedido({ pedido_id: pedido.id, produto_id: prod.id, quantidade_solicitada: 10, quantidade_produzida: 0, preco_unitario: 15.00 });
     handleSelectPedido(pedido.id);
     onUpdate();
@@ -532,12 +534,21 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
               <h3 className="font-bold text-xs uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                 <TrendingUp size={14} /> Receita Livre
               </h3>
-              <input type="text" value={livreDescricao} onChange={e => setLivreDescricao(e.target.value)} placeholder="Descrição (ex: Venda avulsa)"
-                className="w-full p-2 border border-emerald-200 dark:border-[#1d3d25] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-500">Descrição</label>
+                <input type="text" value={livreDescricao} onChange={e => setLivreDescricao(e.target.value)} placeholder="Ex: Venda avulsa"
+                  className="w-full p-2 border border-emerald-200 dark:border-[#1d3d25] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+              </div>
               <div className="flex gap-2">
-                <input type="text" inputMode="decimal" value={livreValor} onChange={e => setLivreValor(e.target.value)} placeholder="Valor"
-                  className="flex-1 p-2 border border-emerald-200 dark:border-[#1d3d25] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono" />
-                <SelectSearch value={livreForma} onChange={v => setLivreForma(v)} options={FORMAS_PAGAMENTO.map(f => ({ value: f.value, label: f.label }))} placeholder="Pagamento" />
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Valor (R$)</label>
+                  <input type="text" inputMode="decimal" value={livreValor} onChange={e => setLivreValor(e.target.value)} placeholder="0,00"
+                    className="w-full p-2 border border-emerald-200 dark:border-[#1d3d25] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono mt-1" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
+                  <SelectSearch value={livreForma} onChange={v => setLivreForma(v)} options={FORMAS_PAGAMENTO.map(f => ({ value: f.value, label: f.label }))} placeholder="Selecione..." className="mt-1" />
+                </div>
               </div>
               <button onClick={() => { handleNovaReceita(); setActiveForm(null); }}
                 disabled={!livreValor || !livreDescricao}
@@ -553,12 +564,21 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
               <h3 className="font-bold text-xs uppercase tracking-wider text-red-700 dark:text-red-400 flex items-center gap-1.5">
                 <TrendingDown size={14} /> Despesa Rápida
               </h3>
-              <input type="text" value={despDescricao} onChange={e => setDespDescricao(e.target.value)} placeholder="Descrição (ex: Café)"
-                className="w-full p-2 border border-red-200 dark:border-[#3d1d1d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+              <div>
+                <label className="text-[10px] font-bold uppercase text-gray-500">Descrição</label>
+                <input type="text" value={despDescricao} onChange={e => setDespDescricao(e.target.value)} placeholder="Ex: Café"
+                  className="w-full p-2 border border-red-200 dark:border-[#3d1d1d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+              </div>
               <div className="flex gap-2">
-                <input type="text" inputMode="decimal" value={despValor} onChange={e => setDespValor(e.target.value)} placeholder="Valor"
-                  className="flex-1 p-2 border border-red-200 dark:border-[#3d1d1d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono" />
-                <SelectSearch value={despForma} onChange={v => setDespForma(v)} options={FORMAS_PAGAMENTO.map(f => ({ value: f.value, label: f.label }))} placeholder="Pagamento" />
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Valor (R$)</label>
+                  <input type="text" inputMode="decimal" value={despValor} onChange={e => setDespValor(e.target.value)} placeholder="0,00"
+                    className="w-full p-2 border border-red-200 dark:border-[#3d1d1d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono mt-1" />
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Forma de Pagamento</label>
+                  <SelectSearch value={despForma} onChange={v => setDespForma(v)} options={FORMAS_PAGAMENTO.map(f => ({ value: f.value, label: f.label }))} placeholder="Selecione..." className="mt-1" />
+                </div>
               </div>
               <button onClick={() => { handleNovaDespesa(); setActiveForm(null); }}
                 disabled={!despValor || !despDescricao}

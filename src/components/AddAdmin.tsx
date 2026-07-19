@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Copy, Key } from 'lucide-react';
 import { signUp, marcarPrimeiroAcessoConcluido, supabase } from '../lib/supabaseClient';
 
@@ -144,7 +144,7 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
                 {error && (
                     <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
                         <AlertCircle size={14} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-red-800 dark:text-red-200">{error}</p>
+                        <p className="text-xs text-red-800 dark:text-red-200 min-w-0">{error}</p>
                     </div>
                 )}
 

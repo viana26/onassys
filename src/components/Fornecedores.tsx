@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Fornecedor } from '../types';
 import { phoneMask } from '../lib/mask';
@@ -39,14 +39,14 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
 
   const [deleteConfirm, setDeleteConfirm] = useState<Fornecedor | null>(null);
 
-  const filtered = useMemo(() => {
+  const filtered = (() => {
     return store.fornecedores.filter(f => {
       if (!showInativos && f.ativo === false) return false;
       return f.nome_fantasia.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (f.contato || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (f.telefone || '').includes(searchTerm);
     });
-  }, [store.fornecedores, searchTerm, showInativos]);
+  })();
 
   const { sortedItems: sortedFornecedores, requestSort, sortConfig } = useSortableData(filtered, 'nome_fantasia');
 
@@ -398,27 +398,25 @@ export default function Fornecedores({ store, onUpdate }: FornecedoresProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium">Telefone</label>
-                  <input
-                    type="tel"
-                    value={telefone}
-                    onChange={(e) => setTelefone(phoneMask(e.target.value))}
-                    placeholder="Ex: (11) 98888-7777"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium">Email</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Ex: contato@fornecedor.com"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium">Telefone</label>
+                <input
+                  type="tel"
+                  value={telefone}
+                  onChange={(e) => setTelefone(phoneMask(e.target.value))}
+                  placeholder="Ex: (11) 98888-7777"
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Ex: contato@fornecedor.com"
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                />
               </div>
 
               <div className="flex items-center gap-2 pt-2">

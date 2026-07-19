@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Pedido, Cliente } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
@@ -55,6 +55,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   const [statusId, setStatusId] = useState<number>(2);
   const [itensPedido, setItensPedido] = useState<{ produto_id: string; quantidade_solicitada: number; preco_unitario: number; observacao?: string }[]>([]);
   const [categoriaReceitaId, setCategoriaReceitaId] = useState<number>(0);
+  const [descontoValor, setDescontoValor] = useState(0);
   const categoriasReceita = store.categoriasFinanceiro.filter(c => c.tipo === 'receita');
 
   // Selected Order detail popup state
@@ -112,6 +113,17 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
+  // Lock body scroll when any modal is open
+  const anyModalOpen = isFormOpen || !!selectedPedidoId || !!reverseConfirm || !!customAlert || !!deleteConfirm || !!estornoConfirm || !!insufficientItemsEdit || relatorioOpen;
+  useEffect(() => {
+    if (anyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [anyModalOpen]);
+
   // Quick order trigger handler exposes
   if (forceOpenNewOrderRef) {
     forceOpenNewOrderRef.trigger = () => {
@@ -131,8 +143,9 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setObservacoes('');
     setStatusId(2);
     setCategoriaReceitaId(0);
+    setDescontoValor(0);
     // Adiciona primeiramente uma coxinha
-    setItensPedido([{ produto_id: store.produtos[0]?.id || '', quantidade_solicitada: 10, preco_unitario: 15.00 }]);
+    setItensPedido([{ produto_id: store.produtos[0]?.id || '', quantidade_solicitada: 10, preco_unitario: store.produtos[0]?.preco_venda || 0 }]);
     setAnaliseResultado(null);
   };
 
@@ -146,6 +159,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setObservacoes(pedido.observacoes || '');
     setStatusId(pedido.status_id);
     setCategoriaReceitaId(pedido.categoria_receita_id || 0);
+    setDescontoValor(pedido.desconto_valor ?? 0);
 
     const itens = store.itensPedido.filter(it => it.pedido_id === pedidoId);
     setItensPedido(itens.map(it => ({
@@ -164,8 +178,8 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     const prod = store.produtos[0];
     if (!prod) return;
     setItensPedido([
-      ...itensPedido, 
-      { produto_id: prod.id, quantidade_solicitada: 5, preco_unitario: 15.00 }
+      { produto_id: prod.id, quantidade_solicitada: 5, preco_unitario: prod.preco_venda || 0 },
+      ...itensPedido
     ]);
   };
 
@@ -177,17 +191,10 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     const next = [...itensPedido];
     next[idx] = { ...next[idx], ...fields };
 
-    // Auto align unit sales price according to catalog
     if (fields.produto_id) {
       const selectedProd = store.produtos.find(p => p.id === fields.produto_id);
       if (selectedProd) {
-        // Suggested pricing system defaults
-        let precoSugerido = 15.00;
-        const catBolo = store.categorias.find(c => c.nome === 'bolo')?.id;
-        const catSalgado = store.categorias.find(c => c.nome === 'salgado')?.id;
-        if (selectedProd.categoria_id === catBolo) precoSugerido = 80.00;
-        if (selectedProd.categoria_id === catSalgado && selectedProd.unidade_producao_id === 5) precoSugerido = 2.50;
-        next[idx].preco_unitario = precoSugerido;
+        next[idx].preco_unitario = selectedProd.preco_venda || 0;
       }
     }
 
@@ -221,39 +228,45 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     }
 
     if (editingPedidoId) {
-      // Update existing order
-      store.updatePedido(editingPedidoId, {
+      const updateOk = await store.updatePedido(editingPedidoId, {
         cliente_id: clienteId,
         status_id: statusId,
         data_entrega_prevista: dataEntrega,
         observacoes: observacoes,
         criado_by: 'Cozinha',
         categoria_receita_id: categoriaReceitaId || undefined,
+        desconto_valor: descontoValor,
       });
+
+      if (!updateOk) {
+        setCustomAlert({ title: 'Erro ao salvar', message: 'Não foi possível atualizar o pedido no servidor. Verifique sua conexão.' });
+        return;
+      }
 
       const existingItens = store.itensPedido.filter(it => it.pedido_id === editingPedidoId);
       const newItemKeys = itensPedido.map(item => `${item.produto_id}_${item.preco_unitario}_${item.observacao || ''}`);
 
       // Remove items that are no longer in the list
-      existingItens.forEach(existingItem => {
+      for (const existingItem of existingItens) {
         const key = `${existingItem.produto_id}_${existingItem.preco_unitario}_${existingItem.observacao || ''}`;
         if (!newItemKeys.includes(key)) {
-          store.deleteItemPedido(existingItem.id);
+          await store.deleteItemPedido(existingItem.id);
         }
-      });
+      }
 
       // Add or update items
-      itensPedido.forEach((item, idx) => {
+      for (let idx = 0; idx < itensPedido.length; idx++) {
+        const item = itensPedido[idx];
         const existing = existingItens[idx];
         if (existing) {
-          store.updateItemPedido(existing.id, {
+          await store.updateItemPedido(existing.id, {
             produto_id: item.produto_id,
             quantidade_solicitada: item.quantidade_solicitada,
             preco_unitario: item.preco_unitario,
             observacao: item.observacao
           });
         } else {
-          store.addItemPedido({
+          await store.addItemPedido({
             pedido_id: editingPedidoId,
             produto_id: item.produto_id,
             quantidade_solicitada: item.quantidade_solicitada,
@@ -262,7 +275,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
             observacao: item.observacao
           });
         }
-      });
+      }
 
       setEditingPedidoId(null);
       setIsFormOpen(false);
@@ -278,12 +291,13 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       observacoes: observacoes,
       criado_by: 'Cozinha',
       categoria_receita_id: categoriaReceitaId || undefined,
+      desconto_valor: descontoValor,
     });
 
     if (!savedPedido) return;
 
-    itensPedido.forEach(item => {
-      store.addItemPedido({
+    for (const item of itensPedido) {
+      await store.addItemPedido({
         pedido_id: savedPedido.id,
         produto_id: item.produto_id,
         quantidade_solicitada: item.quantidade_solicitada,
@@ -291,7 +305,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
         preco_unitario: item.preco_unitario,
         observacao: item.observacao
       });
-    });
+    }
 
     setIsFormOpen(false);
     onUpdate();
@@ -933,241 +947,287 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
       {/* ---------------------------------------------------------------------------- */}
       {/* BUILDER MODAL: REGISTER / CREATE ORDER */}
       {/* ---------------------------------------------------------------------------- */}
-      {isFormOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans" id="modal-order-creation">
-          <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto no-scrollbar shadow-xl flex flex-col justify-between border-t border-amber-100">
-            <div className="p-6 border-b border-amber-100 flex items-center justify-between sticky top-0 bg-white z-10">
-              <div>
-                <h3 className="font-display font-semibold text-base sm:text-lg text-amber-950">
-                  {editingPedidoId ? 'Editar Encomenda' : 'Registrar Encomenda de Cliente'}
-                </h3>
-                <p className="text-[10px] text-gray-500 mt-1">{editingPedidoId ? 'Altere os dados necessários e salve as alterações.' : 'Selecione o cliente, os itens de salgados/bolos encomendados e execute a verificação inteligente de estoque.'}</p>
-              </div>
-              <button onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
-                <X size={20} />
-              </button>
-            </div>
+      {isFormOpen && (() => {
+        const subtotal = itensPedido.reduce((acc, cur) => acc + (cur.quantidade_solicitada * cur.preco_unitario), 0);
+        const totalGeral = Math.max(0, subtotal - descontoValor);
 
-            <form onSubmit={handleSaveOrderSubmit} className="p-6 space-y-5">
-              
-              {/* Client and deliveries schedule inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 font-medium">Comprador / Cliente *</label>
-                  <SelectSearch value={clienteId} onChange={setClienteId} options={store.clientes.map(c => ({ value: c.id, label: `${c.nome} (${store.tipoClienteNome(c.tipo_id)})` }))} placeholder="Selecione um cliente" />
-                </div>
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans" id="modal-order-creation">
+            <div className="bg-white w-full sm:max-w-3xl rounded-t-2xl sm:rounded-2xl h-screen sm:max-h-[90vh] flex flex-col shadow-xl">
+              <form onSubmit={handleSaveOrderSubmit} className="flex-1 flex flex-col min-h-0">
 
-                <div className="space-y-1">
-                  <label className="text-amber-950 font-medium font-sans">Data / Hora Agendada de Entrega *</label>
-                  <input 
-                    type="datetime-local" 
-                    value={dataEntrega}
-                    onChange={(e) => setDataEntrega(e.target.value)}
-                    className="w-full p-2 border border-amber-200 rounded-lg text-xs font-mono"
-                    required
-                  />
-                </div>
-              </div>
+                {/* ── TOPBAR FIXA ─────────────────────────────────────── */}
+                <header className="shrink-0 border-b border-amber-100 px-4 py-3 space-y-3">
 
-              {/* Items builder composer list */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-amber-100 pb-1">
-                  <h4 className="font-display font-semibold text-amber-900 uppercase tracking-wider text-[10px]">Composição do Pedido</h4>
-                  <button 
-                    type="button" 
-                    onClick={handleAddItemRow}
-                    className="text-amber-800 hover:text-amber-950 text-xs font-bold flex items-center gap-1"
-                  >
-                    <Plus size={14} /> Adicionar Item
-                  </button>
-                </div>
+                  {/* Título + fechar */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-display font-semibold text-base text-amber-950">
+                        {editingPedidoId ? '✏️ Editar Encomenda' : '📦 Nova Encomenda'}
+                      </h3>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {editingPedidoId
+                          ? 'Altere os dados necessários e salve.'
+                          : 'Selecione o cliente, produtos e verifique o estoque.'}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => setIsFormOpen(false)} className="text-gray-400 hover:text-amber-950 p-1 rounded-lg hover:bg-gray-100 transition">
+                      <X size={20} />
+                    </button>
+                  </div>
 
-                <div className="space-y-2">
-                  {itensPedido.map((item, idx) => {
-                    const prodRef = store.produtos.find(p => p.id === item.produto_id);
-                    return (
-                      <div key={idx} className="flex flex-col sm:flex-row gap-2 items-center bg-orange-50/10 p-2.5 rounded-lg border border-amber-100/50">
-                        {/* Selected product dropdown */}
-                        <div className="w-full sm:flex-1 space-y-1">
-                          <label className="text-[9px] font-semibold text-amber-900/60 uppercase">Produto</label>
-                          <SelectSearch value={item.produto_id} onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })} options={store.produtos.map(p => ({ value: p.id, label: p.nome }))} placeholder="Selecione um produto" />
-                        </div>
+                  {/* Linha 1 — campos cabeçalho lado a lado */}
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="w-56">
+                      <label className="text-[10px] text-gray-500 block mb-1">Cliente *</label>
+                      <SelectSearch
+                        value={clienteId}
+                        onChange={setClienteId}
+                        options={store.clientes.map(c => ({ value: c.id, label: `${c.nome} (${store.tipoClienteNome(c.tipo_id)})` }))}
+                        placeholder="Selecione um cliente"
+                      />
+                    </div>
 
-                        {/* Quantity input requested */}
-                        <div className="w-full sm:w-28 space-y-1">
-                          <label className="text-[9px] font-semibold text-amber-900/60 uppercase">Quantidade</label>
-                          <div className="flex items-center border border-amber-200 rounded bg-white">
-                            <input 
-                              type="number"
-                              min="1"
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Data de Entrega *</label>
+                      <input
+                        type="datetime-local"
+                        value={dataEntrega}
+                        onChange={(e) => setDataEntrega(e.target.value)}
+                        className="h-9 border border-gray-200 rounded-lg px-2 text-xs font-mono focus:outline-none focus:border-amber-400 bg-white"
+                        required
+                      />
+                    </div>
+
+                    <div className="w-40">
+                      <label className="text-[10px] text-gray-500 block mb-1">Categoria Financeira</label>
+                      <SelectSearch
+                        value={categoriaReceitaId.toString()}
+                        onChange={v => setCategoriaReceitaId(Number(v))}
+                        options={[
+                          { value: '0', label: 'Sem categoria' },
+                          ...categoriasReceita.map(c => ({ value: c.id.toString(), label: c.nome })),
+                        ]}
+                        placeholder="Categoria"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-gray-500 block mb-1">Status</label>
+                      <select
+                        value={statusId}
+                        onChange={(e) => setStatusId(Number(e.target.value))}
+                        className="h-9 border border-gray-200 rounded-lg px-2 text-xs font-semibold focus:outline-none focus:border-amber-400 bg-white"
+                      >
+                        <option value={2}>Confirmado</option>
+                        <option value={1}>Rascunho</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Observações */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 block mb-1">Observações / Detalhes de Decoração</label>
+                    <textarea
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                      placeholder="Ex: Coxinhas com catupiry. Brigadeiros com granulado dourado."
+                      className="w-full h-12 p-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-amber-400 resize-none"
+                    />
+                  </div>
+                </header>
+
+                {/* ── ÁREA ROLÁVEL — ITENS ────────────────────────────── */}
+                <main className="flex-1 overflow-y-auto px-4 py-3 space-y-4 no-scrollbar">
+
+                  {/* Label + botão adicionar */}
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-amber-900 uppercase tracking-wider text-[10px] font-sans">
+                      Itens do Pedido
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={handleAddItemRow}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-200 text-amber-800 text-[10px] font-semibold hover:bg-amber-50 active:bg-amber-100 transition"
+                    >
+                      <Plus size={13} /> Adicionar item
+                    </button>
+                  </div>
+
+                  {/* Desktop/tablet — tabela com borda suave */}
+                  <div className="hidden md:block overflow-hidden rounded-lg border border-amber-100">
+                    <table className="w-full border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-amber-50/60 text-amber-900">
+                          <th className="text-left font-semibold px-3 py-2 border-b border-amber-100">Produto</th>
+                          <th className="text-center font-semibold px-3 py-2 border-b border-amber-100 w-28">Qtd</th>
+                          <th className="text-right font-semibold px-3 py-2 border-b border-amber-100 w-28">R$ Unitário</th>
+                          <th className="text-right font-semibold px-3 py-2 border-b border-amber-100 w-24">Total item</th>
+                          <th className="px-3 py-2 border-b border-amber-100 w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itensPedido.map((item, idx) => {
+                          const prodRef = store.produtos.find(p => p.id === item.produto_id);
+                          return (
+                            <tr key={idx} className={idx % 2 === 1 ? 'bg-amber-50/20' : 'bg-white'}>
+                              <td className="px-2 py-1.5 border-b border-amber-50">
+                                <SelectSearch
+                                  value={item.produto_id}
+                                  onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })}
+                                  options={store.produtos.filter(p => !itensPedido.some((it, i) => it.produto_id === p.id && i !== idx)).map(p => ({ value: p.id, label: p.nome }))}
+                                  placeholder="Selecione o produto"
+                                />
+                              </td>
+                              <td className="px-2 py-1.5 border-b border-amber-50">
+                                <div className="flex items-center border border-amber-200 rounded-md bg-white">
+                                  <input
+                                    type="number" min="1"
+                                    value={item.quantidade_solicitada}
+                                    onChange={(e) => handleUpdateItemRow(idx, { quantidade_solicitada: Number(e.target.value) })}
+                                    {...useSmartArrowKeys(item.quantidade_solicitada, (v) => handleUpdateItemRow(idx, { quantidade_solicitada: v }), 1)}
+                                    className="w-full h-9 px-2 focus:outline-none font-mono text-xs text-center bg-transparent"
+                                    required
+                                  />
+                                  <span className="bg-amber-100 px-1.5 h-9 flex items-center text-[9px] text-amber-900 font-bold font-mono border-l border-amber-200 rounded-r-md">
+                                    {store.unidadeSigla(prodRef?.unidade_producao_id || 0)}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 border-b border-amber-50">
+                                <input
+                                  type="number" step="0.01" inputMode="decimal"
+                                  value={item.preco_unitario}
+                                  onChange={(e) => handleUpdateItemRow(idx, { preco_unitario: Number(e.target.value) })}
+                                  {...useSmartArrowKeys(item.preco_unitario, (v) => handleUpdateItemRow(idx, { preco_unitario: v }), 0)}
+                                  className="w-full h-9 border border-amber-200 rounded-md px-2 font-mono text-xs text-right focus:outline-none focus:border-amber-400"
+                                  required
+                                />
+                              </td>
+                              <td className="px-3 py-1.5 border-b border-amber-50 text-right font-semibold font-mono text-amber-900">
+                                {formatCurrency(item.quantidade_solicitada * item.preco_unitario)}
+                              </td>
+                              <td className="px-2 py-1.5 border-b border-amber-50 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveItemRow(idx)}
+                                  className="w-9 h-9 inline-flex items-center justify-center rounded-md text-red-500 hover:bg-red-50 transition"
+                                  aria-label="Remover item"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile — cards compactos */}
+                  <div className="flex flex-col gap-2 md:hidden">
+                    {itensPedido.map((item, idx) => {
+                      const prodRef = store.produtos.find(p => p.id === item.produto_id);
+                      return (
+                        <div key={idx} className="border border-amber-100 rounded-lg p-2.5 grid grid-cols-2 gap-2 items-center bg-white">
+                          <div className="col-span-2">
+                            <SelectSearch
+                              value={item.produto_id}
+                              onChange={(v) => handleUpdateItemRow(idx, { produto_id: v })}
+                              options={store.produtos.filter(p => !itensPedido.some((it, i) => it.produto_id === p.id && i !== idx)).map(p => ({ value: p.id, label: p.nome }))}
+                              placeholder="Selecione o produto"
+                            />
+                          </div>
+
+                          <label className="text-[10px] text-gray-400 font-semibold">Qtd</label>
+                          <div className="flex items-center border border-amber-200 rounded-md bg-white">
+                            <input type="number" min="1"
                               value={item.quantidade_solicitada}
                               onChange={(e) => handleUpdateItemRow(idx, { quantidade_solicitada: Number(e.target.value) })}
                               {...useSmartArrowKeys(item.quantidade_solicitada, (v) => handleUpdateItemRow(idx, { quantidade_solicitada: v }), 1)}
-                              className="w-full p-1.5 focus:outline-none font-mono text-xs text-center"
-                              required
+                              className="w-full h-9 px-2 focus:outline-none font-mono text-xs text-center" required
                             />
-                            <span className="bg-amber-100 px-2 py-1 text-[9px] text-amber-900 font-bold whitespace-nowrap font-mono border-l border-amber-200">
+                            <span className="bg-amber-100 px-1.5 h-9 flex items-center text-[9px] text-amber-900 font-bold font-mono border-l border-amber-200 rounded-r-md shrink-0">
                               {store.unidadeSigla(prodRef?.unidade_producao_id || 0)}
                             </span>
                           </div>
-                        </div>
 
-                        {/* Custom price per unit */}
-                        <div className="w-full sm:w-24 space-y-1">
-                          <label className="text-[9px] font-semibold text-amber-900/60 uppercase">R$ Unitário</label>
-                          <input 
-                            type="number" 
-                            step="any"
+                          <label className="text-[10px] text-gray-400 font-semibold">R$ Unit.</label>
+                          <input type="number" step="0.01" inputMode="decimal"
                             value={item.preco_unitario}
                             onChange={(e) => handleUpdateItemRow(idx, { preco_unitario: Number(e.target.value) })}
                             {...useSmartArrowKeys(item.preco_unitario, (v) => handleUpdateItemRow(idx, { preco_unitario: v }), 0)}
-                            className="w-full p-1.5 border border-amber-200 rounded font-mono text-xs"
-                            required
+                            className="h-9 border border-amber-200 rounded-md px-2 font-mono text-xs text-right focus:outline-none focus:border-amber-400" required
                           />
-                        </div>
 
-                        <div className="w-full sm:w-20 text-right pt-3 sm:pt-4">
-                          <span className="text-[10px] text-gray-500 font-mono">
-                            {formatCurrency((item.quantidade_solicitada * item.preco_unitario))}
-                          </span>
-                        </div>
+                          <div className="flex items-center justify-between col-span-2 pt-1 border-t border-amber-50">
+                            <span className="text-[10px] text-gray-400">Total do item</span>
+                            <span className="text-xs font-semibold font-mono text-amber-900">{formatCurrency(item.quantidade_solicitada * item.preco_unitario)}</span>
+                          </div>
 
-                        <div className="pt-2 sm:pt-4">
-                          <button 
-                            type="button" 
+                          <button
+                            type="button"
                             onClick={() => handleRemoveItemRow(idx)}
-                            className="text-red-500 hover:bg-red-50 p-1.5 rounded"
+                            className="col-span-2 h-9 w-full flex items-center justify-center gap-1.5 rounded-lg text-red-500 border border-red-100 hover:bg-red-50 active:bg-red-100 text-xs font-semibold transition"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} /> Remover item
                           </button>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Action buttons inside form to trigger validation checks! */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center bg-amber-50/50 p-2.5 rounded-lg">
-                  <span className="font-semibold text-amber-950 font-sans">Executar Verificação de Viabilidade</span>
-                  <button 
-                    type="button" 
-                    onClick={triggerLiveStockValidation}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-1 px-3 rounded-lg flex items-center gap-1 font-sans transition shadow-sm"
-                  >
-                    Analisar Estoque & Insumos 🔍
-                  </button>
-                </div>
-
-                {/* Validation Results Displays */}
-                {analiseResultado && (
-                  <div className="border border-amber-100 rounded-xl p-3 bg-white space-y-2 text-[11px] animate-in slide-in-from-top-1">
-                    {analiseResultado.tudoDisponivelEmEstoquePronto ? (
-                      <em className="text-emerald-800 font-medium bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 flex items-center gap-1.5">
-                        <CheckCircle2 size={15} className="text-emerald-600" />
-                        <span>Excelente! Há produtos prontos suficientes estocados na prateleira para cobrir esta encomenda.</span>
-                      </em>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-100 text-amber-900 leading-relaxed font-semibold">
-                          ⚠️ Prateleiras insuficientes! Será necessário produzir o restante de forma complementar.
-                        </div>
-
-                        {/* Deficit materials detail lists */}
-                        {!analiseResultado.podeProduzirRestante ? (
-                          <div className="p-3 rounded-lg bg-red-100/50 border border-red-200 text-red-800 space-y-1">
-                            <p className="font-bold font-sans flex items-center gap-1">
-                              <AlertTriangle size={15} className="text-red-500 font-semibold" /> Cuidado: Insumos Insuficientes na Cozinha para Cozinhar!
-                            </p>
-                            <ul className="list-disc list-inside font-semibold pl-1 space-y-0.5 text-[10px]">
-                              {analiseResultado.resumoFaltasMateriais.map((f, fIdx) => (
-                                <li key={fIdx}>
-                                  Faltam <span className="font-mono font-bold text-red-600">{f.falta.toFixed(2)}{f.unidade}</span> de {f.materialNome}
-                                </li>
-                              ))}
-                            </ul>
-                            <p className="text-[9px] text-gray-500 leading-snug mt-1 italic">
-                              Você pode rascunhar o pedido, mas travará na cozinha ao tentar "Iniciar Produção" até que os ingredientes acima sejam comprados ou reabastecidos.
-                            </p>
-                          </div>
-                        ) : (
-                          <em className="text-emerald-800 font-medium bg-emerald-50 p-2.5 rounded-lg border border-emerald-100 flex items-center gap-1.5">
-                            <CheckCircle2 size={15} className="text-emerald-600 font-semibold" />
-                            <span>Insumos suficientes! Apesar de não haver pronto estocado, a cozinha possui ingredientes bastantes para assar este pedido.</span>
-                          </em>
-                        )}
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                </main>
 
-              {/* Note / adjustments elements */}
-              <div className="space-y-1">
-                <label className="text-amber-950 font-medium font-sans">Observações Especiais do Pedido / Detalhes de Decoração</label>
-                <textarea 
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Ex: Coxinhas com catupiry. Brigadeiros decorados com granulado dourado."
-                  className="w-full h-14 p-2 border border-amber-200 rounded-lg text-xs"
-                />
-              </div>
+                {/* ── FOOTER FIXO — RESUMO + AÇÕES ──────────────────── */}
+                <footer className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-b-2xl">
+                  <div className="text-xs text-gray-500">
+                    Subtotal <span className="text-gray-900 font-semibold font-mono">{formatCurrency(subtotal)}</span>
+                  </div>
 
-              <div className="space-y-1">
-                <label className="text-amber-950 font-medium font-sans">Categoria Financeira</label>
-                <SelectSearch
-                  value={categoriaReceitaId.toString()}
-                  onChange={v => setCategoriaReceitaId(Number(v))}
-                  options={[
-                    { value: '0', label: 'Sem categoria' },
-                    ...categoriasReceita.map(c => ({ value: c.id.toString(), label: c.nome })),
-                  ]}
-                  placeholder="Selecione uma categoria"
-                />
-              </div>
+                  <div className="flex items-center gap-1.5">
+                    <label className="text-xs text-gray-500">Desconto R$</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={descontoValor}
+                      onChange={(e) => setDescontoValor(Math.max(0, Number(e.target.value)))}
+                      {...useSmartArrowKeys(descontoValor, (v) => setDescontoValor(Math.max(0, v)), 0.01)}
+                      className="w-20 h-9 border border-gray-200 rounded-lg px-2 text-xs text-right font-mono focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
 
-              {/* Total calculation strip */}
-              <div className="p-3 bg-emerald-100/50 rounded-xl border border-emerald-100 flex items-center justify-between text-xs" id="order-pricing-strip">
-                <span className="font-bold text-emerald-950 flex items-center gap-1 font-sans">
-                  <DollarSign size={15} className="text-emerald-600" /> Valor Total Estimado da Encomenda:
-                </span>
-                <span className="font-bold font-mono text-emerald-800 text-lg">
-                  {formatCurrency(itensPedido.reduce((acc, current) => acc + (current.quantidade_solicitada * current.preco_unitario), 0))}
-                </span>
-              </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xs text-gray-500">Total</span>
+                    <span className="text-sm font-semibold text-gray-900 font-mono">{formatCurrency(totalGeral)}</span>
+                  </div>
 
-              {/* Saving or rascunho switches options */}
-              <div className="flex gap-4">
-                <label className="flex items-center gap-1 cursor-pointer font-semibold text-amber-950">
-                  <input type="radio" checked={statusId === 2} onChange={() => setStatusId(2)} className="text-amber-700" /> Ativo / Confirmado
-                </label>
-                <label className="flex items-center gap-1 cursor-pointer text-gray-500">
-                  <input type="radio" checked={statusId === 1} onChange={() => setStatusId(1)} className="text-amber-700" /> Guardar Rascunho
-                </label>
-              </div>
-
-              {/* Submit footer links */}
-              <div className="flex items-center gap-3 pt-3 border-t border-amber-100">
-                <button 
-                  type="button" 
-                  onClick={() => setIsFormOpen(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-2.5 rounded-xl text-center"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 text-white font-bold py-2.5 rounded-xl text-center shadow-md font-sans text-xs"
-                >
-                  Confirmar Encomenda
-                </button>
-              </div>
-
-            </form>
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="h-9 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={itensPedido.every(it => !it.produto_id)}
+                      className="h-9 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold text-xs transition shadow-sm active:bg-amber-800"
+                    >
+                      {editingPedidoId ? 'Salvar Alterações' : 'Confirmar Pedido'}
+                    </button>
+                  </div>
+                </footer>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+
+
 
       {/* ---------------------------------------------------------------------------- */}
       {/* DIALOG DETAILS MODAL FOR SELECTION CARDS */}

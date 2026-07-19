@@ -87,7 +87,7 @@ export default function Login({ onLoginSuccess, onNavigateToAddAdmin }: LoginPro
                     {recError && (
                         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
                             <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                            <p className="text-sm text-red-800 dark:text-red-200">{recError}</p>
+                            <p className="text-sm text-red-800 dark:text-red-200 min-w-0">{recError}</p>
                         </div>
                     )}
 
@@ -160,7 +160,7 @@ export default function Login({ onLoginSuccess, onNavigateToAddAdmin }: LoginPro
                 {error && (
                     <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
                         <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                        <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                        <p className="text-sm text-red-800 dark:text-red-200 min-w-0">{error}</p>
                     </div>
                 )}
 

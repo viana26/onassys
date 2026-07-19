@@ -668,7 +668,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             {errorMessage && (
               <div className="bg-red-50 dark:bg-red-950/25 text-red-800 dark:text-red-300 p-3 rounded-xl border border-red-100 dark:border-red-950/30 flex items-start gap-2 text-xs">
                 <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <p className="font-semibold">Insumos Críticos!</p>
                   <p className="text-[10px] leading-normal">{errorMessage}</p>
                 </div>
@@ -762,7 +762,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             {errorMessage && (
               <div className="bg-red-50 dark:bg-red-950/25 text-red-800 dark:text-red-300 p-3 rounded-xl border border-red-100 dark:border-red-950/30 flex items-start gap-2 text-xs">
                 <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <p className="font-semibold">Erro ao ajustar estoque</p>
                   <p className="text-[10px] leading-normal">{errorMessage}</p>
                 </div>

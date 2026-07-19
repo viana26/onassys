@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { Cliente } from '../types';
 import { phoneMask } from '../lib/mask';
@@ -48,7 +48,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
   const [observacoes, setObservacoes] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
 
-  const filteredClientes = useMemo(() => {
+  const filteredClientes = (() => {
     const searchLower = searchTerm.toLowerCase().trim();
     const searchDigits = searchTerm.replace(/\D/g, '');
     
@@ -69,7 +69,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
       }
       return matchesSearch;
     });
-  }, [store.clientes, searchTerm, typeFilter]);
+  })();
 
   const { sortedItems: sortedClientes, requestSort, sortConfig } = useSortableData(filteredClientes, 'nome');
 
@@ -115,7 +115,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     setObservacoes(c.observacoes || '');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nome.trim()) {
       alert('Favor preencher o nome do cliente.');
@@ -123,7 +123,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
     }
 
     if (editId) {
-      store.updateCliente(editId, {
+      await store.updateCliente(editId, {
         nome,
         tipo_id: tipoId,
         telefone,
@@ -132,7 +132,7 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
         observacoes
       });
     } else {
-      store.addCliente({
+      await store.addCliente({
         nome,
         tipo_id: tipoId,
         telefone,
@@ -401,22 +401,20 @@ export default function Clientes({ store, onUpdate }: ClientesProps) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium">Tipo de Cliente *</label>
-                  <SelectSearch value={String(tipoId)} onChange={v => setTipoId(Number(v))} options={store.tiposCliente.map(tc => ({ value: String(tc.id), label: tc.nome }))} placeholder="Tipo de cliente" />
-                </div>
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium">Tipo de Cliente *</label>
+                <SelectSearch value={String(tipoId)} onChange={v => setTipoId(Number(v))} options={store.tiposCliente.map(tc => ({ value: String(tc.id), label: tc.nome }))} placeholder="Tipo de cliente" />
+              </div>
 
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Telefone / WhatsApp</label>
-                  <input 
-                    type="tel" 
-                    value={telefone}
-                    onChange={(e) => setTelefone(phoneMask(e.target.value))}
-                    placeholder="Ex: (11) 98888-7777"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Telefone / WhatsApp</label>
+                <input 
+                  type="tel" 
+                  value={telefone}
+                  onChange={(e) => setTelefone(phoneMask(e.target.value))}
+                  placeholder="Ex: (11) 98888-7777"
+                  className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 placeholder:text-gray-400 dark:placeholder:text-amber-200/20"
+                />
               </div>
 
               <div className="space-y-1">

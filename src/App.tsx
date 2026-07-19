@@ -20,10 +20,10 @@ import { OnboardingChecklist } from './components/Help';
 import './components/Help/driver-overrides.css';
 import { 
     isSupabaseConfigured, 
-    verificarAdminExiste,
     onAuthStateChange, 
     signOut,
-    supabase
+    supabase,
+    verificarAdminExiste
 } from './lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 
@@ -101,9 +101,12 @@ export default function App() {
   // EFFECTS - Auth
   // =====================================================
   useEffect(() => {
+    let initialAuthDone = false;
+
     const initAuth = async () => {
       if (!isSupabaseConfigured()) {
         setAuthScreen('setup');
+        initialAuthDone = true;
         return;
       }
 
@@ -120,6 +123,8 @@ export default function App() {
       } catch {
         setAuthScreen('setup');
       }
+
+      initialAuthDone = true;
     };
 
     initAuth();
@@ -128,11 +133,10 @@ export default function App() {
       if (user) {
         setCurrentUser(user);
         setAuthScreen('app');
-      } else {
+      } else if (initialAuthDone) {
         setCurrentUser(null);
         setStore(null);
-        const adminExiste = await verificarAdminExiste();
-        setAuthScreen(adminExiste ? 'login' : 'add-admin');
+        setAuthScreen('login');
       }
     });
 
