@@ -9,7 +9,7 @@ export const supabase: SupabaseClient = supabaseUrl && supabaseAnonKey
     : createClient('https://placeholder.supabase.co', 'placeholder');
 
 export const supabaseAdmin: SupabaseClient = supabaseUrl && supabaseServiceRoleKey 
-    ? createClient(supabaseUrl, supabaseServiceRoleKey)
+    ? createClient(supabaseUrl, supabaseServiceRoleKey, { auth: { persistSession: false } })
     : createClient('https://placeholder.supabase.co', 'placeholder');
 
 export interface Perfil {

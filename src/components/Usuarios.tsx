@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MiniFactoryStore } from '../lib/store';
-import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Copy, CheckCircle, Pencil } from 'lucide-react';
+import { Users as UsersIcon, Plus, Shield, AlertCircle, Trash2, AlertTriangle, Key, Pencil, RefreshCw } from 'lucide-react';
 import { supabase, supabaseAdmin, signOut } from '../lib/supabaseClient';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
+
+function generatePassword(length = 10): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 interface UsuarioRow {
   id: string;
@@ -36,11 +41,23 @@ export default function Usuarios({ store }: UsuariosProps) {
   const [resetConfirm, setResetConfirm] = useState('');
   const [resetSaving, setResetSaving] = useState(false);
   const [resetError, setResetError] = useState('');
-  const [userRecoveryCode, setUserRecoveryCode] = useState('');
-  const [recoveryCopied, setRecoveryCopied] = useState(false);
-  const [createdUserCode, setCreatedUserCode] = useState('');
-  const [createdUserName, setCreatedUserName] = useState('');
   const [editUser, setEditUser] = useState<UsuarioRow | null>(null);
+  const [showGenerated, setShowGenerated] = useState(false);
+
+  const handleGeneratePassword = useCallback(() => {
+    const pwd = generatePassword();
+    setSenha(pwd);
+    setShowGenerated(true);
+    setTimeout(() => setShowGenerated(false), 5000);
+  }, []);
+
+  const handleGenerateResetPassword = useCallback(() => {
+    const pwd = generatePassword();
+    setResetPass(pwd);
+    setResetConfirm(pwd);
+    setShowGenerated(true);
+    setTimeout(() => setShowGenerated(false), 5000);
+  }, []);
 
   useEffect(() => { carregarUsuarios(); }, [store]);
 
@@ -81,9 +98,6 @@ export default function Usuarios({ store }: UsuariosProps) {
         await supabase.from('perfis_usuario').upsert({
           id: data.user.id, perfil_id: perfilId, ativo: true
         });
-        const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: data.user.id });
-        setCreatedUserCode(code || '');
-        setCreatedUserName(nome);
       }
       setShowModal(false);
       setEmail(''); setSenha(''); setNome(''); setPerfilId(1);
@@ -254,17 +268,14 @@ export default function Usuarios({ store }: UsuariosProps) {
                         </button>
                       )}
                       {store.hasPermission('usuarios.editar') && (
-                        <button onClick={async () => {
+                        <button onClick={() => {
                           setResetPassUser(user);
                           setResetPass('');
                           setResetConfirm('');
                           setResetError('');
-                          setUserRecoveryCode('');
-                          const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: user.id });
-                          setUserRecoveryCode(code || '');
                         }}
                           className="p-1.5 text-amber-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg transition"
-                          title="Recuperação de senha">
+                          title="Redefinir senha">
                           <Key size={16} />
                         </button>
                       )}
@@ -302,8 +313,14 @@ export default function Usuarios({ store }: UsuariosProps) {
               </div>
               {!editUser && (
                 <div>
-                  <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Senha</label>
-                  <input type="password" value={senha} onChange={e => setSenha(e.target.value)} required minLength={6}
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-[#5c4a37] dark:text-amber-100">Senha</label>
+                    <button type="button" onClick={handleGeneratePassword}
+                      className="text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-500 flex items-center gap-0.5 transition">
+                      <RefreshCw size={10} /> Gerar
+                    </button>
+                  </div>
+                  <input type={showGenerated ? 'text' : 'password'} value={senha} onChange={e => setSenha(e.target.value)} required minLength={6}
                     className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500" />
                 </div>
               )}
@@ -367,7 +384,7 @@ export default function Usuarios({ store }: UsuariosProps) {
                 <Key size={24} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">Recuperação de Senha</h3>
+                <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50">Redefinir Senha</h3>
                 <p className="text-xs text-[#5c4a37] dark:text-amber-100/70">
                   {resetPassUser.nome} ({resetPassUser.email})
                 </p>
@@ -378,94 +395,31 @@ export default function Usuarios({ store }: UsuariosProps) {
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-300">{resetError}</div>
             )}
 
-            <div className="space-y-5">
+            <form onSubmit={redefinirSenha} className="space-y-3">
               <div>
-                <label className="block text-sm font-semibold text-[#5c4a37] dark:text-amber-100 mb-2">Código de Recuperação</label>
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
-                  <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-3 py-2 mb-2 text-center">
-                    <span className="text-lg font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">
-                      {userRecoveryCode || '────────'}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => {
-                      try { navigator.clipboard.writeText(userRecoveryCode); } catch {
-                        const ta = document.createElement('textarea');
-                        ta.value = userRecoveryCode; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                      }
-                      setRecoveryCopied(true); setTimeout(() => setRecoveryCopied(false), 2000);
-                    }}
-                      className="flex-1 py-1.5 text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-white dark:hover:bg-[#130b04] transition flex items-center justify-center gap-1">
-                      <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar'}
-                    </button>
-                    <button onClick={async () => {
-                      const { data: code } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: resetPassUser.id });
-                      if (code) setUserRecoveryCode(code);
-                    }}
-                      className="flex-1 py-1.5 text-xs border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg text-[#5c4a37] dark:text-amber-100 font-medium hover:bg-white dark:hover:bg-[#130b04] transition">
-                      Regenerar
-                    </button>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium text-[#5c4a37] dark:text-amber-100">Nova senha</label>
+                  <button type="button" onClick={handleGenerateResetPassword}
+                    className="text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-500 flex items-center gap-0.5 transition">
+                    <RefreshCw size={10} /> Gerar
+                  </button>
                 </div>
+                <input type={showGenerated ? 'text' : 'password'} value={resetPass} onChange={e => setResetPass(e.target.value)} required minLength={6} placeholder="Nova senha"
+                  className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
               </div>
-
-              <hr className="border-[#ebdcc9] dark:border-[#2e1a0a]" />
-
-              <div>
-                <label className="block text-sm font-semibold text-[#5c4a37] dark:text-amber-100 mb-2">Redefinir Senha</label>
-                <form onSubmit={redefinirSenha} className="space-y-3">
-                  <input type="password" value={resetPass} onChange={e => setResetPass(e.target.value)} required minLength={6} placeholder="Nova senha"
-                    className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                  <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} required minLength={6} placeholder="Confirmar nova senha"
-                    className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                  <div className="flex gap-2">
-                    <button type="submit" disabled={resetSaving}
-                      className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl text-sm transition disabled:cursor-not-allowed">
-                      {resetSaving ? 'Redefinindo...' : 'Redefinir'}
-                    </button>
-                    <button type="button" onClick={() => { setResetPassUser(null); setResetPass(''); setResetConfirm(''); setResetError(''); }}
-                      className="flex-1 py-2 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium text-sm hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
-                      Fechar
-                    </button>
-                  </div>
-                </form>
+              <input type={showGenerated ? 'text' : 'password'} value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} required minLength={6} placeholder="Confirmar nova senha"
+                className="w-full px-3 py-2 bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+              <div className="flex gap-2 pt-2">
+                <button type="submit" disabled={resetSaving}
+                  className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-amber-400 text-white font-semibold rounded-xl text-sm transition disabled:cursor-not-allowed">
+                  {resetSaving ? 'Redefinindo...' : 'Redefinir'}
+                </button>
+                <button type="button" onClick={() => { setResetPassUser(null); setResetPass(''); setResetConfirm(''); setResetError(''); }}
+                  className="flex-1 py-2 border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#5c4a37] dark:text-amber-100 font-medium text-sm hover:bg-[#f8f5ee] dark:hover:bg-[#130b04] transition">
+                  Fechar
+                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {createdUserCode && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-md w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a] text-center">
-            <div className="bg-emerald-100 dark:bg-emerald-900/30 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
-              <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <h3 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-1">Usuário Criado!</h3>
-            <p className="text-sm text-[#5c4a37] dark:text-amber-100/70 mb-4">{createdUserName}</p>
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-3">
-              <span className="text-xs font-semibold text-amber-700 dark:text-amber-300 block mb-2">CÓDIGO DE RECUPERAÇÃO</span>
-              <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-3 py-2 mb-2">
-                <span className="text-lg font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">{createdUserCode}</span>
-              </div>
-              <button onClick={() => {
-                try { navigator.clipboard.writeText(createdUserCode); } catch {
-                  const ta = document.createElement('textarea');
-                  ta.value = createdUserCode; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                }
-                setRecoveryCopied(true); setTimeout(() => setRecoveryCopied(false), 2000);
-              }}
-                className="text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 transition flex items-center justify-center gap-1 mx-auto">
-                <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar código'}
-              </button>
-            </div>
-            <p className="text-xs text-red-600 dark:text-red-400 mb-4">⚠️ Guarde o código. Sem ele, só o admin poderá redefinir a senha.</p>
-            <button onClick={() => { setCreatedUserCode(''); setCreatedUserName(''); }}
-              className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-sm transition">
-              Ok
-            </button>
+            </form>
           </div>
         </div>
       )}

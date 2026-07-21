@@ -46,8 +46,6 @@ import {
   Sun,
   Moon,
   LogOut,
-  Key,
-  Copy,
   Wifi,
   WifiOff,
   AlertCircle,
@@ -74,9 +72,6 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [caixaPreselectedId, setCaixaPreselectedId] = useState<string | null>(null);
-  const [showRecoveryCode, setShowRecoveryCode] = useState(false);
-  const [recoveryCodeValue, setRecoveryCodeValue] = useState('');
-  const [recoveryCopied, setRecoveryCopied] = useState(false);
   const newOrderTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
   const newLotTriggerRef = useRef<{ trigger: () => void }>({ trigger: () => {} });
 
@@ -174,32 +169,6 @@ export default function App() {
     }
   }, [store?.dadosEmpresa?.nome_empresa]);
 
-  // Mostrar código de recuperação no primeiro login
-  useEffect(() => {
-    if (!store || !currentUser) return;
-    let cancelled = false;
-    const checkCode = async () => {
-      try {
-        await new Promise(r => setTimeout(r, 500));
-        const { data: perfil, error } = await supabase
-          .from('perfis_usuario')
-          .select('recovery_code_shown')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-        if (cancelled || error || !perfil || perfil.recovery_code_shown) return;
-        const { data: code, error: rpcError } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: currentUser.id });
-        if (cancelled || rpcError || !code) return;
-        await supabase.from('perfis_usuario').update({ recovery_code_shown: true }).eq('id', currentUser.id);
-        setRecoveryCodeValue(code);
-        setShowRecoveryCode(true);
-      } catch {
-        // coluna ou RPC ainda não existem no banco — ignora
-      }
-    };
-    const timer = setTimeout(checkCode, 1500);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [store, currentUser]);
-
   // =====================================================
   // EFFECTS - Sync app name to browser tab
   // =====================================================
@@ -237,7 +206,7 @@ export default function App() {
   };
 
   const handleAddAdminSuccess = () => {
-    setAuthScreen('login');
+    setAuthScreen(prev => prev === 'app' ? prev : 'login');
   };
 
   const handleLogout = async () => {
@@ -658,82 +627,6 @@ export default function App() {
           <Plus size={18} />
         </button>
       </nav>
-
-      {showRecoveryCode && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 border border-[#ebdcc9] dark:border-[#2e1a0a] text-center shadow-2xl">
-            <div className="bg-amber-100 dark:bg-amber-900/30 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Key size={28} className="text-amber-600 dark:text-amber-400" />
-            </div>
-            <h2 className="text-lg font-bold text-[#2e2315] dark:text-amber-50 mb-1">
-              Seu Código de Recuperação
-            </h2>
-            <p className="text-xs text-[#5c4a37]/70 dark:text-amber-100/60 mb-4">
-              Guarde este código em local seguro. Ele permite redefinir sua senha sem precisar do administrador.
-            </p>
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-4">
-              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">
-                Código de Recuperação
-              </span>
-              <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-4 py-3 mt-2">
-                <span className="text-2xl font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 font-mono select-all">
-                  {recoveryCodeValue}
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  try {
-                    navigator.clipboard.writeText(recoveryCodeValue);
-                  } catch {
-                    const ta = document.createElement('textarea');
-                    ta.value = recoveryCodeValue;
-                    ta.style.position = 'fixed';
-                    ta.style.opacity = '0';
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                  }
-                  setRecoveryCopied(true);
-                }}
-                className="mt-2 inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 transition"
-              >
-                <Copy size={12} /> {recoveryCopied ? 'Copiado!' : 'Copiar código'}
-              </button>
-            </div>
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl mb-4">
-              <p className="text-xs text-red-700 dark:text-red-300">
-                ⚠️ Este código não é sua senha. É uma chave de recuperação exibida apenas uma vez. Se perder, peça ao administrador para gerar um novo.
-              </p>
-            </div>
-            <button onClick={() => {
-              setShowRecoveryCode(false);
-              setRecoveryCopied(false);
-              const firstTab = [
-                { id: 'dashboard', perm: null },
-                { id: 'materiais', perm: 'materiais.ver' },
-                { id: 'produtos', perm: 'produtos.ver' },
-                { id: 'estoque', perm: 'estoque.ver' },
-                { id: 'clientes', perm: 'clientes.ver' },
-                { id: 'fornecedores', perm: 'fornecedores.ver' },
-                { id: 'pedidos', perm: 'pedidos.ver' },
-                { id: 'caixa', perm: 'financeiro.ver' },
-                { id: 'financeiro', perm: 'financeiro.ver' },
-                { id: 'relatorios', perm: 'financeiro.ver' },
-                { id: 'usuarios', perm: '' },
-                { id: 'config', perm: 'config.editar' },
-              ].find(t => {
-                if (t.id === 'usuarios') return store.perfisUsuarios.find(u => u.id === store.currentUserId)?.perfil_id === 1;
-                return !t.perm || store.hasPermission(t.perm);
-              });
-              if (firstTab) setCurrentTab(firstTab.id);
-            }}
-              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-xl text-sm transition">
-              Entendi, guardar o código
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

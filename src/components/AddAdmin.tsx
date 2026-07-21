@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Copy, Key } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { signUp, marcarPrimeiroAcessoConcluido, supabase } from '../lib/supabaseClient';
+
+function generatePassword(length = 10): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 interface AddAdminProps {
     onSuccess: () => void;
@@ -15,8 +20,15 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [recoveryCode, setRecoveryCode] = useState('');
-    const [copied, setCopied] = useState(false);
+    const [showGenerated, setShowGenerated] = useState(false);
+
+    const handleGeneratePassword = useCallback(() => {
+      const pwd = generatePassword();
+      setPassword(pwd);
+      setConfirmPassword(pwd);
+      setShowGenerated(true);
+      setTimeout(() => setShowGenerated(false), 5000);
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,17 +58,10 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
                 });
             }
             await marcarPrimeiroAcessoConcluido();
-            let code = '';
-            if (result.userId) {
-                const { data: c } = await supabase.rpc('gerar_codigo_recovery_usuario', { p_user_id: result.userId });
-                code = c || '';
-            }
-            await supabase.rpc('gerar_codigo_recovery');
-            setRecoveryCode(code);
             setSuccess(true);
             setTimeout(() => {
                 onSuccess();
-            }, 10000);
+            }, 5000);
         } else {
             setError(result.error || 'Erro ao criar administrador');
         }
@@ -75,40 +80,8 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
                         Administrador Criado!
                     </h2>
                     <p className="text-xs text-[#5c4a37]/70 dark:text-amber-100/60 mb-3">
-                        Guarde o código abaixo para recuperar sua senha.
+                        Você já pode acessar com o email e senha cadastrados.
                     </p>
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3 mb-3">
-                        <div className="flex items-center gap-1.5 justify-center mb-2">
-                            <Key size={14} className="text-amber-600 dark:text-amber-400" />
-                            <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 tracking-wider">
-                                CÓDIGO DE RECUPERAÇÃO
-                            </span>
-                        </div>
-                        <div className="bg-white dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-lg px-3 py-2 mb-2">
-                            <span className="text-xl font-bold tracking-[0.3em] text-[#2e2315] dark:text-amber-50 select-all font-mono">
-                                {recoveryCode}
-                            </span>
-                        </div>
-                        <button
-                            onClick={() => {
-                              try { navigator.clipboard.writeText(recoveryCode); } catch {
-                                const ta = document.createElement('textarea');
-                                ta.value = recoveryCode; ta.style.position = 'fixed'; ta.style.opacity = '0';
-                                document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-                              }
-                              setCopied(true); setTimeout(() => setCopied(false), 2000);
-                            }}
-                            className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 hover:text-amber-600 dark:hover:text-amber-200 transition"
-                        >
-                            <Copy size={12} />
-                            {copied ? 'Copiado!' : 'Copiar código'}
-                        </button>
-                    </div>
-                    <div className="p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-                        <p className="text-[10px] text-red-700 dark:text-red-300">
-                            ⚠️ Código exibido apenas uma vez. Guarde em local seguro.
-                        </p>
-                    </div>
                     <p className="text-[10px] text-[#5c4a37]/50 dark:text-amber-100/40 mt-3">
                         Redirecionando para login...
                     </p>
@@ -171,10 +144,16 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
 
                     <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <label className="block text-xs font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Senha</label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="block text-xs font-medium text-[#5c4a37] dark:text-amber-100">Senha</label>
+                              <button type="button" onClick={handleGeneratePassword}
+                                className="text-[10px] text-amber-600 dark:text-amber-400 hover:text-amber-500 flex items-center gap-0.5 transition">
+                                <RefreshCw size={10} /> Gerar
+                              </button>
+                            </div>
                             <div className="relative">
                                 <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#5c4a37]/50 dark:text-amber-100/40" />
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
+                                <input type={showGenerated ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
                                     className="w-full pl-8 pr-3 py-1.5 text-sm bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 placeholder:text-[#5c4a37]/40 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
                                     placeholder="Mín. 6" />
                             </div>
@@ -183,7 +162,7 @@ export default function AddAdmin({ onSuccess, onBack }: AddAdminProps) {
                             <label className="block text-xs font-medium text-[#5c4a37] dark:text-amber-100 mb-1">Confirmar</label>
                             <div className="relative">
                                 <Lock size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#5c4a37]/50 dark:text-amber-100/40" />
-                                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required
+                                <input type={showGenerated ? 'text' : 'password'} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required
                                     className="w-full pl-8 pr-3 py-1.5 text-sm bg-[#f8f5ee] dark:bg-[#130b04] border border-[#ebdcc9] dark:border-[#2e1a0a] rounded-xl text-[#2e2315] dark:text-amber-50 placeholder:text-[#5c4a37]/40 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
                                     placeholder="Repetir" />
                             </div>
