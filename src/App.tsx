@@ -436,12 +436,6 @@ export default function App() {
       {/* MOBILE HEADER */}
       <header className="md:hidden bg-[#f8f5ee] dark:bg-[#0c0703] text-[#2e2315] dark:text-amber-100 p-4 border-b border-[#ebdcc9] dark:border-[#1e1005] flex items-center justify-between sticky top-0 z-40 transition-colors duration-200">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-1.5 -ml-1 rounded-lg hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] transition"
-          >
-            <Menu size={18} />
-          </button>
           {store?.dadosEmpresa?.logo_url ? (
                   <img src={store.dadosEmpresa.logo_url} alt="Logo" className="w-20 h-20 object-cover rounded-xl shadow-md border border-amber-200 dark:border-amber-800/40" />
           ) : (
@@ -459,6 +453,12 @@ export default function App() {
           >
             {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
           </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-1.5 rounded-lg hover:bg-[#ebe2d5] dark:hover:bg-[#1e140b] transition"
+          >
+            <Menu size={18} />
+          </button>
         </div>
       </header>
 
@@ -466,18 +466,9 @@ export default function App() {
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-64 bg-[#f8f5ee] dark:bg-[#0c0703] shadow-2xl border-r border-[#ebdcc9] dark:border-[#1e1005] p-5 animate-in slide-in-from-left-1 overflow-y-auto">
+          <div className="absolute right-0 top-0 bottom-0 w-64 bg-[#f8f5ee] dark:bg-[#0c0703] shadow-2xl border-l border-[#ebdcc9] dark:border-[#1e1005] p-5 animate-in slide-in-from-right-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#ebdcc9] dark:border-[#1e1005]">
-              <div className="flex items-center gap-2">
-                {store?.dadosEmpresa?.logo_url ? (
-            <img src={store.dadosEmpresa.logo_url} alt="Logo" className="w-20 h-20 object-cover rounded-xl shadow-md border border-amber-200 dark:border-amber-800/40" />
-                ) : (
-                  <div className="bg-amber-600 w-20 h-20 flex items-center justify-center rounded-xl text-amber-950 shrink-0 shadow-md border border-amber-200 dark:border-amber-800/40">
-                    <ChefHat size={28} />
-                  </div>
-                )}
-                <span className="font-display font-bold text-sm text-[#2e2315] dark:text-white">{appName}</span>
-              </div>
+              <span className="font-display font-bold text-sm text-[#2e2315] dark:text-white">Menu</span>
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-gray-400 hover:text-amber-950 p-1">
                 <X size={18} />
               </button>

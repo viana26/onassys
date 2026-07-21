@@ -131,12 +131,12 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
 
   return (
     <div className="space-y-6" id="dashboard-tab" data-help="dashboard">
-      <div className="bg-gradient-to-r from-orange-50/90 to-amber-100/90 dark:from-amber-800/40 dark:to-amber-900/40 rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.3)] flex items-center justify-between backdrop-blur-sm border-t border-amber-200/50 dark:border-t-amber-700/20" id="dash-banner">
-        <div className="flex items-center gap-3">
-          <span className="bg-amber-200/70 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full uppercase tracking-wider font-mono">
+      <div className="bg-gradient-to-r from-orange-50/90 to-amber-100/90 dark:from-amber-800/40 dark:to-amber-900/40 rounded-2xl p-3 md:p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.12),0_0_0_1px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_12px_-4px_rgba(0,0,0,0.3)] flex flex-col md:flex-row md:items-center md:justify-between gap-3 backdrop-blur-sm border-t border-amber-200/50 dark:border-t-amber-700/20" id="dash-banner">
+        <div className="flex flex-col gap-1">
+          <span className="bg-amber-200/70 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider font-mono w-fit">
             Painel Geral
           </span>
-          <h1 className="text-lg font-display font-semibold text-amber-950 dark:text-amber-100 tracking-tight">
+          <h1 className="text-base md:text-lg font-display font-semibold text-amber-950 dark:text-amber-100 tracking-tight">
             {(() => {
               const h = hoje.getHours();
               const nome = store.perfisUsuarios.find(u => u.id === store.currentUserId)?.nome?.split(' ')[0] || 'fofura';
@@ -149,13 +149,13 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
             })()}
           </h1>
         </div>
-        <div className="flex gap-2" id="quick-actions">
+        <div className="flex gap-2 w-full md:w-auto" id="quick-actions">
           <button onClick={onSetQuickOrder}
-            className="bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center gap-1 shadow-sm font-sans">
+            className="flex-1 md:flex-none bg-amber-500 hover:bg-amber-400 text-white text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1 shadow-sm font-sans">
             <PlusCircle size={14} /> Novo Pedido
           </button>
           <button onClick={onSetQuickLot}
-            className="bg-white dark:bg-[#22160b] border border-amber-300 dark:border-white/20 text-amber-800 dark:text-amber-300 text-xs font-semibold py-1.5 px-3 rounded-xl transition flex items-center gap-1 font-sans hover:bg-amber-50 dark:hover:bg-[#2a1d10]">
+            className="flex-1 md:flex-none bg-white dark:bg-[#22160b] border border-amber-300 dark:border-white/20 text-amber-800 dark:text-amber-300 text-xs font-semibold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1 font-sans hover:bg-amber-50 dark:hover:bg-[#2a1d10]">
             <TrendingUp size={14} /> Concluir Lote
           </button>
         </div>
