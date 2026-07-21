@@ -244,7 +244,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       setCustomAlert({ title: 'Nenhum insumo', message: 'Por favor, cadastre matérias-primas primeiro!' });
       return;
     }
-    const usedIds = recipeItems.map(r => r.material_id);
+    const usedIds = recipeItems.map(r => r.material_id).filter(Boolean);
     const unused = store.materiais.find(m => !usedIds.includes(m.id));
     if (!unused) {
       setCustomAlert({ title: 'Limite atingido', message: 'Todos os ingredientes disponíveis já foram adicionados à receita.' });
@@ -253,9 +253,9 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
     setRecipeItems([
       ...recipeItems,
       {
-        material_id: unused.id,
+        material_id: '',
         quantidade_necessaria: 1,
-        unidade_id: unused.unidade_id
+        unidade_id: store.unidades[0]?.id || 1
       }
     ]);
   };
@@ -306,12 +306,13 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
       return;
     }
 
-    if (recipeItems.length === 0) {
+    const validRecipeItems = recipeItems.filter(r => r.material_id);
+    if (validRecipeItems.length === 0) {
       setCustomAlert({ title: 'Ficha técnica vazia', message: 'Adicione pelo menos 1 ingrediente na composição da receita.' });
       return;
     }
 
-    const matIds = recipeItems.map(r => r.material_id);
+    const matIds = validRecipeItems.map(r => r.material_id);
     const hasDuplicate = matIds.some((val, i) => matIds.indexOf(val) !== i);
     if (hasDuplicate) {
       setCustomAlert({ title: 'Ingrediente duplicado', message: 'Você incluiu o mesmo ingrediente mais de uma vez na receita do produto. Junte as quantidades para salvar em linha única.' });
@@ -350,7 +351,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
 
       const oldFichas = store.fichas.filter(f => f.produto_id === editId);
       for (const f of oldFichas) await store.deleteFichaTecnica(f.id);
-      for (const item of recipeItems) {
+      for (const item of validRecipeItems) {
         await store.addFichaTecnica({
           produto_id: editId,
           material_id: item.material_id,
@@ -371,7 +372,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
         imagem: ''
       });
 
-      for (const item of recipeItems) {
+      for (const item of validRecipeItems) {
         await store.addFichaTecnica({
           produto_id: prod.id,
           material_id: item.material_id,

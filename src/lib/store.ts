@@ -65,9 +65,9 @@ export class MiniFactoryStore {
   // ================================================
   // LOOKUP HELPERS
   // ================================================
-  unidadeSigla(id: number): string { return this.unidades.find(u => u.id === id)?.sigla || `?(${id})`; }
-  unidadeNome(id: number): string { return this.unidades.find(u => u.id === id)?.nome || `?(${id})`; }
-  categoriaNome(id: number): string { return this.categorias.find(c => c.id === id)?.nome || `?(${id})`; }
+  unidadeSigla(id: number): string { if (!id) return ''; return this.unidades.find(u => u.id === id)?.sigla || ''; }
+  unidadeNome(id: number): string { if (!id) return ''; return this.unidades.find(u => u.id === id)?.nome || ''; }
+  categoriaNome(id: number): string { if (!id) return ''; return this.categorias.find(c => c.id === id)?.nome || ''; }
   statusNome(id: number): string { return this.statusPedido.find(s => s.id === id)?.nome || `?(${id})`; }
   tipoClienteNome(id: number): string { return this.tiposCliente.find(t => t.id === id)?.nome || `?(${id})`; }
   fornecedorNome(id: number): string { return this.fornecedores.find(f => f.id === id)?.nome_fantasia || `?(${id})`; }

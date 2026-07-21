@@ -144,8 +144,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     setStatusId(2);
     setCategoriaReceitaId(0);
     setDescontoValor(0);
-    // Adiciona primeiramente uma coxinha
-    setItensPedido([{ produto_id: store.produtos[0]?.id || '', quantidade_solicitada: 10, preco_unitario: store.produtos[0]?.preco_venda || 0 }]);
+    setItensPedido([]);
     setAnaliseResultado(null);
   };
 
@@ -183,7 +182,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
     }
     setItensPedido([
       ...itensPedido,
-      { produto_id: unused.id, quantidade_solicitada: 1, preco_unitario: unused.preco_venda || 0 }
+      { produto_id: '', quantidade_solicitada: 1, preco_unitario: 0 }
     ]);
   };
 
@@ -1218,8 +1217,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                     </button>
                     <button
                       type="submit"
-                      disabled={itensPedido.every(it => !it.produto_id)}
-                      className="h-9 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold text-xs transition shadow-sm active:bg-amber-800"
+                      className="h-9 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition shadow-sm active:bg-amber-800"
                     >
                       {editingPedidoId ? 'Salvar Alterações' : 'Confirmar Pedido'}
                     </button>

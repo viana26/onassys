@@ -62,7 +62,9 @@ INSERT INTO public.unidades (id, sigla, nome, tipo) OVERRIDING SYSTEM VALUE VALU
     (4, 'mL', 'Mililitro', 'volume'),
     (5, 'un', 'Unidade', 'unidade'),
     (6, 'cx', 'Caixa', 'unidade'),
-    (7, 'pc', 'Pacote', 'unidade')
+    (7, 'pc', 'Pacote', 'unidade'),
+    (8, 'ct', 'Cento', 'unidade'),
+    (9, 'dz', 'Dúzia', 'unidade')
 ON CONFLICT (sigla) DO NOTHING;
 
 -- Reset sequence to avoid conflict on future inserts
