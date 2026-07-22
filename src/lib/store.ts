@@ -508,7 +508,7 @@ export class MiniFactoryStore {
         if (tipoEntrada) tipoId = tipoEntrada.id;
       }
 
-      let obsTexto = `Ajuste manual: ${antigo} → ${novoSaldo}`;
+      let obsTexto = `Ajuste no saldo de: ${antigo} → ${novoSaldo}`;
       if (observacao) obsTexto += ` | ${observacao}`;
 
       const custoUnit = this.materiais[idx].custo_unitario;
@@ -910,7 +910,7 @@ export class MiniFactoryStore {
       const movProd: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: tipoIdProd, quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId,         observacao: observacao ? `Entrada por produção — ${observacao}` : (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
+        pedido_id: pedidoId, observacao: observacao ? `Entrada por produção — ${observacao}` : (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
         usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
       };
