@@ -849,7 +849,6 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                             <thead className="sticky top-0 z-10">
                               <tr className="bg-amber-50 dark:bg-[#1c140c] border-b border-amber-200 dark:border-[#2d1e0d]">
                                 <th className="text-left px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-1/2">Ingrediente</th>
-                                <th className="text-left px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-28">Quantidade</th>
                                 <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-20">Custo</th>
                                 <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-10"></th>
                               </tr>
@@ -867,18 +866,6 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                           .map(m => ({value: m.id, label: `${m.nome} (${store.unidadeSigla(m.unidade_id)})`}))}
                                         placeholder="Selecione um ingrediente"
                                         className="w-full" />
-                                    </td>
-                                    <td className="px-2 py-1.5">
-                                      <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
-                                        <input type="number" step="0.001" min="0.001" placeholder="0,500"
-                                          value={item.quantidade_necessaria}
-                                          onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
-                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
-                                          className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
-                                        <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[9px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                                          {store.unidadeSigla(item.unidade_id)}
-                                        </span>
-                                      </div>
                                     </td>
                                     <td className="px-2 py-1.5 text-right">
                                       <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100">
@@ -913,16 +900,6 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                   placeholder="Selecione um ingrediente"
                                   className="w-full" />
                                 <div className="flex items-center gap-2">
-                                  <div className="flex-1 flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
-                                      <input type="number" step="0.001" min="0.001" placeholder="0,500"
-                                          value={item.quantidade_necessaria}
-                                          onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
-                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
-                                          className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
-                                        <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
-                                          {store.unidadeSigla(item.unidade_id)}
-                                        </span>
-                                      </div>
                                   <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100 whitespace-nowrap">
                                     {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
                                   </span>

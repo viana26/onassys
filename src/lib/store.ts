@@ -5,7 +5,7 @@ import { deleteProdutoImage, isStorageUrl } from './imageUpload';
 
 export const dataLocal = (d?: Date) => {
   const dt = d || new Date();
-  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 };
 
 export class MiniFactoryStore {
@@ -252,24 +252,24 @@ export class MiniFactoryStore {
   // ================================================
   async loadLookups() {
     if (!isSupabaseConfigured()) return;
-      const [
-        u, cat, st, tm, tc, f, perm, perf, pp, cf
-      ] = await Promise.all([
-        this.fetchAll<Unidade>('unidades'),
-        this.fetchAll<Categoria>('categorias'),
-        this.fetchAll<StatusPedido>('status_pedido'),
-        this.fetchAll<TipoMovimentacao>('tipos_movimentacao'),
-        this.fetchAll<TipoCliente>('tipos_cliente'),
-        this.fetchAll<Fornecedor>('fornecedores'),
-        this.fetchAll<Permissao>('permissoes'),
-        this.fetchAll<Perfil>('perfis'),
-        this.fetchAll<PerfilPermissao>('perfis_permissoes'),
-        this.fetchAll<CategoriaFinanceiro>('categorias_financeiro'),
-      ]);
-      this.unidades = u; this.categorias = cat; this.statusPedido = st;
-      this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
-      this.permissoes = perm; this.perfis = perf; this.perfisPermissoes = pp; this.categoriasFinanceiro = cf;
-      await this.ensureFornecedorPermissions();
+    const [
+      u, cat, st, tm, tc, f, perm, perf, pp, cf
+    ] = await Promise.all([
+      this.fetchAll<Unidade>('unidades'),
+      this.fetchAll<Categoria>('categorias'),
+      this.fetchAll<StatusPedido>('status_pedido'),
+      this.fetchAll<TipoMovimentacao>('tipos_movimentacao'),
+      this.fetchAll<TipoCliente>('tipos_cliente'),
+      this.fetchAll<Fornecedor>('fornecedores'),
+      this.fetchAll<Permissao>('permissoes'),
+      this.fetchAll<Perfil>('perfis'),
+      this.fetchAll<PerfilPermissao>('perfis_permissoes'),
+      this.fetchAll<CategoriaFinanceiro>('categorias_financeiro'),
+    ]);
+    this.unidades = u; this.categorias = cat; this.statusPedido = st;
+    this.tiposMovimentacao = tm; this.tiposCliente = tc; this.fornecedores = f;
+    this.permissoes = perm; this.perfis = perf; this.perfisPermissoes = pp; this.categoriasFinanceiro = cf;
+    await this.ensureFornecedorPermissions();
   }
 
   private async ensureFornecedorPermissions() {
@@ -438,7 +438,7 @@ export class MiniFactoryStore {
       material_id: id,
       tipo_id: tipoId,
       quantidade,
-      observacao: observacao?.trim() || 'Entrada Compra',
+      observacao: observacao?.trim() ? `Entrada Compra — ${observacao.trim()}` : 'Entrada Compra',
       valor_pago: unitPrice * quantidade,
       custo_unitario: unitPrice,
       criado_em: new Date().toISOString()
@@ -459,13 +459,13 @@ export class MiniFactoryStore {
       this.movMateriais = [mov, ...this.movMateriais];
       if (criarDespesa) {
         const catDespesa = this.categoriasFinanceiro.find(c => c.nome === 'Matéria-Prima' || c.tipo === 'despesa');
-        const baseDesc = `+Compra/${mat.nome}${observacao?.trim() ? ` - !Obs/${observacao.trim()}` : ''}`;
+        const baseDesc = `Compra: ${mat.nome}${observacao?.trim() ? ` | ${observacao.trim()}` : ''}`;
         const despesa: LancamentoFinanceiro = {
           id: crypto.randomUUID(), criado_em: new Date().toISOString(),
           data_lancamento: dataLocal(),
           valor: unitPrice * quantidade, tipo: 'despesa',
           categoria_id: catDespesa?.id || 1,
-          descricao: `${baseDesc} #compra`,
+          descricao: baseDesc,
           forma_pagamento: formaPagamento || undefined,
           movimentacao_id: mov.id,
         };
@@ -476,54 +476,63 @@ export class MiniFactoryStore {
     }
   }
 
-  async ajustarEstoqueMaterial(materialId: string, novoSaldo: number, observacao?: string): Promise<{ success: boolean; error?: string }> {
+  async ajustarEstoqueMaterial(materialId: string, novoSaldo: number, observacao?: string, quantidadeMinima?: number): Promise<{ success: boolean; error?: string }> {
     const idx = this.materiais.findIndex(m => m.id === materialId);
     if (idx === -1) return { success: false, error: 'Insumo não encontrado.' };
     const antigo = this.materiais[idx].quantidade_atual;
-    if (novoSaldo === antigo) return { success: true };
-
-    const delta = novoSaldo - antigo;
-    let tipoId = 3;
-    let qtdMov = delta;
-    if (delta < 0) {
-      const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
-      if (tipoSaida) tipoId = tipoSaida.id;
-      qtdMov = Math.abs(delta);
-    } else {
-      const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
-      if (tipoEntrada) tipoId = tipoEntrada.id;
-    }
-
-    const custoUnit = this.materiais[idx].custo_unitario;
-    const mov: MovimentacaoMaterial = {
-      id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
-      material_id: materialId,
-      tipo_id: tipoId,
-      quantidade: qtdMov,
-      custo_unitario: custoUnit,
-      valor_pago: custoUnit * qtdMov,
-      observacao: observacao || `Ajuste manual: ${antigo} → ${novoSaldo}`,
-      criado_em: new Date().toISOString()
-    };
+    const antigoMinimo = this.materiais[idx].quantidade_minima;
+    const mudouSaldo = novoSaldo !== antigo;
+    const mudouMinimo = quantidadeMinima !== undefined && quantidadeMinima !== antigoMinimo;
+    if (!mudouSaldo && !mudouMinimo) return { success: true };
 
     const atualizado = {
       ...this.materiais[idx],
       quantidade_atual: novoSaldo,
+      quantidade_minima: mudouMinimo ? quantidadeMinima! : antigoMinimo,
       data_ultima_atualizacao: new Date().toISOString()
     };
 
     const okMat = await this.supabaseUpdate('materiais', materialId, atualizado as unknown as Record<string, unknown>);
     if (!okMat) return { success: false, error: this.error || 'Erro ao atualizar estoque no servidor.' };
 
-    const okMov = await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>);
-    if (!okMov) {
-      const revertido = { ...atualizado, quantidade_atual: antigo };
-      await this.supabaseUpdate('materiais', materialId, revertido as unknown as Record<string, unknown>);
-      return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+    if (mudouSaldo) {
+      const delta = novoSaldo - antigo;
+      let tipoId = 3;
+      let qtdMov = delta;
+      if (delta < 0) {
+        const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
+        if (tipoSaida) tipoId = tipoSaida.id;
+        qtdMov = Math.abs(delta);
+      } else {
+        const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
+        if (tipoEntrada) tipoId = tipoEntrada.id;
+      }
+
+      let obsTexto = `Ajuste manual: ${antigo} → ${novoSaldo}`;
+      if (observacao) obsTexto += ` | ${observacao}`;
+
+      const custoUnit = this.materiais[idx].custo_unitario;
+      const mov: MovimentacaoMaterial = {
+        id: 'mov_m_' + Math.random().toString(36).substring(2, 9),
+        material_id: materialId,
+        tipo_id: tipoId,
+        quantidade: qtdMov,
+        custo_unitario: custoUnit,
+        valor_pago: custoUnit * qtdMov,
+        observacao: obsTexto,
+        criado_em: new Date().toISOString()
+      };
+
+      const okMov = await this.supabaseInsert('movimentacoes_materiais', mov as unknown as Record<string, unknown>);
+      if (!okMov) {
+        const revertido = { ...atualizado, quantidade_atual: antigo };
+        await this.supabaseUpdate('materiais', materialId, revertido as unknown as Record<string, unknown>);
+        return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+      }
+      this.movMateriais = [mov, ...this.movMateriais];
     }
 
     this.materiais = this.materiais.map((m, i) => i === idx ? atualizado : m);
-    this.movMateriais = [mov, ...this.movMateriais];
     this.saveToLocalStorage();
     this.notify();
     return { success: true };
@@ -563,7 +572,7 @@ export class MiniFactoryStore {
     const p = this.produtos.find(x => x.id === id);
     const ok = await this.supabaseDelete('produtos', id);
     if (ok) {
-      if (p?.imagem && isStorageUrl(p.imagem)) deleteProdutoImage(p.imagem).catch(() => {});
+      if (p?.imagem && isStorageUrl(p.imagem)) deleteProdutoImage(p.imagem).catch(() => { });
       this.produtos = this.produtos.filter(x => x.id !== id);
       this.fichas = this.fichas.filter(f => f.produto_id !== id);
       this.estoqueProdutos = this.estoqueProdutos.filter(e => e.produto_id !== id);
@@ -615,57 +624,61 @@ export class MiniFactoryStore {
 
   async updateEstoqueProdutoConfig(id: string, updates: Partial<EstoqueProduto>) { return this.updateEstoqueProduto(id, updates); }
 
-  async ajustarEstoqueProduto(estoqueId: string, novoDisponivel: number, observacao?: string): Promise<{ success: boolean; error?: string }> {
+  async ajustarEstoqueProduto(estoqueId: string, novoDisponivel: number, observacao?: string, quantidadeMinima?: number): Promise<{ success: boolean; error?: string }> {
     const idx = this.estoqueProdutos.findIndex(e => e.id === estoqueId);
     if (idx === -1) return { success: false, error: 'Registro de estoque não encontrado.' };
     const antigo = this.estoqueProdutos[idx].quantidade_disponivel;
+    const antigoMinimo = this.estoqueProdutos[idx].quantidade_minima;
+    const mudouSaldo = novoDisponivel !== antigo;
+    const mudouMinimo = quantidadeMinima !== undefined && quantidadeMinima !== antigoMinimo;
+    if (!mudouSaldo && !mudouMinimo) return { success: true };
+
     const atualizado = {
       ...this.estoqueProdutos[idx],
       quantidade_disponivel: novoDisponivel,
+      quantidade_minima: mudouMinimo ? quantidadeMinima! : antigoMinimo,
       data_atualizacao: new Date().toISOString()
-    };
-
-    const delta = novoDisponivel - antigo;
-    if (delta === 0) return { success: true };
-
-    let tipoId = 3; // Fallback se não encontrar por nome
-    let qtdMov = delta;
-    if (delta < 0) {
-      const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
-      if (tipoSaida) {
-        tipoId = tipoSaida.id;
-      }
-      qtdMov = Math.abs(delta);
-    } else {
-      const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
-      if (tipoEntrada) {
-        tipoId = tipoEntrada.id;
-      }
-    }
-
-    const mov: MovimentacaoProduto = {
-      id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
-      produto_id: this.estoqueProdutos[idx].produto_id,
-      tipo_id: tipoId,
-      quantidade: qtdMov,
-      observacao: observacao || `Ajuste manual: ${antigo} → ${novoDisponivel}`,
-      usuario_id: this.currentUserId ?? undefined,
-      criado_em: new Date().toISOString()
     };
 
     const ok = await this.supabaseUpdate('estoque_produtos', estoqueId, atualizado as unknown as Record<string, unknown>);
     if (!ok) return { success: false, error: this.error || 'Erro ao atualizar estoque no servidor.' };
 
-    const okMov = await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>);
-    if (!okMov) {
-      // Reverte a atualização do estoque
-      const revertido = { ...atualizado, quantidade_disponivel: antigo };
-      await this.supabaseUpdate('estoque_produtos', estoqueId, revertido as unknown as Record<string, unknown>);
-      return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+    if (mudouSaldo) {
+      const delta = novoDisponivel - antigo;
+      let tipoId = 3;
+      let qtdMov = delta;
+      if (delta < 0) {
+        const tipoSaida = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque (Saída)' || t.nome === 'Ajuste Saída');
+        if (tipoSaida) tipoId = tipoSaida.id;
+        qtdMov = Math.abs(delta);
+      } else {
+        const tipoEntrada = this.tiposMovimentacao.find(t => t.nome === 'Ajuste Estoque' || t.nome === 'Ajuste Entrada' || t.nome === 'Ajuste Estoque (Entrada)');
+        if (tipoEntrada) tipoId = tipoEntrada.id;
+      }
+
+      let obsTexto = `Ajuste no saldo de: ${antigo} → ${novoDisponivel}`;
+      if (observacao) obsTexto += ` | ${observacao}`;
+
+      const mov: MovimentacaoProduto = {
+        id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
+        produto_id: this.estoqueProdutos[idx].produto_id,
+        tipo_id: tipoId,
+        quantidade: qtdMov,
+        observacao: obsTexto,
+        usuario_id: this.currentUserId ?? undefined,
+        criado_em: new Date().toISOString()
+      };
+
+      const okMov = await this.supabaseInsert('movimentacoes_produtos', mov as unknown as Record<string, unknown>);
+      if (!okMov) {
+        const revertido = { ...atualizado, quantidade_disponivel: antigo };
+        await this.supabaseUpdate('estoque_produtos', estoqueId, revertido as unknown as Record<string, unknown>);
+        return { success: false, error: this.error || 'Erro ao registrar movimentação. Estoque não foi alterado.' };
+      }
+      this.movProdutos = [mov, ...this.movProdutos];
     }
 
     this.estoqueProdutos = this.estoqueProdutos.map((e, i) => i === idx ? atualizado : e);
-    this.movProdutos = [mov, ...this.movProdutos];
     this.saveToLocalStorage();
     this.notify();
     return { success: true };
@@ -832,7 +845,7 @@ export class MiniFactoryStore {
     const updatesMatLocal: { idx: number; dados: Material }[] = [];
 
     for (const matId of Object.keys(materiaisUsados)) {
-       const totalQtd = Number(materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0).toFixed(3));
+      const totalQtd = Number(materiaisUsados[matId].reduce((s, e) => s + e.qtdNeeded, 0).toFixed(3));
       const mat = this.materiais.find(m => m.id === matId)!;
       const dadosMat = {
         ...mat,
@@ -874,17 +887,18 @@ export class MiniFactoryStore {
       let estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);
 
       if (estoque) {
-        const updatedEstoque = { ...estoque,
-            quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
-            data_atualizacao: new Date().toISOString()
+        const updatedEstoque = {
+          ...estoque,
+          quantidade_disponivel: estoque.quantidade_disponivel + item.quantidade_solicitada,
+          data_atualizacao: new Date().toISOString()
         };
         updatesEstoqueLocal.push({ idx: this.estoqueProdutos.indexOf(estoque), dados: updatedEstoque });
         prodPromises.push(this.supabaseUpdate('estoque_produtos', updatedEstoque.id, updatedEstoque as unknown as Record<string, unknown>));
       } else {
         const novoEstoque = {
-            id: 'est_' + Math.random().toString(36).substring(2, 9),
-            produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
-            quantidade_minima: 0, data_atualizacao: new Date().toISOString()
+          id: 'est_' + Math.random().toString(36).substring(2, 9),
+          produto_id: item.produto_id, quantidade_disponivel: item.quantidade_solicitada,
+          quantidade_minima: 0, data_atualizacao: new Date().toISOString()
         };
         novosEstoqueLocal.push(novoEstoque);
         prodPromises.push(this.supabaseInsert('estoque_produtos', novoEstoque as unknown as Record<string, unknown>));
@@ -896,7 +910,7 @@ export class MiniFactoryStore {
       const movProd: MovimentacaoProduto = {
         id: 'mov_p_' + Math.random().toString(36).substring(2, 9),
         produto_id: item.produto_id, tipo_id: tipoIdProd, quantidade: item.quantidade_solicitada,
-        pedido_id: pedidoId, observacao: observacao || (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
+        pedido_id: pedidoId,         observacao: observacao ? `Entrada por produção — ${observacao}` : (pedidoId ? `Entrada por produção — Pedido #${pedidoId.slice(-6).toUpperCase()}` : 'Entrada por produção'),
         usuario_id: this.currentUserId ?? undefined,
         criado_em: new Date().toISOString()
       };
@@ -1005,12 +1019,12 @@ export class MiniFactoryStore {
     }
   }
 
-  async lancarSaidaPedido(pedidoId: string): Promise<{ success: boolean; error?: string; insufficientItems?: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> }> {
+  async lancarSaidaPedido(pedidoId: string): Promise<{ success: boolean; error?: string; insufficientItems?: Array<{ produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string }> }> {
     const pedido = this.pedidos.find(p => p.id === pedidoId);
     if (!pedido) return { success: false, error: 'Pedido não encontrado' };
     const itens = this.itensPedido.filter(i => i.pedido_id === pedidoId);
 
-    const insufficientItems: Array<{produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string}> = [];
+    const insufficientItems: Array<{ produtoId: string; produtoNome: string; disponivel: number; necessario: number; unidade: string }> = [];
     for (const item of itens) {
       const prod = this.produtos.find(p => p.id === item.produto_id);
       const estoque = this.estoqueProdutos.find(e => e.produto_id === item.produto_id);

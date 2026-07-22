@@ -236,14 +236,11 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       });
       estoqueId = novo.id;
     } else {
-      const resultadoEstoque = await store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs);
+      const resultadoEstoque = await store.ajustarEstoqueProduto(estoqueId, Number(adjustStockNovoSaldo), adjustStockObs, Number(adjustStockQtdMinima));
       if (!resultadoEstoque.success) {
         setErrorMessage(resultadoEstoque.error || 'Erro ao ajustar estoque.');
         return;
       }
-      await store.updateEstoqueProdutoConfig(estoqueId, {
-        quantidade_minima: Number(adjustStockQtdMinima),
-      });
     }
 
     setIsAdjustStockOpen(false);
@@ -851,10 +848,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 </button>
                 <button 
                   type="submit"
-                  disabled={adjustStockNovoSaldo === (store.estoqueProdutos.find(e => e.id === adjustStockEstoqueId)?.quantidade_disponivel ?? 0)}
-                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex-1 bg-amber-700 hover:bg-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 text-white font-semibold py-2.5 rounded-xl text-center shadow"
                 >
-                  Confirmar Ajuste
+                  Confirmar
                 </button>
               </div>
             </form>

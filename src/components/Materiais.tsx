@@ -90,6 +90,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
 
   const [adjustMaterialId, setAdjustMaterialId] = useState<string | null>(null);
   const [adjustNovoSaldo, setAdjustNovoSaldo] = useState<number>(0);
+  const [adjustQtdMinima, setAdjustQtdMinima] = useState<number>(0);
   const [adjustObservacao, setAdjustObservacao] = useState('');
 
   const opcoesPagamento = formasPagamentoSelectOptions;
@@ -448,7 +449,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                               )}
                               {store.hasPermission('materiais.editar') && (
                                 <button 
-                                  onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustObservacao(''); }}
+                                  onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustQtdMinima(m.quantidade_minima); setAdjustObservacao(''); }}
                                   className="bg-amber-50 dark:bg-[#2d1e0d] hover:bg-amber-100 dark:hover:bg-[#3d2e1d] text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-[#3d2e1d] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
                                 >
                                   📦 Ajustar
@@ -525,7 +526,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                         )}
                         {store.hasPermission('materiais.editar') && (
                           <button 
-                            onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustObservacao(''); }}
+                            onClick={() => { setAdjustMaterialId(m.id); setAdjustNovoSaldo(m.quantidade_atual); setAdjustQtdMinima(m.quantidade_minima); setAdjustObservacao(''); }}
                             className="flex-1 bg-amber-600 hover:bg-amber-700 dark:bg-amber-800 dark:hover:bg-amber-750 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg text-center cursor-pointer font-sans"
                           >
                             📦 Ajustar
@@ -691,13 +692,13 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
                               isEntrada
                                 ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
                             }`}>
                               {isEntrada ? <ArrowDownLeft size={10} /> : <ArrowUpRight size={10} />}
                               {tipo?.nome || '—'}
                             </span>
                           </td>
-                          <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
+                          <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                             {isEntrada ? '+' : '-'}{mov.quantidade} {store.unidadeSigla(mat?.unidade_id || 0) || ''}
                           </td>
                           <td className="p-3 text-right font-mono whitespace-nowrap">
@@ -733,7 +734,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                             className="rounded border-amber-300 dark:border-amber-950/40 text-amber-600 focus:ring-amber-500 cursor-pointer"
                           />
                         )}
-                        <div className={`p-1.5 rounded-lg ${isEntrada ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'}`}>
+                        <div className={`p-1.5 rounded-lg ${isEntrada ? 'bg-emerald-100 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-350' : 'bg-red-100 dark:bg-red-950/20 text-red-700 dark:text-red-300'}`}>
                           {isEntrada ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
                         </div>
                         <div>
@@ -742,7 +743,7 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-800 dark:text-amber-400'}`}>
+                        <p className={`font-bold font-mono ${isEntrada ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                           {isEntrada ? '+' : '-'}{mov.quantidade}{store.unidadeSigla(mat?.unidade_id || 0) || ''}
                         </p>
                         <p className={`font-bold font-mono text-xs mt-0.5 ${isEntrada ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-500 dark:text-red-400'}`}>
@@ -852,31 +853,33 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium">{editId ? 'Qtd Atual' : 'Qtd Inicial'}</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    value={quantidadeAtual}
-                    onChange={(e) => setQuantidadeAtual(Number(e.target.value))}
-                    {...useSmartArrowKeys(quantidadeAtual, setQuantidadeAtual)}
-                    className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
-                  />
-                </div>
+              {!editId && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-amber-950 dark:text-amber-100 font-medium">Qtd Inicial</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={quantidadeAtual}
+                      onChange={(e) => setQuantidadeAtual(Number(e.target.value))}
+                      {...useSmartArrowKeys(quantidadeAtual, setQuantidadeAtual)}
+                      className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Qtd Mínima</label>
-                  <input 
-                    type="number" 
-                    step="any"
-                    value={quantidadeMinima}
-                    onChange={(e) => setQuantidadeMinima(Number(e.target.value))}
-                    {...useSmartArrowKeys(quantidadeMinima, setQuantidadeMinima)}
-                    className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Qtd Mínima</label>
+                    <input 
+                      type="number" 
+                      step="any"
+                      value={quantidadeMinima}
+                      onChange={(e) => setQuantidadeMinima(Number(e.target.value))}
+                      {...useSmartArrowKeys(quantidadeMinima, setQuantidadeMinima)}
+                      className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2 pt-2">
                 <button 
@@ -1141,27 +1144,49 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
         const mat = store.materiais.find(m => m.id === adjustMaterialId);
         if (!mat) return null;
         return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-[#1a1208] rounded-2xl max-w-sm w-full p-6 border border-amber-100 dark:border-[#2e1a0a] space-y-4">
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 text-xs font-sans">
+            <div className="bg-white dark:bg-[#1a1208] w-full sm:max-w-xs rounded-t-2xl sm:rounded-2xl p-6 shadow-xl space-y-4 border-t border-amber-100 dark:border-[#2e1a0a]">
               <h3 className="font-bold text-amber-950 dark:text-amber-100 flex items-center gap-2">
                 📦 Ajustar Estoque — {mat.nome}
               </h3>
               <div className="space-y-3">
-                <div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase text-gray-500">Saldo Atual</label>
-                  <div className="w-full p-2 bg-gray-100 dark:bg-[#130b04] border border-gray-200 dark:border-[#2e1a0a] rounded-xl text-sm font-mono font-bold text-amber-950 dark:text-amber-100 mt-1">
-                    {mat.quantidade_atual} {store.unidadeSigla(mat.unidade_id)}
+                  <div className="flex items-center border border-amber-100 dark:border-amber-950/35 rounded-lg overflow-hidden bg-amber-50/50 dark:bg-amber-950/15">
+                    <p className="flex-1 p-2 text-left font-mono font-bold text-amber-950 dark:text-amber-200">
+                      {mat.quantidade_atual}
+                    </p>
+                    <span className="bg-amber-100/60 dark:bg-amber-950/40 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {store.unidadeSigla(mat.unidade_id)}
+                    </span>
                   </div>
                 </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-gray-500">Novo Saldo</label>
-                  <input type="number" step="any" min="0" value={adjustNovoSaldo} onChange={e => setAdjustNovoSaldo(Number(e.target.value))}
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-xl text-sm font-mono bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Novo Saldo *</label>
+                  <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
+                    <input type="number" step="any" min="0" value={adjustNovoSaldo} onChange={e => setAdjustNovoSaldo(Number(e.target.value))}
+                      {...useSmartArrowKeys(adjustNovoSaldo, setAdjustNovoSaldo, 0)}
+                      className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+                    <span className="bg-amber-50 dark:bg-amber-950/35 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {store.unidadeSigla(mat.unidade_id)}
+                    </span>
+                  </div>
                 </div>
-                <div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold uppercase text-gray-500">Qtd. Mínima *</label>
+                  <div className="flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded-lg overflow-hidden bg-white dark:bg-[#1c140c]">
+                    <input type="number" step="any" min="0" value={adjustQtdMinima} onChange={e => setAdjustQtdMinima(Number(e.target.value))}
+                      {...useSmartArrowKeys(adjustQtdMinima, setAdjustQtdMinima, 0)}
+                      className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100" />
+                    <span className="bg-amber-50 dark:bg-amber-950/35 px-2 py-2 text-[10px] font-bold text-amber-950 dark:text-amber-200 font-mono">
+                      {store.unidadeSigla(mat.unidade_id)}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
                   <label className="text-[10px] font-bold uppercase text-gray-500">Observação (opcional)</label>
                   <input type="text" value={adjustObservacao} onChange={e => setAdjustObservacao(e.target.value)} placeholder="Ex: Ajuste por quebra"
-                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-xl text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 mt-1" />
+                    className="w-full p-2 border border-amber-200 dark:border-[#2d1e0d] rounded-lg text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 focus:outline-none focus:border-amber-400 placeholder:text-gray-400 dark:placeholder:text-amber-200/20" />
                 </div>
               </div>
               <div className="flex gap-2 pt-2">
@@ -1170,12 +1195,12 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   Voltar
                 </button>
                 <button onClick={async () => {
-                  await store.ajustarEstoqueMaterial(adjustMaterialId, adjustNovoSaldo, adjustObservacao);
+                  await store.ajustarEstoqueMaterial(adjustMaterialId, adjustNovoSaldo, adjustObservacao, adjustQtdMinima);
                   setAdjustMaterialId(null);
                   onUpdate();
                 }}
                   className="flex-1 py-2 px-3 bg-amber-700 hover:bg-amber-600 text-white rounded-xl text-xs font-bold">
-                  Confirmar Ajuste
+                  Confirmar
                 </button>
               </div>
             </div>

@@ -174,6 +174,10 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
   };
 
   const handleAddItemRow = () => {
+    if (store.produtos.length === 0) {
+      setCustomAlert({ title: 'Sem produtos', message: 'Nenhum produto cadastrado. Cadastre produtos antes de criar um pedido.' });
+      return;
+    }
     const usedIds = itensPedido.map(it => it.produto_id).filter(Boolean);
     const unused = store.produtos.find(p => !usedIds.includes(p.id));
     if (!unused) {
@@ -987,7 +991,7 @@ export default function Pedidos({ store, onUpdate, forceOpenNewOrderRef, onNavig
                       <SelectSearch
                         value={clienteId}
                         onChange={setClienteId}
-                        options={store.clientes.map(c => ({ value: c.id, label: `${c.nome} (${store.tipoClienteNome(c.tipo_id)})` }))}
+                        options={store.clientes.map(c => ({ value: c.id, label: c.nome }))}
                         placeholder="Selecione um cliente"
                       />
                     </div>
