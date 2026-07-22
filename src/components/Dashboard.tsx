@@ -6,7 +6,7 @@ import {
   Beef, PlusCircle, DollarSign,
   ArrowUpCircle, ArrowDownCircle, BarChart3
 } from 'lucide-react';
-import { normalizarQuantidade } from '../lib/calculos';
+import { normalizarQuantidade, formatarNumero } from '../lib/calculos';
 import DashboardCharts from './DashboardCharts';
 
 interface DashboardProps {
@@ -390,7 +390,7 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
                     </div>
                     <div className="text-right shrink-0">
                       <span className={`font-bold font-mono text-xs ${cr.margem >= 30 ? 'text-emerald-600 dark:text-emerald-400' : cr.margem >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {cr.margem >= 0 ? '+' : ''}{cr.margem.toFixed(0)}%
+                        {cr.margem >= 0 ? '+' : ''}{formatarNumero(cr.margem, 0)}%
                       </span>
                       <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
                         <div className={`h-full rounded-full ${cr.margem >= 30 ? 'bg-emerald-500' : cr.margem >= 0 ? 'bg-amber-500' : 'bg-red-500'}`}
@@ -469,7 +469,7 @@ export default function Dashboard({ store, onNavigate, onSetQuickOrder, onSetQui
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-bold text-red-600 dark:text-red-400 font-mono text-sm whitespace-nowrap">{m.quantidade_atual}{store.unidadeSigla(m.unidade_id)}</span>
-                      <p className="text-[9px] text-red-500 whitespace-nowrap">Repor {(m.quantidade_minima - m.quantidade_atual).toFixed(2)}{store.unidadeSigla(m.unidade_id)}</p>
+                      <p className="text-[9px] text-red-500 whitespace-nowrap">Repor {formatarNumero(m.quantidade_minima - m.quantidade_atual)}{store.unidadeSigla(m.unidade_id)}</p>
                     </div>
                   </div>
                 ))}

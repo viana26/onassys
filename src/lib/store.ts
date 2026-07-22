@@ -1,5 +1,5 @@
 import { Material, Produto, FichaTecnicaItem, EstoqueProduto, Cliente, Pedido, ItemPedido, MovimentacaoMaterial, MovimentacaoProduto, Unidade, Categoria, StatusPedido, TipoMovimentacao, TipoCliente, Fornecedor, Permissao, Perfil, CategoriaFinanceiro, LancamentoFinanceiro, PlanejamentoCompra, PerfilUsuario, PerfilPermissao, DadosEmpresa } from '../types';
-import { calcularCustoProducao, normalizarQuantidade } from './calculos';
+import { calcularCustoProducao, normalizarQuantidade, formatarNumero } from './calculos';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { deleteProdutoImage, isStorageUrl } from './imageUpload';
 
@@ -830,7 +830,7 @@ export class MiniFactoryStore {
 
         if (mat.quantidade_atual < qtdNeeded) {
           const falta = qtdNeeded - mat.quantidade_atual;
-          itensInsuficientes.push(`${mat.nome}: falta ${falta.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}`);
+          itensInsuficientes.push(`${mat.nome}: falta ${formatarNumero(falta)}${this.unidadeSigla(mat.unidade_id)}`);
         } else {
           if (!materiaisUsados[mat.id]) materiaisUsados[mat.id] = [];
           materiaisUsados[mat.id].push({ material: mat, ficha, qtdNeeded });

@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, Package, AlertTriangle } from 'lucide-react';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import { formatarNumero } from '../../lib/calculos';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -113,7 +114,7 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;font-weight:700;color:#1c1917;background:${bg};font-size:12px">${medalha}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;font-weight:600;color:#1c1917;background:${bg}">${r.material.nome}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;font-family:monospace;color:#57534e;background:${bg}">${r.unidade}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#1c1917;background:${bg}">${r.qtdTotal.toFixed(2)}</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#1c1917;background:${bg}">${formatarNumero(r.qtdTotal, 2)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#059669;background:${bg}">${formatCurrency(r.custoTotal)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;font-family:monospace;color:#57534e;background:${bg}">${r.movimentacoes}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:${r.estoqueAtual < r.estoqueMinimo ? '#dc2626' : '#57534e'};background:${bg}">${r.estoqueAtual}</td>
@@ -156,7 +157,7 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
     </td>
     <td style="width:33%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#f5f3ff">
       <p style="margin:0;font-size:8px;font-weight:700;color:#7c3aed;text-transform:uppercase">Qtd. Total Consumida</p>
-      <p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#7c3aed">${totalQtd.toFixed(0)}</p>
+      <p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#7c3aed">${formatarNumero(totalQtd, 0)}</p>
     </td>
     <td style="width:33%;border:1px solid #d6d3d1;padding:0.75rem;text-align:center;background:#fef2f2">
       <p style="margin:0;font-size:8px;font-weight:700;color:#dc2626;text-transform:uppercase">Abastecimento Necessário</p>
@@ -239,7 +240,7 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
             </div>
             <div className="p-3 bg-violet-50 dark:bg-violet-950/20 rounded-xl border border-violet-200 dark:border-violet-800">
               <span className="text-[10px] font-bold text-violet-700 dark:text-violet-400 uppercase">Qtd. Total</span>
-              <p className="text-lg font-bold font-mono text-violet-800 dark:text-violet-300">{totalQtd.toFixed(0)}</p>
+              <p className="text-lg font-bold font-mono text-violet-800 dark:text-violet-300">{formatarNumero(totalQtd, 0)}</p>
             </div>
             <div className="p-3 bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800">
               <div className="flex items-center gap-1.5 mb-1">
@@ -284,7 +285,7 @@ export default function ConsumoInsumos({ store, isOpen, onClose }: ConsumoInsumo
                         {r.unidade}
                       </td>
                       <td className="p-3 text-right font-mono font-bold text-amber-950 dark:text-amber-100 whitespace-nowrap">
-                        {r.qtdTotal.toFixed(2)}
+                        {formatarNumero(r.qtdTotal, 2)}
                       </td>
                       <td className="p-3 text-right font-mono font-bold text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
                         {formatCurrency(r.custoTotal)}

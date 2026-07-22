@@ -1,5 +1,13 @@
 import { Material, FichaTecnicaItem, Produto, EstoqueProduto, Unidade } from '../types';
 
+export function formatarNumero(valor: number, decimais: number = 2): string {
+  if (Number.isInteger(valor)) return valor.toString();
+  return valor.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimais,
+  });
+}
+
 export function normalizarQuantidade(
   qtdFicha: number,
   unidadeFichaId: number,

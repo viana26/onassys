@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
 import { MiniFactoryStore } from '../lib/store';
+import { formatarNumero } from '../lib/calculos';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -150,7 +151,7 @@ export default function DashboardCharts({ store }: DashboardChartsProps) {
       },
       tooltip: {
         callbacks: {
-          label: (ctx: any) => `${ctx.label}: ${formatCurrency(ctx.raw)} (${((ctx.raw / (ctx.dataset.data[0] + ctx.dataset.data[1])) * 100).toFixed(1)}%)`,
+          label: (ctx: any) => `${ctx.label}: ${formatCurrency(ctx.raw)} (${formatarNumero((ctx.raw / (ctx.dataset.data[0] + ctx.dataset.data[1])) * 100, 1)}%)`,
         },
       },
     },

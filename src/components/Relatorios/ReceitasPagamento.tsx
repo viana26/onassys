@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter } from 'lucide-react';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import { formatarNumero } from '../../lib/calculos';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -103,7 +104,7 @@ export default function ReceitasPagamento({ store, isOpen, onClose }: ReceitasPa
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:center;font-family:monospace;color:#57534e;background:${bg}">${g.quantidade}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:700;color:#059669;background:${bg}">${formatCurrency(g.total)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:#57534e;background:${bg}">${formatCurrency(g.ticketMedio)}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:#57534e;background:${bg}">${g.percentual.toFixed(1)}%</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:#57534e;background:${bg}">${formatarNumero(g.percentual, 1)}%</td>
       </tr>`;
     }).join('');
 
@@ -244,7 +245,7 @@ export default function ReceitasPagamento({ store, isOpen, onClose }: ReceitasPa
                         {formatCurrency(g.ticketMedio)}
                       </td>
                       <td className="p-3 text-right pr-4 font-mono text-gray-500 dark:text-amber-100/40 whitespace-nowrap">
-                        {g.percentual.toFixed(1)}%
+                        {formatarNumero(g.percentual, 1)}%
                       </td>
                     </tr>
                   ))}

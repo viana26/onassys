@@ -3,6 +3,7 @@ import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, Package } from 'lucide-react';
 import { useSortableData } from '../../lib/hooks/useSortableData';
 import { SortButton } from '../SortButton';
+import { formatarNumero } from '../../lib/calculos';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const appName = () => localStorage.getItem('appName') || 'Mini Fábrica';
@@ -110,7 +111,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:#059669;background:${bg}">${formatCurrency(r.receitaTotal)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;color:#57534e;background:${bg}">${formatCurrency(r.custoTotal)}</td>
         <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:${r.lucroBruto >= 0 ? '#059669' : '#dc2626'};background:${bg}">${formatCurrency(r.lucroBruto)}</td>
-        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:${r.margem >= 30 ? '#059669' : r.margem >= 10 ? '#ca8a04' : '#dc2626'};background:${bg}">${r.margem.toFixed(1)}%</td>
+        <td style="border-bottom:1px solid #e7e5e4;padding:0.5rem 0.75rem;text-align:right;font-family:monospace;font-weight:600;color:${r.margem >= 30 ? '#059669' : r.margem >= 10 ? '#ca8a04' : '#dc2626'};background:${bg}">${formatarNumero(r.margem, 1)}%</td>
       </tr>`;
     }).join('');
 
@@ -282,7 +283,7 @@ export default function DesempenhoProdutos({ store, isOpen, onClose }: Desempenh
                         {formatCurrency(r.lucroBruto)}
                       </td>
                       <td className={`p-3 text-right pr-4 font-mono font-bold whitespace-nowrap ${r.margem >= 30 ? 'text-emerald-700 dark:text-emerald-400' : r.margem >= 10 ? 'text-amber-700 dark:text-amber-400' : 'text-red-700 dark:text-red-400'}`}>
-                        {r.margem.toFixed(1)}%
+                        {formatarNumero(r.margem, 1)}%
                       </td>
                     </tr>
                   ))}

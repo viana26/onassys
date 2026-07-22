@@ -311,7 +311,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
     const recebido = p
       ? store.lancamentos.filter(l => l.pedido_id === id && l.tipo === 'receita').reduce((s, l) => s + l.valor, 0)
       : 0;
-    setPaymentAmount((p ? p.valor_total - recebido : 0).toFixed(2));
+    setPaymentAmount((p ? p.valor_total - recebido : 0).toFixed(2).replace('.', ','));
     setFormaPagamento('Pix');
     if (onClearPreselected) onClearPreselected();
   };
@@ -768,7 +768,7 @@ export default function Caixa({ store, onUpdate, preselectedPedidoId, onClearPre
                           {FORMAS_PAGAMENTO.map(f => (
                             <button
                               key={f.value}
-                              onClick={() => { setFormaPagamento(f.value); if (f.value !== 'Dinheiro' && troco > 0) setPaymentAmount(saldoRestante.toFixed(2)); }}
+                              onClick={() => { setFormaPagamento(f.value); if (f.value !== 'Dinheiro' && troco > 0) setPaymentAmount(saldoRestante.toFixed(2).replace('.', ',')); }}
                               className={`flex flex-col items-center py-1.5 rounded-xl text-[9px] font-bold text-white transition shadow-sm ${
                                 formaPagamento === f.value
                                   ? f.color + ' ring-2 ring-offset-1 ring-amber-500 scale-105'

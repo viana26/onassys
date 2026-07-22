@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { formatarNumero } from '../../lib/calculos';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -138,7 +139,7 @@ export default function BalancetePeriodo({ store, isOpen, onClose }: BalancetePe
         <div style="width:8px;height:8px;border-radius:2px;background:${p.cor};flex-shrink:0"></div>
         <span style="font-size:7px;color:#525252;flex:1">${p.nome}</span>
         <span style="font-size:7px;font-weight:600;color:#1c1917;font-family:monospace">${formatCurrency(p.total)}</span>
-        <span style="font-size:6px;color:#a3a3a3">(${p.pct.toFixed(1)}%)</span>
+        <span style="font-size:6px;color:#a3a3a3">(${formatarNumero(p.pct, 1)}%)</span>
       </div>`;
     }
     return `

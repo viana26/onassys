@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { EstoqueProduto, Produto } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
-import { normalizarQuantidade } from '../lib/calculos';
+import { normalizarQuantidade, formatarNumero } from '../lib/calculos';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
@@ -195,7 +195,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
       const qtdNeeded = normalizarQuantidade(ficha.quantidade_necessaria * quantidade, ficha.unidade_id, mat.unidade_id, store.unidades);
       if (mat.quantidade_atual < qtdNeeded) {
         const falta = qtdNeeded - mat.quantidade_atual;
-        faltas.push(`${mat.nome}: falta ${falta.toFixed(2)}${store.unidadeSigla(mat.unidade_id)}`);
+        faltas.push(`${mat.nome}: falta ${formatarNumero(falta)}${store.unidadeSigla(mat.unidade_id)}`);
       }
     }
     setErrorMessage(faltas.length > 0 ? faltas.join('\n') : null);
@@ -749,7 +749,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                         return (
                           <div key={i} className="flex justify-between text-[10px]">
                             <span className="text-amber-900 dark:text-amber-200 truncate">{mat?.nome || '—'}</span>
-                            <span className="font-mono text-amber-700 dark:text-amber-300 ml-2 whitespace-nowrap">{f.quantidade_necessaria} {store.unidadeSigla(f.unidade_id)} <span className="text-amber-500 dark:text-amber-400/60 ml-1">({(mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0)})</span></span>
+                            <span className="font-mono text-amber-700 dark:text-amber-300 ml-2 whitespace-nowrap">{formatarNumero(f.quantidade_necessaria)} {store.unidadeSigla(f.unidade_id)} <span className="text-amber-500 dark:text-amber-400/60 ml-1">({(mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0)})</span></span>
                           </div>
                         );
                       })}

@@ -22,7 +22,7 @@ import {
   Info,
   Settings
 } from 'lucide-react';
-import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade } from '../lib/calculos';
+import { sugerirMaximoProduzivel, verificarViabilidadeProducao, normalizarQuantidade, formatarNumero } from '../lib/calculos';
 import { compressImageToBlob } from '../lib/imageOptimizer';
 import { uploadProdutoImage, deleteProdutoImage, isStorageUrl, isBase64Image, base64ToBlob } from '../lib/imageUpload';
 import { useSortableData } from '../lib/hooks/useSortableData';
@@ -526,7 +526,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                         {p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (
                           <span className={`text-[10px] font-bold ${p.preco_venda > p.custo_producao_calculado ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
                             {p.preco_venda > p.custo_producao_calculado
-                              ? ((1 - p.custo_producao_calculado / p.preco_venda) * 100).toFixed(1) + '%'
+                              ? formatarNumero((1 - p.custo_producao_calculado / p.preco_venda) * 100, 1) + '%'
                               : 'prej.'}
                           </span>
                         ) : (
@@ -593,7 +593,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Prep</span><p className="text-[10px] font-semibold text-amber-950 dark:text-amber-100 font-mono">{p.tempo_producao_minutos}m</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Custo</span><p className="text-[10px] font-semibold text-gray-600 dark:text-amber-200/65 font-mono truncate" title={formatCurrency(p.custo_producao_calculado)}>{formatCurrency(p.custo_producao_calculado)}</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Preço</span><p className={`text-[10px] font-mono truncate ${!p.preco_venda || p.preco_venda <= 0 ? 'text-gray-400 dark:text-amber-100/30' : p.preco_venda < p.custo_producao_calculado ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-emerald-700 dark:text-emerald-450 font-bold'}`}>{!p.preco_venda || p.preco_venda <= 0 ? <span className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1 py-0.5 rounded text-[7px] font-bold">—</span> : formatCurrency(p.preco_venda)}</p></div>
-                      <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Margem</span><p className={`text-[10px] font-mono truncate ${p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500') : 'text-gray-300 dark:text-amber-100/20'}`}>{p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? ((1 - p.custo_producao_calculado / p.preco_venda) * 100).toFixed(1) + '%' : 'prej.') : '—'}</p></div>
+                      <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Margem</span><p className={`text-[10px] font-mono truncate ${p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500') : 'text-gray-300 dark:text-amber-100/20'}`}>{p.preco_venda > 0 && p.custo_producao_calculado > 0 ? (p.preco_venda > p.custo_producao_calculado ? formatarNumero((1 - p.custo_producao_calculado / p.preco_venda) * 100, 1) + '%' : 'prej.') : '—'}</p></div>
                       <div className="flex-1 min-w-[60px]"><span className="text-[8px] text-gray-400 dark:text-amber-100/40 uppercase font-semibold">Cap.</span><p className={`text-[10px] font-bold font-mono truncate ${maxQtd > 5 ? 'text-amber-900 dark:text-amber-200' : maxQtd > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-red-500'}`}>{maxQtd} {store.unidadeSigla(p.unidade_producao_id)}</p></div>
                     </div>
 
@@ -978,7 +978,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                       }`}>
                         {liveCustoProducao > 0 && precoVenda > 0
                           ? precoVenda > liveCustoProducao
-                            ? ((1 - liveCustoProducao / precoVenda) * 100).toFixed(1) + '%'
+                            ? formatarNumero((1 - liveCustoProducao / precoVenda) * 100, 1) + '%'
                             : 'prejuízo'
                           : '—'}
                       </p>

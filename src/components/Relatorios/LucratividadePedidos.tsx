@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../../lib/store';
 import { X, Download, Printer, Filter, TrendingUp, DollarSign, BadgeDollarSign } from 'lucide-react';
-import { normalizarQuantidade } from '../../lib/calculos';
+import { normalizarQuantidade, formatarNumero } from '../../lib/calculos';
 import SelectSearch from '../SelectSearch';
 
 const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -292,7 +292,7 @@ export default function LucratividadePedidos({ store, isOpen, onClose }: Lucrati
               </p>
               {totais.receita > 0 && (
                 <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">
-                  Margem: {((totais.lucro / totais.receita) * 100).toFixed(1)}%
+                  Margem: {formatarNumero((totais.lucro / totais.receita) * 100, 1)}%
                 </p>
               )}
             </div>

@@ -23,7 +23,7 @@ import {
   CheckCircle,
   ShoppingBag
 } from 'lucide-react';
-import { analisarEstoqueParaPedido } from '../lib/calculos';
+import { analisarEstoqueParaPedido, formatarNumero } from '../lib/calculos';
 import RelatorioPedidos from './RelatorioPedidos';
 import SelectSearch from './SelectSearch';
 
@@ -1453,7 +1453,7 @@ ${pagHtml}
                             <p className="font-bold font-sans flex items-center gap-1"><AlertTriangle size={14} /> Produção Complementar Bloqueada por Insumos:</p>
                             <ul className="list-disc list-inside mt-1 font-semibold text-[9px] pl-1">
                               {analise.resumoFaltasMateriais.map((f, fIdx) => (
-                                <li key={fIdx}>{f.materialNome}: faltam <span className="font-mono font-bold">{f.falta.toFixed(2)}{f.unidade}</span></li>
+                                <li key={fIdx}>{f.materialNome}: faltam <span className="font-mono font-bold">{formatarNumero(f.falta)}{f.unidade}</span></li>
                               ))}
                             </ul>
                           </div>
