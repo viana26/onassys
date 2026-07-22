@@ -167,7 +167,9 @@ export class MiniFactoryStore {
   // PERSISTÊNCIA LOCAL (cache)
   // ================================================
   private saveToLocalStorage() {
-    // no-op: Supabase é a fonte de verdade
+    if (this.dadosEmpresa) {
+      localStorage.setItem('oc_dadosEmpresa', JSON.stringify(this.dadosEmpresa));
+    }
   }
 
   private loadFromLocalStorage() {
@@ -1422,6 +1424,7 @@ export class MiniFactoryStore {
       .eq('id', 1);
     if (error) { this.setError(error.message + ' — Contate o supervisor.', 'server'); return false; }
     localStorage.setItem('appName', dados.nome_empresa);
+    this.saveToLocalStorage();
     this.notify();
     return true;
   }
