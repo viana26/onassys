@@ -737,6 +737,27 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 </div>
               </div>
 
+              {loteProdutoId && (() => {
+                const fichas = store.fichas.filter(f => f.produto_id === loteProdutoId);
+                if (fichas.length === 0) return null;
+                return (
+                  <div className="space-y-1">
+                    <label className="text-gray-400 dark:text-amber-100/30 text-[10px] block font-sans">Insumos por unidade</label>
+                    <div className="bg-amber-50/50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-950/35 rounded-lg p-2 space-y-1">
+                      {fichas.map((f, i) => {
+                        const mat = store.materiais.find(m => m.id === f.material_id);
+                        return (
+                          <div key={i} className="flex justify-between text-[10px]">
+                            <span className="text-amber-900 dark:text-amber-200 truncate">{mat?.nome || '—'}</span>
+                            <span className="font-mono text-amber-700 dark:text-amber-300 ml-2 whitespace-nowrap">{f.quantidade_necessaria} {store.unidadeSigla(f.unidade_id)} <span className="text-amber-500 dark:text-amber-400/60 ml-1">({(mat?.custo_unitario || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/{store.unidadeSigla(mat?.unidade_id || 0)})</span></span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium">Observação / Ajustes adicionais</label>
                 <input 

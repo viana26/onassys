@@ -848,9 +848,11 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                           <table className="w-full text-xs">
                             <thead className="sticky top-0 z-10">
                               <tr className="bg-amber-50 dark:bg-[#1c140c] border-b border-amber-200 dark:border-[#2d1e0d]">
-                                <th className="text-left px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-1/2">Ingrediente</th>
-                                <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-20">Custo</th>
-                                <th className="text-right px-2 py-2 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-10"></th>
+                                <th className="text-left px-1.5 py-1.5 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-2/5">Ingrediente</th>
+                                <th className="text-left px-1.5 py-1.5 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-[22%]">Quantidade</th>
+                                <th className="text-right px-1.5 py-1.5 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-[18%]">Custo Unit.</th>
+                                <th className="text-right px-1.5 py-1.5 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-[18%]">Custo</th>
+                                <th className="text-right px-1.5 py-1.5 text-[9px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider w-10"></th>
                               </tr>
                             </thead>
                             <tbody>
@@ -859,7 +861,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                 const usedIds = recipeItems.filter((_, i) => i !== idx).map(r => r.material_id);
                                 return (
                                   <tr key={idx} className="border-b border-amber-100/30 dark:border-[#2d1e0d]/30 hover:bg-amber-50/20 dark:hover:bg-[#1c140c]/20">
-                                    <td className="px-2 py-1.5">
+                                    <td className="px-1.5 py-1">
                                       <SelectSearch value={item.material_id}
                                         onChange={v => handleUpdateRecipeRow(idx, { material_id: v })}
                                         options={store.materiais.filter(m => !usedIds.includes(m.id))
@@ -867,14 +869,29 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                         placeholder="Selecione um ingrediente"
                                         className="w-full" />
                                     </td>
-                                    <td className="px-2 py-1.5 text-right">
+                                    <td className="px-1.5 py-1">
+                                      <div className="flex items-center h-9 border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
+                                        <input type="number" step="0.001" min="0.001" placeholder="0,500"
+                                          value={item.quantidade_necessaria}
+                                          onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
+                                          {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
+                                          className="w-full px-2 py-1 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
+                                        <span className="bg-amber-50 dark:bg-amber-950/40 px-1.5 py-1 text-[9px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
+                                          {store.unidadeSigla(item.unidade_id)}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-1.5 py-1 text-right font-mono text-[10px] text-gray-500 dark:text-amber-100/50">
+                                      {formatCurrency(materialRef?.custo_unitario || 0)}
+                                    </td>
+                                    <td className="px-1.5 py-1 text-right">
                                       <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100">
                                         {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
                                       </span>
                                     </td>
-                                    <td className="px-2 py-1.5 text-right">
+                                    <td className="px-1.5 py-1 text-right">
                                       <button type="button" onClick={() => handleRemoveRecipeRow(idx)}
-                                        className="hover:bg-red-100 dark:hover:bg-red-950/40 p-1 rounded text-red-550 dark:text-red-400 cursor-pointer">
+                                        className="hover:bg-red-100 dark:hover:bg-red-950/40 p-0.5 rounded text-red-550 dark:text-red-400 cursor-pointer">
                                         <Trash2 size={12} />
                                       </button>
                                     </td>
@@ -900,6 +917,19 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
                                   placeholder="Selecione um ingrediente"
                                   className="w-full" />
                                 <div className="flex items-center gap-2">
+                                  <div className="flex-1 flex items-center border border-amber-200 dark:border-[#2d1e0d] rounded overflow-hidden">
+                                    <input type="number" step="0.001" min="0.001" placeholder="0,500"
+                                      value={item.quantidade_necessaria}
+                                      onChange={(e) => handleUpdateRecipeRow(idx, { quantidade_necessaria: Number(e.target.value) })}
+                                      {...useSmartArrowKeys(item.quantidade_necessaria, (v) => handleUpdateRecipeRow(idx, { quantidade_necessaria: v }), 0.001)}
+                                      className="w-full p-1.5 focus:outline-none font-mono text-xs bg-white dark:bg-[#1a1109] text-amber-950 dark:text-amber-100" required />
+                                    <span className="bg-amber-50 dark:bg-amber-950/40 px-2 py-1.5 text-[10px] font-bold text-amber-900 dark:text-amber-200 font-mono whitespace-nowrap">
+                                      {store.unidadeSigla(item.unidade_id)}
+                                    </span>
+                                  </div>
+                                  <span className="font-mono text-[10px] text-gray-500 dark:text-amber-100/50 whitespace-nowrap">
+                                    {formatCurrency(materialRef?.custo_unitario || 0)}
+                                  </span>
                                   <span className="font-mono text-[10px] font-semibold text-amber-900 dark:text-amber-100 whitespace-nowrap">
                                     {formatCurrency(item.quantidade_necessaria * (materialRef?.custo_unitario || 0))}
                                   </span>

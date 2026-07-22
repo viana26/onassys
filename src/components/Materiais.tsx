@@ -820,11 +820,22 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
               </div>
 
               <div className="space-y-1">
+                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
+                <div className="flex items-center gap-2">
+                  <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" className="flex-1" />
+                  <button type="button" onClick={() => setShowNovoFornecedor(true)}
+                    className="w-[120px] h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    + Novo Fornecedor
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
                 <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Unidade *</label>
                 <div className="flex items-center gap-2">
                   <SelectSearch value={String(unidadeId)} onChange={v => setUnidadeId(Number(v))} options={store.unidades.map(u => ({ value: String(u.id), label: `${u.sigla.toUpperCase()} — ${u.nome}` }))} placeholder="Selecione a unidade" className="flex-1" />
                   <button type="button" onClick={() => setShowNovaUnidade(true)}
-                    className="px-3 h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
+                    className="w-[120px] h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
                     + Nova Unidade
                   </button>
                 </div>
@@ -840,17 +851,6 @@ export default function Materiais({ store, onUpdate }: MateriaisProps) {
                   {...useSmartArrowKeys(custoUnitario, setCustoUnitario)}
                   className="w-full h-9 px-3 border border-amber-200 dark:border-[#2d1e0d] rounded-lg focus:outline-none focus:border-amber-400 text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100 font-mono"
                 />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-amber-950 dark:text-amber-100 font-medium font-sans">Fornecedor principal *</label>
-                <div className="flex items-center gap-2">
-                  <SelectSearch value={String(fornecedorId)} onChange={v => setFornecedorId(Number(v))} options={[{ value: '', label: 'Nenhum' }, ...store.fornecedores.filter(f => f.ativo !== false).map(f => ({ value: String(f.id), label: f.nome_fantasia }))]} placeholder="Selecione o fornecedor" className="flex-1" />
-                  <button type="button" onClick={() => setShowNovoFornecedor(true)}
-                    className="px-3 h-9 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap">
-                    + Novo Fornecedor
-                  </button>
-                </div>
               </div>
 
               {!editId && (
