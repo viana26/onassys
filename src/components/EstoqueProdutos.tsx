@@ -55,6 +55,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   // Lote form state
   const [isLoteOpen, setIsLoteOpen] = useState(false);
   const [loteProdutoId, setLoteProdutoId] = useState('');
+  const [loteFromProduct, setLoteFromProduct] = useState(false);
   const [loteQtd, setLoteQtd] = useState<number>(12);
   const [loteObs, setLoteObs] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -177,8 +178,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
   const handleOpenLoteForm = (produtoId?: string) => {
     setErrorMessage(null);
     setIsLoteOpen(true);
-    setLoteProdutoId(produtoId || (store.produtos[0]?.id || ''));
-    setLoteQtd(12);
+    setLoteProdutoId(produtoId || '');
+    setLoteFromProduct(!!produtoId);
+    setLoteQtd(1);
     setLoteObs('');
   };
 
@@ -276,7 +278,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             onClick={() => handleOpenLoteForm()}
             className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-750 dark:hover:bg-emerald-700 shadow-sm text-white text-xs font-semibold font-sans py-2 px-4 rounded-xl transition flex items-center gap-1.5 self-start sm:self-center justify-center cursor-pointer"
           >
-            <Layers size={15} /> Lançar Produção
+            <Layers size={15} /> Produzir
           </button>
         )}
       </div>
@@ -396,19 +398,19 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                               {store.hasPermission('estoque.editar') && (
                                 <button 
                                   onClick={() => handleOpenAdjustStock(ep)}
-                                  className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition cursor-pointer"
+                                  className="flex items-center gap-1 hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition cursor-pointer"
                                   title="Ajustar Estoque"
                                   data-help="estoque-novo"
                                 >
-                                  <Edit3 size={14} />
+                                  <Edit3 size={14} /> <span className="text-[10px] font-semibold">Ajustar</span>
                                 </button>
                               )}
                               {store.hasPermission('estoque.criar') && (
                                 <button 
                                   onClick={() => handleOpenLoteForm(ep.produto_id)}
-                                  className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
+                                  className="flex items-center gap-1 bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] rounded-lg px-2 py-1 text-[10px] font-bold cursor-pointer whitespace-nowrap"
                                 >
-                                  + Forno
+                                  <Layers size={12} /> Produzir
                                 </button>
                               )}
                             </div>
@@ -459,18 +461,18 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                           {store.hasPermission('estoque.editar') && (
                             <button 
                               onClick={() => handleOpenAdjustStock(ep)}
-                              className="hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition text-[10px] font-semibold cursor-pointer"
+                              className="flex items-center gap-1 hover:bg-amber-100 dark:hover:bg-amber-950 text-amber-900 dark:text-amber-200 p-1.5 rounded-lg transition text-[10px] font-semibold cursor-pointer"
                             >
-                              Ajustar
+                              <Edit3 size={12} /> Ajustar
                             </button>
                           )}
                         </div>
                         {store.hasPermission('estoque.criar') && (
                           <button 
                             onClick={() => handleOpenLoteForm(ep.produto_id)}
-                            className="bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
+                            className="flex items-center gap-1 bg-emerald-50 dark:bg-[#152e18] hover:bg-emerald-100 dark:hover:bg-[#1d4221] text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-[#1d4022] px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
                           >
-                            + Forno
+                            <Layers size={12} /> Produzir
                           </button>
                         )}
                       </div>
@@ -649,9 +651,9 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-display font-semibold text-lg text-amber-950 dark:text-amber-100">
-                  Lançar Produção
+                  Produzir
                 </h3>
-                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Assar salgado, preparar brigadeiro e estocar pronto. Descontará automaticamente os insumos necessários.</p>
+                <p className="text-[10px] text-gray-500 dark:text-amber-100/40 mt-0.5">Produzirá o produto e descontará automaticamente os insumos da ficha técnica.</p>
               </div>
               <button 
                 onClick={() => setIsLoteOpen(false)}
@@ -674,8 +676,19 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
 
             <form onSubmit={handleSaveLote} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-amber-950 dark:text-amber-100 font-medium">Selecione o Produto *</label>
-                <SelectSearch value={loteProdutoId} onChange={v => { setLoteProdutoId(v); setErrorMessage(null); }} options={store.produtos.map(p => ({ value: p.id, label: `${p.nome} (Sugerido máx: ${sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})` }))} placeholder="Selecione um produto" />
+                {loteFromProduct ? (
+                  <>
+                    <label className="text-amber-950 dark:text-amber-100 font-medium block">Produto</label>
+                    <p className="font-semibold text-amber-950 dark:text-amber-100 text-sm font-display">
+                      {store.produtos.find(p => p.id === loteProdutoId)?.nome || 'Produto'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <label className="text-amber-950 dark:text-amber-100 font-medium">Selecione o Produto *</label>
+                    <SelectSearch value={loteProdutoId} onChange={v => { setLoteProdutoId(v); setErrorMessage(null); }} options={store.produtos.map(p => ({ value: p.id, label: `${p.nome} (Sugerido máx: ${sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})` }))} placeholder="Selecione um produto" />
+                  </>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
