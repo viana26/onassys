@@ -195,6 +195,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const handleOpenNew = () => {
     cleanupImagePreview();
     setIsFormOpen(true);
+    setFormTab('dados');
     setEditId(null);
     setNome('');
     setCategoriaId(2);
@@ -211,6 +212,7 @@ export default function Produtos({ store, onUpdate }: ProdutosProps) {
   const handleOpenEdit = (p: Produto) => {
     cleanupImagePreview();
     setIsFormOpen(true);
+    setFormTab('dados');
     setEditId(p.id);
     setNome(p.nome);
     setCategoriaId(p.categoria_id);
