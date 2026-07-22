@@ -808,6 +808,8 @@ export class MiniFactoryStore {
   async lancarProducao(itens: Array<{ produto_id: string; quantidade_solicitada: number }>, pedidoId?: string, observacao?: string): Promise<{ success: boolean; error?: string }> {
     const materiaisUsados: Record<string, { material: Material; ficha: FichaTecnicaItem; qtdNeeded: number }[]> = {};
 
+    const itensInsuficientes: string[] = [];
+
     for (const item of itens) {
       const fichas = this.fichas.filter(f => f.produto_id === item.produto_id);
       const produto = this.produtos.find(p => p.id === item.produto_id);
@@ -828,15 +830,16 @@ export class MiniFactoryStore {
 
         if (mat.quantidade_atual < qtdNeeded) {
           const falta = qtdNeeded - mat.quantidade_atual;
-          return {
-            success: false,
-            error: `Insumo insuficiente: "${mat.nome}". Tem ${mat.quantidade_atual.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}, precisa ${qtdNeeded.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}. Compre mais ${falta.toFixed(2)}${this.unidadeSigla(mat.unidade_id)} antes de produzir.`
-          };
+          itensInsuficientes.push(`${mat.nome}: falta ${falta.toFixed(2)}${this.unidadeSigla(mat.unidade_id)}`);
+        } else {
+          if (!materiaisUsados[mat.id]) materiaisUsados[mat.id] = [];
+          materiaisUsados[mat.id].push({ material: mat, ficha, qtdNeeded });
         }
-
-        if (!materiaisUsados[mat.id]) materiaisUsados[mat.id] = [];
-        materiaisUsados[mat.id].push({ material: mat, ficha, qtdNeeded });
       }
+    }
+
+    if (itensInsuficientes.length > 0) {
+      return { success: false, error: itensInsuficientes.join('\n') };
     }
 
     // Consumir insumos (paralelo)

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { MiniFactoryStore } from '../lib/store';
 import { EstoqueProduto, Produto } from '../types';
 import { useSmartArrowKeys } from '../lib/hooks/useSmartArrowKeys';
+import { normalizarQuantidade } from '../lib/calculos';
 import { useSortableData } from '../lib/hooks/useSortableData';
 import { SortButton } from './SortButton';
 import SelectSearch from './SelectSearch';
@@ -182,6 +183,22 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
     setLoteFromProduct(!!produtoId);
     setLoteQtd(1);
     setLoteObs('');
+  };
+
+  const verificarEstoque = (produtoId: string, quantidade: number) => {
+    if (!produtoId || quantidade <= 0) { setErrorMessage(null); return; }
+    const fichas = store.fichas.filter(f => f.produto_id === produtoId);
+    const faltas: string[] = [];
+    for (const ficha of fichas) {
+      const mat = store.materiais.find(m => m.id === ficha.material_id);
+      if (!mat) continue;
+      const qtdNeeded = normalizarQuantidade(ficha.quantidade_necessaria * quantidade, ficha.unidade_id, mat.unidade_id, store.unidades);
+      if (mat.quantidade_atual < qtdNeeded) {
+        const falta = qtdNeeded - mat.quantidade_atual;
+        faltas.push(`${mat.nome}: falta ${falta.toFixed(2)}${store.unidadeSigla(mat.unidade_id)}`);
+      }
+    }
+    setErrorMessage(faltas.length > 0 ? faltas.join('\n') : null);
   };
 
   const handleSaveLote = async (e: React.FormEvent) => {
@@ -668,8 +685,10 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
               <div className="bg-red-50 dark:bg-red-950/25 text-red-800 dark:text-red-300 p-3 rounded-xl border border-red-100 dark:border-red-950/30 flex items-start gap-2 text-xs">
                 <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
                 <div className="space-y-1 min-w-0">
-                  <p className="font-semibold">Insumos Críticos!</p>
-                  <p className="text-[10px] leading-normal">{errorMessage}</p>
+                  <p className="font-semibold">Insumos insuficientes</p>
+                  {errorMessage.split('\n').map((linha, i) => (
+                    <p key={i} className="text-[10px] leading-normal">• {linha}</p>
+                  ))}
                 </div>
               </div>
             )}
@@ -686,7 +705,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 ) : (
                   <>
                     <label className="text-amber-950 dark:text-amber-100 font-medium">Selecione o Produto *</label>
-                    <SelectSearch value={loteProdutoId} onChange={v => { setLoteProdutoId(v); setErrorMessage(null); }} options={store.produtos.map(p => ({ value: p.id, label: `${p.nome} (Sugerido máx: ${sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})` }))} placeholder="Selecione um produto" />
+                    <SelectSearch value={loteProdutoId} onChange={v => { setLoteProdutoId(v); verificarEstoque(v, loteQtd); }} options={store.produtos.map(p => ({ value: p.id, label: `${p.nome} (Sugerido máx: ${sugerirMaximoProduzivel(p.id, store.fichas, store.materiais, store.unidades)})` }))} placeholder="Selecione um produto" />
                   </>
                 )}
               </div>
@@ -699,7 +718,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                       type="number" 
                       min="1"
                       value={loteQtd}
-                      onChange={(e) => setLoteQtd(Number(e.target.value))}
+                      onChange={(e) => { const v = Number(e.target.value); setLoteQtd(v); verificarEstoque(loteProdutoId, v); }}
                       {...useSmartArrowKeys(loteQtd, setLoteQtd, 1)}
                       className="w-full p-2 focus:outline-none font-mono text-xs bg-white dark:bg-[#1c140c] text-amber-950 dark:text-amber-100"
                       required
@@ -711,7 +730,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                 </div>
 
                 <div className="space-y-1 col-span-1">
-                  <label className="text-gray-400 dark:text-amber-100/30 text-[10px] block font-sans">Cozinha Capacidade Máx.</label>
+                  <label className="text-gray-400 dark:text-amber-100/30 text-[10px] block font-sans">Capacidade máx.</label>
                   <p className="p-2 bg-amber-50/50 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-950/35 rounded-lg text-center font-mono font-bold text-amber-900 dark:text-amber-200">
                     {sugerirMaximoProduzivel(loteProdutoId, store.fichas, store.materiais, store.unidades)} unidades
                   </p>
@@ -741,7 +760,7 @@ export default function EstoqueProdutos({ store, onUpdate }: EstoqueProdutosProp
                   type="submit"
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-800 dark:hover:bg-emerald-750 text-white font-semibold py-2.5 rounded-xl text-center shadow"
                 >
-                  Registrar Entrada Produção
+                  Registrar produção
                 </button>
               </div>
             </form>
