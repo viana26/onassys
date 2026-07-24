@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 # Cancela execuções em andamento caso ocorram novos pushes seguidos na branch main
 concurrency:
