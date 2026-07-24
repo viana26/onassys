@@ -1,7 +1,14 @@
 name: Deploy to GitHub Pages
+
 on:
   push:
     branches: [main]
+
+# Cancela execuções em andamento caso ocorram novos pushes seguidos na branch main
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -9,25 +16,42 @@ jobs:
       contents: read
       pages: write
       id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js (v20) com cache npm
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run build
+          cache: "npm"
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build da aplicação (Vite)
+        run: npm run build
         env:
-          VITE_BASE_PATH: /onassys/
+          # Detecta automaticamente o nome do repositório (funciona para o seu repo e para qualquer fork)
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.VITE_SUPABASE_SERVICE_ROLE_KEY }}
-          VITE_SUPABASE_BUCKET: ${{ secrets.VITE_SUPABASE_BUCKET }}
-      - uses: actions/configure-pages@v4
-      - uses: actions/upload-pages-artifact@v3
+          VITE_SUPABASE_BUCKET: ${{ secrets.VITE_SUPABASE_BUCKET || 'imagem_produto' }}
+
+      - name: Upload de artefato do build
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-      - id: deployment
+
+      - name: Deploy no GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4

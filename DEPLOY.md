@@ -158,15 +158,20 @@ Adicione em **Site configuration → Environment variables**:
 
 ### Configuração de Secrets
 Em **Settings → Secrets and variables → Actions → New repository secret**, adicione:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_SUPABASE_SERVICE_ROLE_KEY`
-- `VITE_SUPABASE_BUCKET`
+- `VITE_SUPABASE_URL`: URL do seu projeto Supabase.
+- `VITE_SUPABASE_ANON_KEY`: Anon key pública do Supabase.
+- `VITE_SUPABASE_SERVICE_ROLE_KEY`: Service role key privada.
+- `VITE_SUPABASE_BUCKET`: (Opcional) `imagem_produto`.
 
 ### Ativar GitHub Pages
-1. **Settings → Pages**
-2. Em **Source**, escolha **GitHub Actions**
+1. Vá em **Settings → Pages** no GitHub.
+2. Em **Source**, escolha **GitHub Actions**.
 3. O workflow em `.github/workflows/deploy.yml` compilará a aplicação e publicará no GitHub Pages a cada push na `main`.
+
+### 🍴 Suporte Automático para Forks
+Se qualquer pessoa fizer um **Fork** deste projeto para a própria conta do GitHub:
+- O workflow `.github/workflows/deploy.yml` detecta dinamicamente o nome do repositório através de `/${{ github.event.repository.name }}/`.
+- Não é necessário alterar nenhuma linha de código nem criar secret para a rota base. A pessoa só precisa cadastrar as **Secrets do Supabase dela** e ativar o GitHub Pages.
 
 ---
 
